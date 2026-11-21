@@ -89,6 +89,14 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: core
+      - name: 安装 Linux 系统依赖
+        # core 依赖 libdbus 等系统库（屏幕捕获/输入/剪贴板），Ubuntu runner 默认没有
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            pkg-config libdbus-1-dev libx11-dev libxcb1-dev libxkbcommon-dev \
+            libwayland-dev libpipewire-0.3-dev libgbm-dev libdrm-dev
       - name: 构建 cdylib
         run: cargo build --release --manifest-path core/Cargo.toml -p er-ffi
       - name: 打包
