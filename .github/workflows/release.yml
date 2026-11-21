@@ -24,8 +24,8 @@ jobs:
     outputs:
       version: ${{ steps.v.outputs.version }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: '20'
       - id: v
@@ -47,7 +47,7 @@ jobs:
     needs: verify
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
@@ -72,7 +72,7 @@ jobs:
             > "$out/BUILD_INFO.txt"
           tar -czf "dist/easyremote-client-web-${V}.tar.gz" -C dist "easyremote-client-web-${V}"
           ls -lh dist
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: client-web
           path: dist/easyremote-client-web-*.tar.gz
@@ -84,7 +84,7 @@ jobs:
     needs: verify
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
@@ -132,7 +132,7 @@ jobs:
           base="$(basename "$out")"
           ( cd dist && ditto -c -k --sequesterRsrc --keepParent "$base" "${base}.zip" )
           ls -lh dist
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: client-macos
           path: dist/easyremote-client-macos-*.zip
@@ -152,8 +152,8 @@ jobs:
           - { goos: darwin,  goarch: arm64 }
           - { goos: windows, goarch: amd64 }
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
           go-version: ${{ env.GO_VERSION }}
           cache-dependency-path: server/go.sum
@@ -173,7 +173,7 @@ jobs:
               go build -trimpath -ldflags "-s -w" -o "../$out/$cmd$ext" "./cmd/$cmd"
           done
           tar -czf "../$out.tar.gz" -C ../dist "$(basename "$out")"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: server-${{ matrix.goos }}-${{ matrix.goarch }}
           path: dist/easyremote-server-*.tar.gz
@@ -185,10 +185,10 @@ jobs:
     needs: [verify, client-web, client-macos, server]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: artifacts
       - name: 收集产物与校验和
