@@ -152,17 +152,29 @@ npm run dev
 bash scripts/gate.sh     # 9 步：gofmt / vet+test / tsc / 生成物 / 路由 / 禁止模式 / 版本 / 信封
 ```
 
+### 分支模型
+
+```
+feat/xxx ──PR──► dev ──PR──► main ──tag vX.Y.Z──► Release
+```
+
+| 分支 | 说明 |
+|---|---|
+| `dev` | **默认分支**，日常开发都提交到这里 |
+| `main` | 发布分支，受保护：必须 PR + 审查 + CI 绿才能合入 |
+
 ### 贡献流程
 
 ```bash
-git switch -c feat/server-xxx
+git switch dev && git pull
+git switch -c feat/server-xxx           # 从 dev 切出
 # ... 改动 ...
 bash scripts/gate.sh                    # 必须 PASS
 git commit -m "feat(server): 说明"      # 标题遵循 <type>(<scope>): <subject>
-git push -u origin feat/server-xxx      # 开 PR，CI 自动跑
+gh pr create --base dev                 # PR 合入 dev，CI 自动跑
 ```
 
-PR 标题须为 `<type>(<scope>): <subject>`，自查清单需勾选；发布走 `node scripts/check-version.mjs --set` + `git tag vX.Y.Z`。详见 [工作流说明](docs/github-workflows.md)。
+发布：把 `dev` 合入 `main` 后打 Tag（`tag.yml` 校验 Tag 必须在 main 历史上）。完整流程见 [工作流说明](docs/github-workflows.md)。
 
 ## 文档
 

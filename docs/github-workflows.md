@@ -8,13 +8,62 @@
 
 | 文件 | 触发 | 作用 |
 |---|---|---|
-| [`workflows/ci.yml`](workflows/ci.yml) | push main / PR / 手动 | 全量构建与测试：契约闸门、Go、Rust、React、Flutter 五个 job |
+| [`workflows/ci.yml`](workflows/ci.yml) | push main·dev / PR 到 main·dev / 手动 | 全量构建与测试：契约闸门、Go、Rust、React、Flutter 五个 job |
 | [`workflows/pr.yml`](workflows/pr.yml) | PR 打开/编辑/更新 | PR 标题语义化、改动规模提醒、自查清单、自动打标签 |
 | [`workflows/tag.yml`](workflows/tag.yml) | push 任意 Tag | Tag 必须符合语义化版本，且与包版本一致、位于 main 历史 |
 | [`workflows/release.yml`](workflows/release.yml) | push `v*.*.*` | 跨平台打包并发布 GitHub Release（附 SHA256SUMS） |
-| [`workflows/codeql.yml`](workflows/codeql.yml) | push / PR / 每周一 | Go 与 JS/TS 静态安全分析 |
+| [`workflows/codeql.yml`](workflows/codeql.yml) | push main·dev / PR 到 main·dev / 每周一 | Go 与 JS/TS 静态安全分析 |
 
 辅助文件：[`dependabot.yml`](dependabot.yml)（依赖更新）、[`labeler.yml`](labeler.yml)（路径→标签映射）、[`CODEOWNERS`](CODEOWNERS)、Issue/PR 模板。
+
+---
+
+## 分支模型
+
+```
+feat/xxx ──PR──► dev ──PR──► main ──tag v0.3.0──► Release
+                  ▲            ▲
+              日常开发      发布分支（只进已验收代码）
+```
+
+| 分支 | 用途 | 保护规则 |
+|---|---|---|
+| `dev` | **默认分支**，日常开发与集成都落在这里 | 禁止强推、禁止删除；不强制 PR 审查（方便快速迭代） |
+| `main` | 发布分支，只接收从 `dev` 合入的已验证代码 | 禁止强推与删除、**必须开 PR + 1 人审查**、**必须 CI「CI 结果汇总」通过**、必须解决对话 |
+| `feat/*` `fix/*` | 功能/修复分支，从 `dev` 切出 | 无 |
+
+### 日常流程
+
+```bash
+# 1. 从 dev 切功能分支
+git switch dev && git pull
+git switch -c feat/server-xxx
+
+# 2. 开发 + 本地过闸门
+bash scripts/gate.sh
+
+# 3. 提交并推送（CI 自动跑）
+git commit -m "feat(server): 说明"
+git push -u origin feat/server-xxx
+
+# 4. 开 PR 合入 dev（可自行合并）
+gh pr create --base dev --title "feat(server): 说明"
+
+# 5. 发布时把 dev 合入 main（需审查 + CI 绿）
+gh pr create --base main --head dev --title "chore(release): v0.3.0"
+```
+
+### 发布流程（在 main 上打 Tag）
+
+```bash
+git switch main && git pull
+node scripts/check-version.mjs --set 0.3.0    # 四处版本同步
+bash scripts/gate.sh                          # 必须 PASS
+git commit -am "chore(release): v0.3.0" && git push
+git tag v0.3.0 && git push origin v0.3.0      # 触发 release.yml
+```
+
+> **注意**：`tag.yml` 会校验 Tag 必须位于 `main` 历史中，因此 Tag **只能打在 main 的提交上**，不能在 dev 上打。
 
 ---
 
