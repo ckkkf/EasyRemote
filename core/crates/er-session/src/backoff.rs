@@ -20,14 +20,24 @@ pub struct BackoffPolicy {
 
 impl Default for BackoffPolicy {
     fn default() -> Self {
-        Self { base_ms: 1000, factor: 2, max_ms: 60_000, max_attempts: 0 }
+        Self {
+            base_ms: 1000,
+            factor: 2,
+            max_ms: 60_000,
+            max_attempts: 0,
+        }
     }
 }
 
 impl BackoffPolicy {
     /// 速通策略：测试用，避免真等 60 秒。
     pub fn fast() -> Self {
-        Self { base_ms: 10, factor: 2, max_ms: 200, max_attempts: 8 }
+        Self {
+            base_ms: 10,
+            factor: 2,
+            max_ms: 200,
+            max_attempts: 8,
+        }
     }
 
     /// 第 attempt 次重试（从 0 开始）应等待多久。
@@ -99,7 +109,10 @@ mod tests {
     fn delay_is_capped() {
         let p = BackoffPolicy::default();
         for attempt in 0..50 {
-            assert!(p.delay(attempt) <= Duration::from_secs(60), "attempt {attempt}");
+            assert!(
+                p.delay(attempt) <= Duration::from_secs(60),
+                "attempt {attempt}"
+            );
         }
     }
 
@@ -121,13 +134,19 @@ mod tests {
         assert!(p.should_retry(7));
         assert!(!p.should_retry(8));
 
-        let unlimited = BackoffPolicy { max_attempts: 0, ..BackoffPolicy::fast() };
+        let unlimited = BackoffPolicy {
+            max_attempts: 0,
+            ..BackoffPolicy::fast()
+        };
         assert!(unlimited.should_retry(1000));
     }
 
     #[test]
     fn zero_base_means_no_wait() {
-        let p = BackoffPolicy { base_ms: 0, ..BackoffPolicy::default() };
+        let p = BackoffPolicy {
+            base_ms: 0,
+            ..BackoffPolicy::default()
+        };
         assert_eq!(p.delay(5), Duration::ZERO);
     }
 

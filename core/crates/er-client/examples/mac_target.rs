@@ -39,7 +39,9 @@ fn real_main() {
     use er_input::InputEvent;
 
     fn arg(i: usize, default: &str) -> String {
-        std::env::args().nth(i).unwrap_or_else(|| default.to_string())
+        std::env::args()
+            .nth(i)
+            .unwrap_or_else(|| default.to_string())
     }
 
     /// 采集帧是否"有画面"：全黑/全零 = 没拿到真实屏幕（屏录权限被拒的典型表现）。
@@ -53,7 +55,11 @@ fn real_main() {
                 nonzero += 1;
             }
         }
-        let ratio = if total == 0 { 0.0 } else { nonzero as f64 / total as f64 };
+        let ratio = if total == 0 {
+            0.0
+        } else {
+            nonzero as f64 / total as f64
+        };
         (ratio > 0.01, nonzero)
     }
 
@@ -69,7 +75,10 @@ fn real_main() {
 
     let t_start = Instant::now();
     let disp = MacDisplay::main();
-    println!("MAC: gateway={base} relay={relay_addr} signal={signal} pid={}", std::process::id());
+    println!(
+        "MAC: gateway={base} relay={relay_addr} signal={signal} pid={}",
+        std::process::id()
+    );
     println!(
         "MAC: display pixels={}x{} points={}x{} origin=({},{}) scale={}",
         disp.pixel_width,
@@ -101,10 +110,16 @@ fn real_main() {
         }
         Err(e) => (false, format!("open_primary failed: {e}")),
     };
-    println!("MAC: permission_screen={} ({screen_detail})", if screen_ok { "ok" } else { "denied" });
+    println!(
+        "MAC: permission_screen={} ({screen_detail})",
+        if screen_ok { "ok" } else { "denied" }
+    );
 
     let acc_baseline = MacInjector::cursor_pixel();
-    println!("MAC: cursor_baseline_pixel={:?} (读不到 = 没有输入监控/辅助功能会话)", acc_baseline);
+    println!(
+        "MAC: cursor_baseline_pixel={:?} (读不到 = 没有输入监控/辅助功能会话)",
+        acc_baseline
+    );
 
     // ---------- ② 开会话 ----------
     let target = TargetAgent::start(&base, &phone, &sms, relay_addr).expect("target start");
@@ -120,12 +135,19 @@ fn real_main() {
     // 真实产品里这两个数字显示在被控端屏幕上；跨机编排靠文件传递
     std::fs::write(
         &hello_file,
-        format!("device_id={}\ndevice_code={}\ncaptcha={}\n", target.device_id(), code, captcha),
+        format!(
+            "device_id={}\ndevice_code={}\ncaptcha={}\n",
+            target.device_id(),
+            code,
+            captcha
+        ),
     )
     .expect("write hello");
 
     println!("MAC: waiting_for_signalling ...");
-    let session_id = target.wait_for_session(&signal, Duration::from_secs(240)).expect("signalling");
+    let session_id = target
+        .wait_for_session(&signal, Duration::from_secs(240))
+        .expect("signalling");
     println!("MAC: session={session_id}");
     target.consent(&session_id).expect("consent");
     println!("MAC: consent=authorized");
@@ -138,12 +160,16 @@ fn real_main() {
     // 这里等到 2.5s（与主控 announce 的时序对称），把「谁先到」的竞态消掉。
     std::thread::sleep(Duration::from_millis(2500));
     target.announce(&mut relay, &msg).expect("announce");
-    target.finish(&mut relay, &mut crypto, &session_id).expect("handshake");
+    target
+        .finish(&mut relay, &mut crypto, &session_id)
+        .expect("handshake");
     println!("MAC: handshake_verified (ed25519 + x25519)");
 
     // ---------- ③ 收主控发来的帧并解码 ----------
     // 收不到帧也不 panic：打印 0 帧，让 VERDICT 判 FAIL，日志可断言（便于跨机排障）
-    let got = target.recv_frames(&mut relay, &mut crypto, in_frames).unwrap_or_default();
+    let got = target
+        .recv_frames(&mut relay, &mut crypto, in_frames)
+        .unwrap_or_default();
     if got.is_empty() {
         println!("MAC: frames_received=0 (主控侧没有发出可解码的帧)");
     } else {
@@ -158,7 +184,9 @@ fn real_main() {
 
     // ---------- ④ 采集本机真实屏幕并发给主控 ----------
     let t0 = Instant::now();
-    let sizes = target.send_frames(&mut relay, &mut crypto, out_frames).expect("send frames");
+    let sizes = target
+        .send_frames(&mut relay, &mut crypto, out_frames)
+        .expect("send frames");
     let encode_ms = t0.elapsed().as_millis();
     println!(
         "MAC: frames_sent={} bytes_total={} ms={}",
@@ -181,7 +209,13 @@ fn real_main() {
     // ---------- ⑥ 收主控输入并真注入 ----------
     let mut injector = MacInjector::new(true);
     let injected: Vec<InputEvent> = target
-        .recv_input(&mut relay, &mut crypto, &mut injector, want_input, Duration::from_secs(120))
+        .recv_input(
+            &mut relay,
+            &mut crypto,
+            &mut injector,
+            want_input,
+            Duration::from_secs(120),
+        )
         .expect("recv input");
     std::thread::sleep(Duration::from_millis(250));
     let after = MacInjector::cursor_pixel();
@@ -193,7 +227,11 @@ fn real_main() {
             _ => None,
         })
         .collect();
-    println!("MAC: input_events_received={} kinds={:?}", injected.len(), injected);
+    println!(
+        "MAC: input_events_received={} kinds={:?}",
+        injected.len(),
+        injected
+    );
     println!("MAC: injected_moves={:?}", moves);
     println!("MAC: injected_mapped={}", injector.mapped_moves());
     println!("MAC: cursor_after={:?}", after);
@@ -213,7 +251,10 @@ fn real_main() {
         after,
         delta
     );
-    println!("MAC: cursor_stable_before_inject={}", baseline.is_some() && baseline == baseline2);
+    println!(
+        "MAC: cursor_stable_before_inject={}",
+        baseline.is_some() && baseline == baseline2
+    );
 
     println!(
         "MAC: RESULT screen_permission={} frames_received={} frames_sent={} input_events={} moved_to_target={} elapsed_ms={}",

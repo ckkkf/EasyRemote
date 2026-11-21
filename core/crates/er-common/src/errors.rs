@@ -18,7 +18,10 @@ pub struct ErError {
 
 impl ErError {
     pub fn new(code: RawCode, detail: impl Into<String>) -> Self {
-        Self { code, detail: detail.into() }
+        Self {
+            code,
+            detail: detail.into(),
+        }
     }
 
     pub fn name(&self) -> &'static str {

@@ -27,15 +27,20 @@ pub unsafe extern "C" fn er_host_prepare(
     phone: *const c_char,
     sms_code: *const c_char,
 ) -> *mut c_char {
-    let (Some(gw), Some(relay), Some(phone), Some(code)) =
-        (cstr(gateway_url), cstr(relay_addr), cstr(phone), cstr(sms_code))
-    else {
+    let (Some(gw), Some(relay), Some(phone), Some(code)) = (
+        cstr(gateway_url),
+        cstr(relay_addr),
+        cstr(phone),
+        cstr(sms_code),
+    ) else {
         return into_c_string("{\"ok\":false,\"error\":\"null argument\"}");
     };
     let r = catch_unwind(AssertUnwindSafe(|| {
         let addr = match relay.parse() {
             Ok(a) => a,
-            Err(e) => return into_c_string(&format!("{{\"ok\":false,\"error\":\"bad relay: {e}\"}}")),
+            Err(e) => {
+                return into_c_string(&format!("{{\"ok\":false,\"error\":\"bad relay: {e}\"}}"))
+            }
         };
         match prepare_host(&gw, addr, &phone, &code) {
             Ok((host_id, device_code, captcha)) => into_c_string(&format!(
@@ -44,7 +49,10 @@ pub unsafe extern "C" fn er_host_prepare(
                 escape_json(&device_code),
                 escape_json(&captcha)
             )),
-            Err(e) => into_c_string(&format!("{{\"ok\":false,\"error\":\"{}\"}}", escape_json(&e))),
+            Err(e) => into_c_string(&format!(
+                "{{\"ok\":false,\"error\":\"{}\"}}",
+                escape_json(&e)
+            )),
         }
     }));
     r.unwrap_or_else(|_| into_c_string("{\"ok\":false,\"error\":\"panic\"}"))
@@ -65,7 +73,12 @@ pub unsafe extern "C" fn er_host_serve(
         return into_c_string("{\"ok\":false,\"error\":\"null argument\"}");
     };
     let r = catch_unwind(AssertUnwindSafe(|| {
-        match serve_host(&hid, &sig, frames.max(1) as usize, timeout_secs.max(1) as u64) {
+        match serve_host(
+            &hid,
+            &sig,
+            frames.max(1) as usize,
+            timeout_secs.max(1) as u64,
+        ) {
             Ok(res) => into_c_string(&format!(
                 "{{\"ok\":true,\"session_id\":\"{}\",\"frames\":{},\"width\":{},\"height\":{}}}",
                 escape_json(&res.session_id),
@@ -73,7 +86,10 @@ pub unsafe extern "C" fn er_host_serve(
                 res.frames.first().map(|f| f.width).unwrap_or(0),
                 res.frames.first().map(|f| f.height).unwrap_or(0)
             )),
-            Err(e) => into_c_string(&format!("{{\"ok\":false,\"error\":\"{}\"}}", escape_json(&e))),
+            Err(e) => into_c_string(&format!(
+                "{{\"ok\":false,\"error\":\"{}\"}}",
+                escape_json(&e)
+            )),
         }
     }));
     r.unwrap_or_else(|_| into_c_string("{\"ok\":false,\"error\":\"panic\"}"))
@@ -106,14 +122,19 @@ pub unsafe extern "C" fn er_device_connect(
     let r = catch_unwind(AssertUnwindSafe(|| {
         let addr = match relay.parse() {
             Ok(a) => a,
-            Err(e) => return into_c_string(&format!("{{\"ok\":false,\"error\":\"bad relay: {e}\"}}")),
+            Err(e) => {
+                return into_c_string(&format!("{{\"ok\":false,\"error\":\"bad relay: {e}\"}}"))
+            }
         };
         match connect_device(&gw, addr, &phone, &code, &cap, &sms, frames.max(1) as usize) {
             Ok(res) => into_c_string(&format!(
                 "{{\"ok\":true,\"session_id\":\"{}\"}}",
                 escape_json(&res.session_id)
             )),
-            Err(e) => into_c_string(&format!("{{\"ok\":false,\"error\":\"{}\"}}", escape_json(&e))),
+            Err(e) => into_c_string(&format!(
+                "{{\"ok\":false,\"error\":\"{}\"}}",
+                escape_json(&e)
+            )),
         }
     }));
     r.unwrap_or_else(|_| into_c_string("{\"ok\":false,\"error\":\"panic\"}"))

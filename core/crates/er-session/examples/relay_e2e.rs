@@ -23,8 +23,10 @@ fn main() {
     let host = RelayClient::new(relay, sid, "devA").expect("host client");
     let mut ctrl = RelayClient::new(relay, sid, "devB").expect("ctrl client");
 
-    host.register_with_secret(SECRET, "devB", 600).expect("host register");
-    ctrl.register_with_secret(SECRET, "devA", 600).expect("ctrl register");
+    host.register_with_secret(SECRET, "devB", 600)
+        .expect("host register");
+    ctrl.register_with_secret(SECRET, "devA", 600)
+        .expect("ctrl register");
     std::thread::sleep(Duration::from_millis(400));
 
     // 采集 + 编码
@@ -65,7 +67,12 @@ fn main() {
             return;
         }
     };
-    println!("source {}x{}, encoded {} bytes", frame.width, frame.height, encoded.len());
+    println!(
+        "source {}x{}, encoded {} bytes",
+        frame.width,
+        frame.height,
+        encoded.len()
+    );
 
     // 发送（自动分片）
     let mut host = host;
@@ -101,7 +108,10 @@ fn main() {
         Ok(Some((w, h, rgb))) => {
             println!("decoded {w}x{h}, {} rgb bytes", rgb.len());
             if w != frame.width as usize || h != frame.height as usize {
-                println!("FAIL: dimension mismatch ({w}x{h} vs {}x{})", frame.width, frame.height);
+                println!(
+                    "FAIL: dimension mismatch ({w}x{h} vs {}x{})",
+                    frame.width, frame.height
+                );
                 std::process::exit(1);
             }
             if !rgb.iter().any(|b| *b != 0) {

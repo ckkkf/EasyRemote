@@ -17,7 +17,12 @@ const RELAY_BIN: &str = "/tmp/er-relay-full";
 
 fn spawn_relay(port: u16) -> Child {
     Command::new(RELAY_BIN)
-        .args(["-addr", &format!(":{port}"), "-node-addr", &format!("127.0.0.1:{port}")])
+        .args([
+            "-addr",
+            &format!(":{port}"),
+            "-node-addr",
+            &format!("127.0.0.1:{port}"),
+        ])
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .spawn()
@@ -72,11 +77,18 @@ fn main() {
     let mut child = spawn_relay(port);
     std::thread::sleep(Duration::from_millis(700));
 
-    let policy = BackoffPolicy { base_ms: 200, factor: 2, max_ms: 2000, max_attempts: 12 };
+    let policy = BackoffPolicy {
+        base_ms: 200,
+        factor: 2,
+        max_ms: 2000,
+        max_attempts: 12,
+    };
     let (_, retries) = retry_until(policy, Duration::from_secs(15), || {
         // 每轮重连：重新注册两端并尝试一次收发
-        a.register_with_secret(SECRET, "devB", 600).map_err(|e| e.to_string())?;
-        b.register_with_secret(SECRET, "devA", 600).map_err(|e| e.to_string())?;
+        a.register_with_secret(SECRET, "devB", 600)
+            .map_err(|e| e.to_string())?;
+        b.register_with_secret(SECRET, "devA", 600)
+            .map_err(|e| e.to_string())?;
         std::thread::sleep(Duration::from_millis(50));
         if exchange(&mut a, &mut b, b"after-restart", Duration::from_secs(1)) {
             Ok(())

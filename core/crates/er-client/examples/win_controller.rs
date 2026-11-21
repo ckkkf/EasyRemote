@@ -35,14 +35,27 @@ fn real_main() {
     use er_session::relay_client::RelayClient;
 
     fn arg(i: usize, default: &str) -> String {
-        std::env::args().nth(i).unwrap_or_else(|| default.to_string())
+        std::env::args()
+            .nth(i)
+            .unwrap_or_else(|| default.to_string())
     }
 
     /// 合成渐变帧 → H.264 → 加密 → 中继。
     /// 用于 Session 0（ssh）拿不到真实桌面的场景；链路与真实采集完全一致。
-    fn send_synthetic(relay: &mut RelayClient, crypto: &mut CryptoSession, count: usize) -> Vec<usize> {
+    fn send_synthetic(
+        relay: &mut RelayClient,
+        crypto: &mut CryptoSession,
+        count: usize,
+    ) -> Vec<usize> {
         let (w, h) = (320u32, 240u32);
-        let cfg = EncodeConfig { width: w, height: h, fps: 60, bitrate_kbps: 1000, gop: 60, bframes: 0 };
+        let cfg = EncodeConfig {
+            width: w,
+            height: h,
+            fps: 60,
+            bitrate_kbps: 1000,
+            gop: 60,
+            bframes: 0,
+        };
         let mut codec = create_encoder(cfg).expect("codec");
         let mut frame = vec![0u8; (w * h * 4) as usize];
         let mut sizes = Vec::with_capacity(count);
@@ -86,7 +99,10 @@ fn real_main() {
     let move_y: i32 = arg(9, "300").parse().expect("move_y");
 
     let t_start = Instant::now();
-    println!("WIN: gateway={base} relay={relay_addr} pid={}", std::process::id());
+    println!(
+        "WIN: gateway={base} relay={relay_addr} pid={}",
+        std::process::id()
+    );
 
     // 设备码/验证码由被控端写出（真实产品里显示在被控端屏幕上）
     let deadline = Instant::now() + Duration::from_secs(180);
@@ -114,7 +130,9 @@ fn real_main() {
     println!("WIN: device_code={code} captcha={captcha}");
 
     let ctrl = ControllerAgent::start(&base, &phone, &sms, relay_addr).expect("ctrl start");
-    let session_id = ctrl.request_session(&code, &captcha).expect("request session");
+    let session_id = ctrl
+        .request_session(&code, &captcha)
+        .expect("request session");
     println!("WIN: session={session_id}");
     // 等被控端 consent 落地（真实产品里用户点「接受」也要时间），否则取票据会被拒
     std::thread::sleep(Duration::from_millis(1500));
@@ -123,7 +141,8 @@ fn real_main() {
     println!("WIN: relay_registered local={}", relay.local_addr());
     std::thread::sleep(Duration::from_millis(2500));
     ctrl.announce(&mut relay, &msg).expect("announce");
-    ctrl.finish(&mut relay, &mut crypto, &keys, &session_id).expect("handshake");
+    ctrl.finish(&mut relay, &mut crypto, &keys, &session_id)
+        .expect("handshake");
     println!("WIN: handshake_verified (ed25519 + x25519)");
 
     // ---------- ① 发给被控端视频帧 ----------
@@ -165,16 +184,29 @@ fn real_main() {
 
     // ---------- ② 立刻发输入：被控端收完帧就进 recv_input，不能让它在那边空等 ----------
     let events = vec![
-        InputEvent::MouseMove { x: move_x, y: move_y },
-        InputEvent::MouseMove { x: move_x - 37, y: move_y + 21 },
-        InputEvent::MouseMove { x: move_x, y: move_y },
+        InputEvent::MouseMove {
+            x: move_x,
+            y: move_y,
+        },
+        InputEvent::MouseMove {
+            x: move_x - 37,
+            y: move_y + 21,
+        },
+        InputEvent::MouseMove {
+            x: move_x,
+            y: move_y,
+        },
     ];
-    let n = ctrl.send_input(&mut relay, &mut crypto, &events).expect("send input");
+    let n = ctrl
+        .send_input(&mut relay, &mut crypto, &events)
+        .expect("send input");
     println!("WIN: input_events_sent={n} target=({move_x},{move_y}) sent_before_recv=true");
 
     // ---------- ③ 收被控端（macOS）真实屏幕帧并解码 ----------
     // 收不到帧时不要 panic：打印 0 帧并让 VERDICT 判 FAIL，日志才完整可断言。
-    let got = ctrl.recv_frames(&mut relay, &mut crypto, in_frames).unwrap_or_default();
+    let got = ctrl
+        .recv_frames(&mut relay, &mut crypto, in_frames)
+        .unwrap_or_default();
     if got.is_empty() {
         println!("WIN: frames_from_target=0 (mac 侧没有发出可解码的帧)");
     } else {

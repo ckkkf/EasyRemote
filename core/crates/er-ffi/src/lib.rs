@@ -94,7 +94,10 @@ pub unsafe extern "C" fn er_grab_and_encode(
         match enc.capture_and_encode(capture) {
             Ok(Some(data)) => {
                 if data.len() > cap {
-                    set_err(s, format!("buffer too small: need {}, have {cap}", data.len()));
+                    set_err(
+                        s,
+                        format!("buffer too small: need {}, have {cap}", data.len()),
+                    );
                     return ER_ERR_BUFFER_SMALL;
                 }
                 ptr::copy_nonoverlapping(data.as_ptr(), out_buf, data.len());
@@ -127,7 +130,10 @@ pub unsafe extern "C" fn er_encoder_backend(sess: *mut Session) -> *mut c_char {
             return String::new();
         }
         let s = &*sess;
-        s.enc.as_ref().map(|e| e.backend().to_string()).unwrap_or_default()
+        s.enc
+            .as_ref()
+            .map(|e| e.backend().to_string())
+            .unwrap_or_default()
     }))
     .unwrap_or_default();
     into_c_string(&name)
@@ -138,7 +144,10 @@ pub unsafe extern "C" fn er_encoder_backend(sess: *mut Session) -> *mut c_char {
 /// 判定标准是**真能开出一次 NVENC 会话**，不是"看见显卡名字"。
 #[no_mangle]
 pub extern "C" fn er_hardware_encoder_available() -> c_int {
-    catch_unwind(AssertUnwindSafe(|| er_codec::hardware_encoder_available() as c_int)).unwrap_or(0)
+    catch_unwind(AssertUnwindSafe(|| {
+        er_codec::hardware_encoder_available() as c_int
+    }))
+    .unwrap_or(0)
 }
 
 /// 当前会话实际使用的编码器名："nvenc" / "software" / ""（无会话）。
@@ -166,7 +175,6 @@ pub unsafe extern "C" fn er_encoder_kind(sess: *mut Session) -> *mut c_char {
     .unwrap_or_default();
     into_c_string(&name)
 }
-
 
 /// 版本号。
 #[no_mangle]
@@ -258,11 +266,7 @@ pub unsafe extern "C" fn er_screen_size(
 /// # Safety
 /// buf 必须至少 cap 字节可写。
 #[no_mangle]
-pub unsafe extern "C" fn er_grab_frame(
-    sess: *mut Session,
-    buf: *mut u8,
-    cap: usize,
-) -> c_int {
+pub unsafe extern "C" fn er_grab_frame(sess: *mut Session, buf: *mut u8, cap: usize) -> c_int {
     if sess.is_null() || (buf.is_null() && cap > 0) {
         return ER_ERR_NULL;
     }
@@ -357,7 +361,10 @@ pub unsafe extern "C" fn er_encode_last_frame(
         match enc.encode_bgra(frame.ts_ms, &frame.data) {
             Ok(data) => {
                 if data.len() > cap {
-                    set_err(s, format!("buffer too small: need {}, have {cap}", data.len()));
+                    set_err(
+                        s,
+                        format!("buffer too small: need {}, have {cap}", data.len()),
+                    );
                     return ER_ERR_BUFFER_SMALL;
                 }
                 ptr::copy_nonoverlapping(data.as_ptr(), out_buf, data.len());
@@ -408,7 +415,11 @@ pub unsafe extern "C" fn er_abr_update(
     }
     let r = catch_unwind(AssertUnwindSafe(|| {
         let s = &mut *sess;
-        let d = s.abr.on_feedback(&LinkFeedback { loss_pct, rtt_ms, queue_ms });
+        let d = s.abr.on_feedback(&LinkFeedback {
+            loss_pct,
+            rtt_ms,
+            queue_ms,
+        });
         let lvl: QualityLevel = d.level;
         into_c_string(&format!(
             "{{\"name\":\"{}\",\"bitrate_kbps\":{},\"fps\":{},\"downscale\":{},\"changed\":{},\"reason\":\"{}\"}}",

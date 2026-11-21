@@ -62,18 +62,35 @@ const VER_REGISTER: u32 = struct_version(5);
 const VER_CREATE_BITSTREAM: u32 = struct_version(1);
 
 const fn guid(d1: u32, d2: u16, d3: u16, d4: [u8; 8]) -> nv::GUID {
-    nv::GUID { Data1: d1, Data2: d2, Data3: d3, Data4: d4 }
+    nv::GUID {
+        Data1: d1,
+        Data2: d2,
+        Data3: d3,
+        Data4: d4,
+    }
 }
 
 /// {6BC82762-4E63-4CA4-AA85-1E50F321F6BF}
-const GUID_CODEC_H264: nv::GUID =
-    guid(0x6bc82762, 0x4e63, 0x4ca4, [0xaa, 0x85, 0x1e, 0x50, 0xf3, 0x21, 0xf6, 0xbf]);
+const GUID_CODEC_H264: nv::GUID = guid(
+    0x6bc82762,
+    0x4e63,
+    0x4ca4,
+    [0xaa, 0x85, 0x1e, 0x50, 0xf3, 0x21, 0xf6, 0xbf],
+);
 /// {E7CBC309-4F7A-4B89-AF2A-D537C92BE310}
-const GUID_PROFILE_H264_HIGH: nv::GUID =
-    guid(0xe7cbc309, 0x4f7a, 0x4b89, [0xaf, 0x2a, 0xd5, 0x37, 0xc9, 0x2b, 0xe3, 0x10]);
+const GUID_PROFILE_H264_HIGH: nv::GUID = guid(
+    0xe7cbc309,
+    0x4f7a,
+    0x4b89,
+    [0xaf, 0x2a, 0xd5, 0x37, 0xc9, 0x2b, 0xe3, 0x10],
+);
 /// {36850110-3A07-441F-94D5-3670631F91F6}
-const GUID_PRESET_P3: nv::GUID =
-    guid(0x36850110, 0x3a07, 0x441f, [0x94, 0xd5, 0x36, 0x70, 0x63, 0x1f, 0x91, 0xf6]);
+const GUID_PRESET_P3: nv::GUID = guid(
+    0x36850110,
+    0x3a07,
+    0x441f,
+    [0x94, 0xd5, 0x36, 0x70, 0x63, 0x1f, 0x91, 0xf6],
+);
 
 const NV_ENC_SUCCESS: u32 = 0;
 const NV_ENC_ERR_NEED_MORE_INPUT: u32 = 11;
@@ -177,7 +194,12 @@ impl Cuda {
                 std::mem::transmute(m.sym("cuMemFree_v2").ok_or(CodecError::Unavailable)?);
             let copy: CuMemcpy2D =
                 std::mem::transmute(m.sym("cuMemcpy2D_v2").ok_or(CodecError::Unavailable)?);
-            Ok(Self { mem_alloc_pitch: alloc, mem_free: free, memcpy2d: copy, ctx })
+            Ok(Self {
+                mem_alloc_pitch: alloc,
+                mem_free: free,
+                memcpy2d: copy,
+                ctx,
+            })
         }
     }
 }
@@ -209,12 +231,14 @@ fn nvml_info() -> (Option<String>, Option<String>) {
     unsafe {
         let init: Option<unsafe extern "system" fn() -> i32> =
             m.sym("nvmlInit_v2").map(|p| std::mem::transmute(p));
-        let handle_by_index: Option<unsafe extern "system" fn(u32, *mut *mut c_void) -> i32> =
-            m.sym("nvmlDeviceGetHandleByIndex_v2").map(|p| std::mem::transmute(p));
+        let handle_by_index: Option<unsafe extern "system" fn(u32, *mut *mut c_void) -> i32> = m
+            .sym("nvmlDeviceGetHandleByIndex_v2")
+            .map(|p| std::mem::transmute(p));
         let get_name: Option<unsafe extern "system" fn(*mut c_void, *mut u8, u32) -> i32> =
             m.sym("nvmlDeviceGetName").map(|p| std::mem::transmute(p));
-        let get_driver: Option<unsafe extern "system" fn(*mut u8, u32) -> i32> =
-            m.sym("nvmlSystemGetDriverVersion").map(|p| std::mem::transmute(p));
+        let get_driver: Option<unsafe extern "system" fn(*mut u8, u32) -> i32> = m
+            .sym("nvmlSystemGetDriverVersion")
+            .map(|p| std::mem::transmute(p));
         let (Some(init), Some(handle_by_index), Some(get_name)) = (init, handle_by_index, get_name)
         else {
             return (None, None);
@@ -268,8 +292,9 @@ pub fn probe() -> NvencProbe {
         };
     };
     unsafe {
-        let get_max: Option<unsafe extern "system" fn(*mut u32) -> u32> =
-            mod_.sym("NvEncodeAPIGetMaxSupportedVersion").map(|p| std::mem::transmute(p));
+        let get_max: Option<unsafe extern "system" fn(*mut u32) -> u32> = mod_
+            .sym("NvEncodeAPIGetMaxSupportedVersion")
+            .map(|p| std::mem::transmute(p));
         let mut max_api = 0u32;
         let _ = get_max.map(|f| f(&mut max_api));
 
@@ -308,7 +333,15 @@ pub fn probe() -> NvencProbe {
         let mut enc: *mut c_void = ptr::null_mut();
         let status = match list.nvEncOpenEncodeSessionEx {
             Some(f) => f(&mut params, &mut enc),
-            None => return NvencProbe { available: false, max_api_version: max_api, gpu_name, driver_version, detail: "nvEncOpenEncodeSessionEx missing".into() },
+            None => {
+                return NvencProbe {
+                    available: false,
+                    max_api_version: max_api,
+                    gpu_name,
+                    driver_version,
+                    detail: "nvEncOpenEncodeSessionEx missing".into(),
+                }
+            }
         };
         if status != NV_ENC_SUCCESS || enc.is_null() {
             return NvencProbe {
@@ -331,7 +364,9 @@ pub fn probe() -> NvencProbe {
             let mut got = 0u32;
             if let Some(f) = list.nvEncGetEncodeGUIDs {
                 if f(enc, guids.as_mut_ptr(), count, &mut got) == NV_ENC_SUCCESS {
-                    has_h264 = guids[..got as usize].iter().any(|g| g.Data1 == GUID_CODEC_H264.Data1);
+                    has_h264 = guids[..got as usize]
+                        .iter()
+                        .any(|g| g.Data1 == GUID_CODEC_H264.Data1);
                 }
             }
         }
@@ -343,7 +378,11 @@ pub fn probe() -> NvencProbe {
             max_api_version: max_api,
             gpu_name,
             driver_version,
-            detail: if has_h264 { "nvEnc session opened, H.264 encode GUID supported".into() } else { "H.264 encode GUID not advertised".into() },
+            detail: if has_h264 {
+                "nvEnc session opened, H.264 encode GUID supported".into()
+            } else {
+                "H.264 encode GUID not advertised".into()
+            },
         }
     }
 }
@@ -359,7 +398,11 @@ pub fn probe() -> NvencProbe {
 /// * D3d11：新输入路径。直接 nvEncRegisterResource(NV_ENC_INPUT_RESOURCE_TYPE_DIRECTX)
 ///   注册 ID3D11Texture2D，NVENC 自己在显存里取样，完全没有 cuMemcpy2D。
 enum InputBackend {
-    Cuda { cuda: Cuda, dev_ptr: u64, pitch: usize },
+    Cuda {
+        cuda: Cuda,
+        dev_ptr: u64,
+        pitch: usize,
+    },
     D3d11,
 }
 
@@ -392,7 +435,9 @@ impl NvencEncoder {
         device: *mut c_void,
     ) -> Result<(nv::NV_ENCODE_API_FUNCTION_LIST, *mut c_void), CodecError> {
         let mod_ = Module::load("nvEncodeAPI64.dll").ok_or(CodecError::Unavailable)?;
-        let create_ptr = mod_.sym("NvEncodeAPICreateInstance").ok_or(CodecError::Unavailable)?;
+        let create_ptr = mod_
+            .sym("NvEncodeAPICreateInstance")
+            .ok_or(CodecError::Unavailable)?;
         let mut api: nv::NV_ENCODE_API_FUNCTION_LIST = unsafe { std::mem::zeroed() };
         api.version = VER_OPEN_SESSION;
         unsafe {
@@ -411,7 +456,8 @@ impl NvencEncoder {
         open.apiVersion = NVENCAPI_VERSION;
         let mut encoder: *mut c_void = ptr::null_mut();
         let st = unsafe {
-            api.nvEncOpenEncodeSessionEx.ok_or(CodecError::Unavailable)?(&mut open, &mut encoder)
+            api.nvEncOpenEncodeSessionEx
+                .ok_or(CodecError::Unavailable)?(&mut open, &mut encoder)
         };
         if st != NV_ENC_SUCCESS {
             return Err(CodecError::Internal(format!(
@@ -424,7 +470,8 @@ impl NvencEncoder {
         preset.version = VER_PRESET;
         preset.presetCfg.version = VER_CONFIG;
         let st = unsafe {
-            api.nvEncGetEncodePresetConfigEx.ok_or(CodecError::Unavailable)?(
+            api.nvEncGetEncodePresetConfigEx
+                .ok_or(CodecError::Unavailable)?(
                 encoder,
                 GUID_CODEC_H264,
                 GUID_PRESET_P3,
@@ -469,7 +516,9 @@ impl NvencEncoder {
         init.encodeConfig = &mut config;
         init.tuningInfo = NV_ENC_TUNING_ULTRA_LOW_LATENCY;
         init.bufferFormat = NV_ENC_BUFFER_FORMAT_ARGB;
-        let st = unsafe { api.nvEncInitializeEncoder.ok_or(CodecError::Unavailable)?(encoder, &mut init) };
+        let st = unsafe {
+            api.nvEncInitializeEncoder.ok_or(CodecError::Unavailable)?(encoder, &mut init)
+        };
         if st != NV_ENC_SUCCESS {
             unsafe { api.nvEncDestroyEncoder.map(|f| f(encoder)) };
             return Err(CodecError::Internal(format!("initialize: {st}")));
@@ -484,7 +533,10 @@ impl NvencEncoder {
     ) -> Result<*mut c_void, CodecError> {
         let mut bs: nv::NV_ENC_CREATE_BITSTREAM_BUFFER = unsafe { std::mem::zeroed() };
         bs.version = VER_CREATE_BITSTREAM;
-        let st = unsafe { api.nvEncCreateBitstreamBuffer.ok_or(CodecError::Unavailable)?(encoder, &mut bs) };
+        let st = unsafe {
+            api.nvEncCreateBitstreamBuffer
+                .ok_or(CodecError::Unavailable)?(encoder, &mut bs)
+        };
         if st != NV_ENC_SUCCESS {
             return Err(CodecError::Internal(format!("create bitstream: {st}")));
         }
@@ -504,7 +556,9 @@ impl NvencEncoder {
         let row_bytes = cfg.width as usize * 4;
         let mut dev_ptr = 0u64;
         let mut pitch = 0usize;
-        let rc = unsafe { (cuda.mem_alloc_pitch)(&mut dev_ptr, &mut pitch, row_bytes, cfg.height as usize, 16) };
+        let rc = unsafe {
+            (cuda.mem_alloc_pitch)(&mut dev_ptr, &mut pitch, row_bytes, cfg.height as usize, 16)
+        };
         if rc != 0 || dev_ptr == 0 {
             unsafe { api.nvEncDestroyEncoder.map(|f| f(encoder)) };
             return Err(CodecError::Internal(format!("cuMemAllocPitch: {rc}")));
@@ -512,7 +566,11 @@ impl NvencEncoder {
         let mut this = Self {
             cfg,
             api,
-            backend: InputBackend::Cuda { cuda, dev_ptr, pitch },
+            backend: InputBackend::Cuda {
+                cuda,
+                dev_ptr,
+                pitch,
+            },
             registered: ptr::null_mut(),
             mapped: ptr::null_mut(),
             input_pitch: pitch as u32,
@@ -525,7 +583,11 @@ impl NvencEncoder {
             gpu_name,
         };
         let pitch_u32 = this.input_pitch;
-        match this.register_input(dev_ptr as *mut c_void, NV_ENC_INPUT_RESOURCE_TYPE_CUDADEVICEPTR, pitch_u32) {
+        match this.register_input(
+            dev_ptr as *mut c_void,
+            NV_ENC_INPUT_RESOURCE_TYPE_CUDADEVICEPTR,
+            pitch_u32,
+        ) {
             Ok(()) => {}
             Err(e) => {
                 unsafe { this.api.nvEncDestroyEncoder.map(|f| f(this.encoder)) };
@@ -616,16 +678,30 @@ impl NvencEncoder {
         reg.resourceToRegister = resource;
         reg.bufferFormat = NV_ENC_BUFFER_FORMAT_ARGB;
         reg.bufferUsage = NV_ENC_INPUT_IMAGE;
-        let st = unsafe { self.api.nvEncRegisterResource.ok_or(CodecError::Unavailable)?(self.encoder, &mut reg) };
+        let st = unsafe {
+            self.api
+                .nvEncRegisterResource
+                .ok_or(CodecError::Unavailable)?(self.encoder, &mut reg)
+        };
         if st != NV_ENC_SUCCESS {
-            return Err(CodecError::Internal(format!("register resource(type={resource_type}): {st}")));
+            return Err(CodecError::Internal(format!(
+                "register resource(type={resource_type}): {st}"
+            )));
         }
         let mut map: nv::NV_ENC_MAP_INPUT_RESOURCE = unsafe { std::mem::zeroed() };
         map.version = VER_MAP;
         map.registeredResource = reg.registeredResource;
-        let st = unsafe { self.api.nvEncMapInputResource.ok_or(CodecError::Unavailable)?(self.encoder, &mut map) };
+        let st = unsafe {
+            self.api
+                .nvEncMapInputResource
+                .ok_or(CodecError::Unavailable)?(self.encoder, &mut map)
+        };
         if st != NV_ENC_SUCCESS {
-            unsafe { self.api.nvEncUnregisterResource.map(|f| f(self.encoder, reg.registeredResource)) };
+            unsafe {
+                self.api
+                    .nvEncUnregisterResource
+                    .map(|f| f(self.encoder, reg.registeredResource))
+            };
             return Err(CodecError::Internal(format!("map input: {st}")));
         }
         self.registered = reg.registeredResource;
@@ -637,11 +713,15 @@ impl NvencEncoder {
     fn unregister_input(&mut self) {
         unsafe {
             if !self.mapped.is_null() {
-                self.api.nvEncUnmapInputResource.map(|f| f(self.encoder, self.mapped));
+                self.api
+                    .nvEncUnmapInputResource
+                    .map(|f| f(self.encoder, self.mapped));
                 self.mapped = ptr::null_mut();
             }
             if !self.registered.is_null() {
-                self.api.nvEncUnregisterResource.map(|f| f(self.encoder, self.registered));
+                self.api
+                    .nvEncUnregisterResource
+                    .map(|f| f(self.encoder, self.registered));
                 self.registered = ptr::null_mut();
             }
         }
@@ -673,7 +753,11 @@ impl NvencEncoder {
     ///
     /// 这是最纯粹的零拷贝（连 GPU CopyResource 都省了），代价是每帧一次
     /// register/map/unmap/unregister。
-    pub fn encode_d3d11_texture(&mut self, texture: *mut c_void, ts_ms: u64) -> Result<Vec<u8>, CodecError> {
+    pub fn encode_d3d11_texture(
+        &mut self,
+        texture: *mut c_void,
+        ts_ms: u64,
+    ) -> Result<Vec<u8>, CodecError> {
         if matches!(self.backend, InputBackend::Cuda { .. }) {
             return Err(CodecError::UnsupportedConfig);
         }
@@ -742,7 +826,11 @@ impl NvencEncoder {
         pic.pictureStruct = NV_ENC_PIC_STRUCT_FRAME;
         pic.frameIdx = self.frame_idx;
         pic.inputTimeStamp = ts_ms;
-        pic.encodePicFlags = if force_idr { NV_ENC_PIC_FLAG_FORCEIDR } else { 0 };
+        pic.encodePicFlags = if force_idr {
+            NV_ENC_PIC_FLAG_FORCEIDR
+        } else {
+            0
+        };
 
         let mut data = Vec::new();
         for attempt in 0..4 {
@@ -786,7 +874,9 @@ impl NvencEncoder {
             out.extend_from_slice(std::slice::from_raw_parts(p, n));
         }
         unsafe {
-            self.api.nvEncUnlockBitstream.map(|f| f(self.encoder, self.bitstream));
+            self.api
+                .nvEncUnlockBitstream
+                .map(|f| f(self.encoder, self.bitstream));
         }
         Ok(out)
     }
@@ -802,7 +892,9 @@ impl Encoder for NvencEncoder {
         let data = self.encode_bgra(frame, frame_ts_ms)?;
         if data.is_empty() {
             // 同步模式下偶发空包不是错误，交给上层丢弃
-            return Err(CodecError::Internal("nvEnc produced empty bitstream".into()));
+            return Err(CodecError::Internal(
+                "nvEnc produced empty bitstream".into(),
+            ));
         }
         let mut flags = MediaHeader::FLAG_FRAME_END;
         if force_idr {
@@ -829,7 +921,9 @@ impl Drop for NvencEncoder {
     fn drop(&mut self) {
         self.unregister_input();
         unsafe {
-            self.api.nvEncDestroyBitstreamBuffer.map(|f| f(self.encoder, self.bitstream));
+            self.api
+                .nvEncDestroyBitstreamBuffer
+                .map(|f| f(self.encoder, self.bitstream));
             self.api.nvEncDestroyEncoder.map(|f| f(self.encoder));
             if let InputBackend::Cuda { cuda, dev_ptr, .. } = &self.backend {
                 (cuda.mem_free)(*dev_ptr);
@@ -852,10 +946,21 @@ mod tests {
     /// 非低延迟配置必须在碰驱动之前就被拒绝。
     #[test]
     fn rejects_non_low_latency_config() {
-        let cfg = EncodeConfig { bframes: 2, ..Default::default() };
-        assert!(matches!(NvencEncoder::new(cfg), Err(CodecError::UnsupportedConfig)));
-        let cfg2 = EncodeConfig { width: 0, ..Default::default() };
-        assert!(matches!(NvencEncoder::new(cfg2), Err(CodecError::UnsupportedConfig)));
+        let cfg = EncodeConfig {
+            bframes: 2,
+            ..Default::default()
+        };
+        assert!(matches!(
+            NvencEncoder::new(cfg),
+            Err(CodecError::UnsupportedConfig)
+        ));
+        let cfg2 = EncodeConfig {
+            width: 0,
+            ..Default::default()
+        };
+        assert!(matches!(
+            NvencEncoder::new(cfg2),
+            Err(CodecError::UnsupportedConfig)
+        ));
     }
 }
-

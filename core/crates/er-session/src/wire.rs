@@ -201,8 +201,11 @@ impl Reassembler {
 
         if !self.inflight.contains_key(&msg_id) {
             if self.inflight.len() >= MAX_INFLIGHT {
-                if let Some(oldest) =
-                    self.inflight.iter().min_by_key(|(_, p)| p.age).map(|(k, _)| *k)
+                if let Some(oldest) = self
+                    .inflight
+                    .iter()
+                    .min_by_key(|(_, p)| p.age)
+                    .map(|(k, _)| *k)
                 {
                     self.inflight.remove(&oldest);
                 }
@@ -247,7 +250,10 @@ impl Reassembler {
 
 fn now_ms() -> u64 {
     use std::time::{SystemTime, UNIX_EPOCH};
-    SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis() as u64).unwrap_or(0)
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0)
 }
 
 #[cfg(test)]

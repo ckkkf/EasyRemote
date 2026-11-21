@@ -22,13 +22,22 @@ use er_session::crypto::CryptoSession;
 use er_session::relay_client::RelayClient;
 
 fn arg(i: usize, default: &str) -> String {
-    std::env::args().nth(i).unwrap_or_else(|| default.to_string())
+    std::env::args()
+        .nth(i)
+        .unwrap_or_else(|| default.to_string())
 }
 
 /// 合成渐变帧 → H.264 → 加密 → 中继（主控屏录未授权时的真实链路替代）。
 fn send_synthetic(relay: &mut RelayClient, crypto: &mut CryptoSession, count: usize) -> Vec<usize> {
     let (w, h) = (320u32, 240u32);
-    let cfg = EncodeConfig { width: w, height: h, fps: 60, bitrate_kbps: 1000, gop: 60, bframes: 0 };
+    let cfg = EncodeConfig {
+        width: w,
+        height: h,
+        fps: 60,
+        bitrate_kbps: 1000,
+        gop: 60,
+        bframes: 0,
+    };
     let mut codec = create_encoder(cfg).expect("codec");
     let mut frame = vec![0u8; (w * h * 4) as usize];
     let mut sizes = Vec::with_capacity(count);
@@ -43,7 +52,12 @@ fn send_synthetic(relay: &mut RelayClient, crypto: &mut CryptoSession, count: us
             }
         }
         let encoded = codec.encode((i as u64) * 16, &frame).expect("encode");
-        let hdr = VideoHeader { seq: i as u32, ts_ms: (i as u64 * 16) as u32, width: w as u16, height: h as u16 };
+        let hdr = VideoHeader {
+            seq: i as u32,
+            ts_ms: (i as u64 * 16) as u32,
+            width: w as u16,
+            height: h as u16,
+        };
         let msg = encode_video_msg(&hdr, &encoded.data);
         let sealed = crypto.seal(&msg);
         relay.send(&sealed).expect("relay send");
@@ -90,7 +104,9 @@ fn main() {
     println!("MAC: gateway={base} relay={relay_addr} device_code={code} captcha={captcha}");
 
     let ctrl = ControllerAgent::start(&base, &phone, &sms, relay_addr).expect("ctrl start");
-    let session_id = ctrl.request_session(&code, &captcha).expect("request session");
+    let session_id = ctrl
+        .request_session(&code, &captcha)
+        .expect("request session");
     println!("MAC: session={session_id}");
     // 等被控端 consent 落地（真实产品里用户点「接受」也要时间），否则取票据会被拒
     std::thread::sleep(Duration::from_millis(1500));
@@ -99,7 +115,8 @@ fn main() {
     println!("MAC: relay_registered local={}", relay.local_addr());
     std::thread::sleep(Duration::from_millis(2500));
     ctrl.announce(&mut relay, &msg).expect("announce");
-    ctrl.finish(&mut relay, &mut crypto, &keys, &session_id).expect("handshake");
+    ctrl.finish(&mut relay, &mut crypto, &keys, &session_id)
+        .expect("handshake");
     println!("MAC: handshake_verified (ed25519 + x25519)");
 
     // ① 发给被控端视频帧
@@ -107,27 +124,50 @@ fn main() {
         Ok(mut cap) => {
             let info = cap.info();
             println!("MAC: capture_ok {}x{}", info.width, info.height);
-            let sizes = ctrl.send_frames(&mut relay, &mut crypto, out_frames).expect("send frames");
-            println!("MAC: frames_sent={} bytes_total={}", sizes.len(), sizes.iter().sum::<usize>());
+            let sizes = ctrl
+                .send_frames(&mut relay, &mut crypto, out_frames)
+                .expect("send frames");
+            println!(
+                "MAC: frames_sent={} bytes_total={}",
+                sizes.len(),
+                sizes.iter().sum::<usize>()
+            );
         }
         Err(e) => {
             println!("MAC: capture_unavailable ({e}); fallback=synthetic_h264");
             let sizes = send_synthetic(&mut relay, &mut crypto, out_frames);
-            println!("MAC: frames_sent={} bytes_total={}", sizes.len(), sizes.iter().sum::<usize>());
+            println!(
+                "MAC: frames_sent={} bytes_total={}",
+                sizes.len(),
+                sizes.iter().sum::<usize>()
+            );
         }
     }
 
     // ② 立刻发输入：被控端收完帧就进 recv_input，不能让它在那边空等
     let events = vec![
-        InputEvent::MouseMove { x: move_x, y: move_y },
-        InputEvent::MouseMove { x: move_x - 37, y: move_y + 21 },
-        InputEvent::MouseMove { x: move_x, y: move_y },
+        InputEvent::MouseMove {
+            x: move_x,
+            y: move_y,
+        },
+        InputEvent::MouseMove {
+            x: move_x - 37,
+            y: move_y + 21,
+        },
+        InputEvent::MouseMove {
+            x: move_x,
+            y: move_y,
+        },
     ];
-    let n = ctrl.send_input(&mut relay, &mut crypto, &events).expect("send input");
+    let n = ctrl
+        .send_input(&mut relay, &mut crypto, &events)
+        .expect("send input");
     println!("MAC: input_events_sent={n} target=({move_x},{move_y}) sent_before_recv=true");
 
     // ③ 收被控端（Windows）采集编码的真实屏幕帧并解码
-    let got = ctrl.recv_frames(&mut relay, &mut crypto, in_frames).expect("recv frames");
+    let got = ctrl
+        .recv_frames(&mut relay, &mut crypto, in_frames)
+        .expect("recv frames");
     println!(
         "MAC: frames_from_target={} resolution={}x{} first_h264_bytes={}",
         got.len(),

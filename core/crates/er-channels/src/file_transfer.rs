@@ -75,14 +75,28 @@ pub struct FileSender {
 }
 
 impl FileSender {
-    pub fn new(name: impl Into<String>, data: Vec<u8>, chunk_size: usize) -> Result<Self, TransferError> {
+    pub fn new(
+        name: impl Into<String>,
+        data: Vec<u8>,
+        chunk_size: usize,
+    ) -> Result<Self, TransferError> {
         if data.len() > 4 * 1024 * 1024 * 1024 {
             return Err(TransferError::TooLarge);
         }
-        let cs = if chunk_size == 0 { DEFAULT_CHUNK } else { chunk_size };
+        let cs = if chunk_size == 0 {
+            DEFAULT_CHUNK
+        } else {
+            chunk_size
+        };
         let total = data.len().div_ceil(cs).max(1) as u32;
         let file_hash = sha256_hex(&data);
-        Ok(Self { name: name.into(), data, chunk_size: cs, total_chunks: total, file_hash })
+        Ok(Self {
+            name: name.into(),
+            data,
+            chunk_size: cs,
+            total_chunks: total,
+            file_hash,
+        })
     }
 
     pub fn name(&self) -> &str {
@@ -115,7 +129,9 @@ impl FileSender {
         if from_index > self.total_chunks {
             return Err(TransferError::OutOfRange);
         }
-        (from_index..self.total_chunks).map(|i| self.chunk(i)).collect()
+        (from_index..self.total_chunks)
+            .map(|i| self.chunk(i))
+            .collect()
     }
 }
 

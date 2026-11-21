@@ -14,7 +14,12 @@ const RELAY_BIN: &str = "/tmp/er-relay-full";
 
 fn spawn_relay(port: u16) -> Child {
     Command::new(RELAY_BIN)
-        .args(["-addr", &format!(":{port}"), "-node-addr", &format!("127.0.0.1:{port}")])
+        .args([
+            "-addr",
+            &format!(":{port}"),
+            "-node-addr",
+            &format!("127.0.0.1:{port}"),
+        ])
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .spawn()
@@ -22,7 +27,9 @@ fn spawn_relay(port: u16) -> Child {
 }
 
 fn main() {
-    let base = std::env::args().nth(1).unwrap_or_else(|| "http://127.0.0.1:18099".into());
+    let base = std::env::args()
+        .nth(1)
+        .unwrap_or_else(|| "http://127.0.0.1:18099".into());
     let port = 19141u16;
     let relay_addr: SocketAddr = format!("127.0.0.1:{port}").parse().unwrap();
 
@@ -41,14 +48,21 @@ fn main() {
     let (mut t_relay, mut t_crypto, t_msg) = target.begin(&session_id).expect("t begin");
     ctrl.announce(&mut c_relay, &c_msg).expect("c announce");
     target.announce(&mut t_relay, &t_msg).expect("t announce");
-    target.finish(&mut t_relay, &mut t_crypto, &session_id).expect("t finish");
-    ctrl.finish(&mut c_relay, &mut c_crypto, &c_keys, &session_id).expect("c finish");
+    target
+        .finish(&mut t_relay, &mut t_crypto, &session_id)
+        .expect("t finish");
+    ctrl.finish(&mut c_relay, &mut c_crypto, &c_keys, &session_id)
+        .expect("c finish");
     println!("session {session_id} established");
 
     // 中断前先收 2 帧
     let before = {
-        let n = ctrl.send_frames(&mut c_relay, &mut c_crypto, 2).expect("send");
-        let frames = target.recv_frames(&mut t_relay, &mut t_crypto, 2).expect("recv");
+        let n = ctrl
+            .send_frames(&mut c_relay, &mut c_crypto, 2)
+            .expect("send");
+        let frames = target
+            .recv_frames(&mut t_relay, &mut t_crypto, 2)
+            .expect("recv");
         (n.len(), frames.len())
     };
     println!("before restart: sent {} received {}", before.0, before.1);
@@ -67,13 +81,23 @@ fn main() {
     let mut relay_child = spawn_relay(port);
     std::thread::sleep(Duration::from_millis(700));
 
-    let policy = BackoffPolicy { base_ms: 200, factor: 2, max_ms: 2000, max_attempts: 15 };
+    let policy = BackoffPolicy {
+        base_ms: 200,
+        factor: 2,
+        max_ms: 2000,
+        max_attempts: 15,
+    };
     let (_, retries) = retry_until(policy, Duration::from_secs(20), || {
-        ctrl.rejoin(&mut c_relay, &session_id).map_err(|e| e.to_string())?;
-        target.rejoin(&mut t_relay, &session_id).map_err(|e| e.to_string())?;
+        ctrl.rejoin(&mut c_relay, &session_id)
+            .map_err(|e| e.to_string())?;
+        target
+            .rejoin(&mut t_relay, &session_id)
+            .map_err(|e| e.to_string())?;
         std::thread::sleep(Duration::from_millis(60));
         // 用**既有密钥**发一帧作为探针
-        let n = ctrl.send_frames(&mut c_relay, &mut c_crypto, 1).map_err(|e| e.to_string())?;
+        let n = ctrl
+            .send_frames(&mut c_relay, &mut c_crypto, 1)
+            .map_err(|e| e.to_string())?;
         if n.is_empty() {
             return Err("no frame encoded".to_string());
         }
@@ -84,12 +108,19 @@ fn main() {
     })
     .expect("session resume should succeed");
 
-    println!("session resumed after {} retries (same keys, same session id)", retries);
+    println!(
+        "session resumed after {} retries (same keys, same session id)",
+        retries
+    );
 
     // 恢复后再连续收 2 帧，确认不是"只通一帧"
     let after = {
-        let n = ctrl.send_frames(&mut c_relay, &mut c_crypto, 2).expect("send");
-        let frames = target.recv_frames(&mut t_relay, &mut t_crypto, 2).expect("recv");
+        let n = ctrl
+            .send_frames(&mut c_relay, &mut c_crypto, 2)
+            .expect("send");
+        let frames = target
+            .recv_frames(&mut t_relay, &mut t_crypto, 2)
+            .expect("recv");
         (n.len(), frames.len())
     };
     println!("after resume: sent {} received {}", after.0, after.1);

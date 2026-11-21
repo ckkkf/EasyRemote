@@ -15,32 +15,30 @@
 
 use std::ffi::c_void;
 
+use windows::core::{Interface, Result as WinResult};
 use windows::Win32::Foundation::HMODULE;
+use windows::Win32::Graphics::Direct3D::{
+    D3D_DRIVER_TYPE_UNKNOWN, D3D_FEATURE_LEVEL, D3D_FEATURE_LEVEL_10_0, D3D_FEATURE_LEVEL_10_1,
+    D3D_FEATURE_LEVEL_11_0,
+};
+use windows::Win32::Graphics::Direct3D11::{
+    D3D11CreateDevice, ID3D11Device, ID3D11DeviceContext, ID3D11Texture2D,
+    D3D11_BIND_RENDER_TARGET, D3D11_CPU_ACCESS_READ, D3D11_CREATE_DEVICE_BGRA_SUPPORT,
+    D3D11_MAPPED_SUBRESOURCE, D3D11_MAP_READ, D3D11_SDK_VERSION, D3D11_SUBRESOURCE_DATA,
+    D3D11_TEXTURE2D_DESC, D3D11_USAGE_DEFAULT, D3D11_USAGE_STAGING,
+};
+use windows::Win32::Graphics::Dxgi::Common::{DXGI_FORMAT_B8G8R8A8_UNORM, DXGI_SAMPLE_DESC};
+use windows::Win32::Graphics::Dxgi::{
+    CreateDXGIFactory1, IDXGIAdapter1, IDXGIFactory1, IDXGIOutput1, IDXGIOutputDuplication,
+    IDXGIResource, DXGI_ERROR_ACCESS_LOST, DXGI_ERROR_INVALID_CALL, DXGI_ERROR_WAIT_TIMEOUT,
+    DXGI_OUTDUPL_FRAME_INFO,
+};
 use windows::Win32::System::Power::{
     SetThreadExecutionState, ES_CONTINUOUS, ES_DISPLAY_REQUIRED, ES_SYSTEM_REQUIRED,
 };
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     SendInput, INPUT, INPUT_MOUSE, MOUSEEVENTF_MOVE, MOUSEINPUT,
 };
-use windows::Win32::Graphics::Direct3D::{
-    D3D_DRIVER_TYPE_UNKNOWN, D3D_FEATURE_LEVEL, D3D_FEATURE_LEVEL_10_0, D3D_FEATURE_LEVEL_10_1,
-    D3D_FEATURE_LEVEL_11_0,
-};
-use windows::Win32::Graphics::Direct3D11::{
-    D3D11CreateDevice, ID3D11Device, ID3D11DeviceContext, ID3D11Texture2D, D3D11_BIND_RENDER_TARGET,
-    D3D11_CPU_ACCESS_READ, D3D11_CREATE_DEVICE_BGRA_SUPPORT, D3D11_MAPPED_SUBRESOURCE, D3D11_MAP_READ,
-    D3D11_SDK_VERSION, D3D11_SUBRESOURCE_DATA, D3D11_TEXTURE2D_DESC, D3D11_USAGE_DEFAULT,
-    D3D11_USAGE_STAGING,
-};
-use windows::Win32::Graphics::Dxgi::Common::{
-    DXGI_FORMAT_B8G8R8A8_UNORM, DXGI_SAMPLE_DESC,
-};
-use windows::Win32::Graphics::Dxgi::{
-    CreateDXGIFactory1, IDXGIAdapter1, IDXGIFactory1, IDXGIOutput1, IDXGIOutputDuplication,
-    IDXGIResource, DXGI_ERROR_ACCESS_LOST, DXGI_ERROR_INVALID_CALL, DXGI_ERROR_WAIT_TIMEOUT,
-    DXGI_OUTDUPL_FRAME_INFO,
-};
-use windows::core::{Interface, Result as WinResult};
 
 use crate::{CaptureError, CaptureInfo, RawFrame};
 
@@ -86,7 +84,8 @@ fn input_desktop_is_lock_screen() -> bool {
         DESKTOP_READOBJECTS, UOI_NAME,
     };
     unsafe {
-        let Ok(desk) = OpenInputDesktop(DESKTOP_CONTROL_FLAGS(0), false, DESKTOP_READOBJECTS) else {
+        let Ok(desk) = OpenInputDesktop(DESKTOP_CONTROL_FLAGS(0), false, DESKTOP_READOBJECTS)
+        else {
             return false;
         };
         let mut buf = [0u16; 64];
@@ -140,7 +139,9 @@ fn create_device(adapter: &IDXGIAdapter1) -> WinResult<(ID3D11Device, ID3D11Devi
     }
     match (device, context) {
         (Some(d), Some(c)) => Ok((d, c)),
-        _ => Err(windows::core::Error::from(windows::Win32::Foundation::E_FAIL)),
+        _ => Err(windows::core::Error::from(
+            windows::Win32::Foundation::E_FAIL,
+        )),
     }
 }
 
@@ -265,7 +266,12 @@ impl DxgiCapture {
             staging,
             held: None,
             encoder_input: None,
-            info: CaptureInfo { width, height, refresh_hz: 60, display_count: 1 },
+            info: CaptureInfo {
+                width,
+                height,
+                refresh_hz: 60,
+                display_count: 1,
+            },
             adapter_name: cand.name.clone(),
             seq: 0,
             consecutive_timeouts: 0,
@@ -364,7 +370,10 @@ impl DxgiCapture {
         self.release();
         let mut info = DXGI_OUTDUPL_FRAME_INFO::default();
         let mut resource: Option<IDXGIResource> = None;
-        let res = unsafe { self.duplication.AcquireNextFrame(timeout_ms, &mut info, &mut resource) };
+        let res = unsafe {
+            self.duplication
+                .AcquireNextFrame(timeout_ms, &mut info, &mut resource)
+        };
         if let Err(e) = res {
             if e.code() == DXGI_ERROR_WAIT_TIMEOUT {
                 return Ok(None);
@@ -542,7 +551,11 @@ impl DxgiCapture {
     pub fn nudge_desktop(&mut self) -> bool {
         use std::sync::atomic::{AtomicI32, Ordering};
         static TOGGLE: AtomicI32 = AtomicI32::new(0);
-        let dir = if TOGGLE.fetch_xor(1, Ordering::Relaxed) == 0 { 2 } else { -2 };
+        let dir = if TOGGLE.fetch_xor(1, Ordering::Relaxed) == 0 {
+            2
+        } else {
+            -2
+        };
         // 必须走 SendInput（真实输入事件）：SetCursorPos 不算输入，
         // 既不会唤醒显示器，也不会让 DWM 重新出帧。
         let mut input = INPUT::default();
@@ -590,7 +603,10 @@ impl DxgiCapture {
         self.release();
         let mut info = DXGI_OUTDUPL_FRAME_INFO::default();
         let mut resource: Option<IDXGIResource> = None;
-        let res = unsafe { self.duplication.AcquireNextFrame(timeout_ms, &mut info, &mut resource) };
+        let res = unsafe {
+            self.duplication
+                .AcquireNextFrame(timeout_ms, &mut info, &mut resource)
+        };
         match res {
             Ok(()) => {
                 let has = resource.is_some();
@@ -657,7 +673,10 @@ impl DxgiCapture {
         desc.MipLevels = 1;
         desc.ArraySize = 1;
         desc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
-        desc.SampleDesc = DXGI_SAMPLE_DESC { Count: 1, Quality: 0 };
+        desc.SampleDesc = DXGI_SAMPLE_DESC {
+            Count: 1,
+            Quality: 0,
+        };
         desc.Usage = D3D11_USAGE_DEFAULT;
         desc.BindFlags = D3D11_BIND_RENDER_TARGET.0 as u32;
         desc.CPUAccessFlags = 0;
@@ -741,7 +760,10 @@ impl DxgiCapture {
         desc.MipLevels = 1;
         desc.ArraySize = 1;
         desc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
-        desc.SampleDesc = DXGI_SAMPLE_DESC { Count: 1, Quality: 0 };
+        desc.SampleDesc = DXGI_SAMPLE_DESC {
+            Count: 1,
+            Quality: 0,
+        };
         desc.Usage = D3D11_USAGE_DEFAULT;
         desc.BindFlags = D3D11_BIND_RENDER_TARGET.0 as u32;
         desc.CPUAccessFlags = 0;
@@ -764,14 +786,21 @@ impl DxgiCapture {
     }
 }
 
-fn create_staging(device: &ID3D11Device, width: u32, height: u32) -> Result<ID3D11Texture2D, String> {
+fn create_staging(
+    device: &ID3D11Device,
+    width: u32,
+    height: u32,
+) -> Result<ID3D11Texture2D, String> {
     let mut desc = D3D11_TEXTURE2D_DESC::default();
     desc.Width = width;
     desc.Height = height;
     desc.MipLevels = 1;
     desc.ArraySize = 1;
     desc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
-    desc.SampleDesc = DXGI_SAMPLE_DESC { Count: 1, Quality: 0 };
+    desc.SampleDesc = DXGI_SAMPLE_DESC {
+        Count: 1,
+        Quality: 0,
+    };
     desc.Usage = D3D11_USAGE_STAGING;
     desc.BindFlags = 0;
     desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ.0 as u32;
@@ -799,7 +828,11 @@ pub fn probe_report() -> Vec<String> {
         match DxgiCapture::open_candidate(&cand) {
             Ok(cap) => line.push_str(&format!(
                 " -> OK {}x{} format={} current={}x{}",
-                cap.info.width, cap.info.height, cap.format(), cap.info.width, cap.info.height
+                cap.info.width,
+                cap.info.height,
+                cap.format(),
+                cap.info.width,
+                cap.info.height
             )),
             Err(e) => line.push_str(&format!(" -> FAIL {e}")),
         }
@@ -830,7 +863,10 @@ pub fn topology() -> Vec<String> {
                 Ok(d) => (
                     wide_to_string(&d.Description),
                     d.VendorId,
-                    format!("{:08x}:{:08x}", d.AdapterLuid.HighPart, d.AdapterLuid.LowPart),
+                    format!(
+                        "{:08x}:{:08x}",
+                        d.AdapterLuid.HighPart, d.AdapterLuid.LowPart
+                    ),
                 ),
                 Err(_) => (format!("adapter#{idx}"), 0u32, "?".to_string()),
             };
@@ -897,7 +933,9 @@ pub mod display {
         let mut dm = DEVMODEW::default();
         dm.dmSize = std::mem::size_of::<DEVMODEW>() as u16;
         // 以当前模式为基础改，避免把色彩位深等字段写成 0
-        if !unsafe { EnumDisplaySettingsW(PCWSTR::null(), ENUM_CURRENT_SETTINGS, &mut dm) }.as_bool() {
+        if !unsafe { EnumDisplaySettingsW(PCWSTR::null(), ENUM_CURRENT_SETTINGS, &mut dm) }
+            .as_bool()
+        {
             return Err("EnumDisplaySettingsW(current) failed".into());
         }
         dm.dmPelsWidth = width;
@@ -928,11 +966,13 @@ pub mod display {
                     dm.dmPelsHeight = h;
                     dm.dmDisplayFrequency = cand;
                     dm.dmFields = DM_PELSWIDTH | DM_PELSHEIGHT | DM_DISPLAYFREQUENCY;
-                    if unsafe { windows::Win32::Graphics::Gdi::EnumDisplaySettingsW(
-                        PCWSTR::null(),
-                        windows::Win32::Graphics::Gdi::ENUM_CURRENT_SETTINGS,
-                        &mut dm,
-                    ) }
+                    if unsafe {
+                        windows::Win32::Graphics::Gdi::EnumDisplaySettingsW(
+                            PCWSTR::null(),
+                            windows::Win32::Graphics::Gdi::ENUM_CURRENT_SETTINGS,
+                            &mut dm,
+                        )
+                    }
                     .as_bool()
                     {
                         return (w, h, cand);

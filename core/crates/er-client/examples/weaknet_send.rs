@@ -22,10 +22,15 @@ const MSG_PONG: u8 = 0x11;
 const MSG_DONE: u8 = 0x12;
 
 fn arg(i: usize, default: &str) -> String {
-    std::env::args().nth(i).unwrap_or_else(|| default.to_string())
+    std::env::args()
+        .nth(i)
+        .unwrap_or_else(|| default.to_string())
 }
 fn now_ms() -> u64 {
-    SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis() as u64).unwrap_or(0)
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0)
 }
 
 fn main() {
@@ -65,7 +70,9 @@ fn main() {
     println!("SEND[{label}]: device_code={code} captcha={captcha}");
 
     let ctrl = ControllerAgent::start(&base, &phone, &sms, relay_addr).expect("ctrl start");
-    let session_id = ctrl.request_session(&code, &captcha).expect("request session");
+    let session_id = ctrl
+        .request_session(&code, &captcha)
+        .expect("request session");
     println!("SEND[{label}]: session={session_id}");
     std::thread::sleep(Duration::from_millis(1500));
     // 被控端 consent 落地有延迟；取票据被拒时重试（不改变任何断言，只是等待）
@@ -141,7 +148,14 @@ fn main() {
     }
     println!("SEND[{label}]: clock rtt_ms={rtt_ms} offset_ms={offset} ok={ping_ok}");
 
-    let cfg = EncodeConfig { width: w, height: h, fps: 60, bitrate_kbps: 1500, gop: 60, bframes: 0 };
+    let cfg = EncodeConfig {
+        width: w,
+        height: h,
+        fps: 60,
+        bitrate_kbps: 1500,
+        gop: 60,
+        bframes: 0,
+    };
     let mut codec = create_encoder(cfg).expect("encoder");
     println!("SEND[{label}]: encoder_kind={:?} {w}x{h}", codec.kind());
 

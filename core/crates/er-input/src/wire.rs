@@ -50,7 +50,10 @@ impl InputEvent {
                     return None;
                 }
                 let scancode = u16::from_be_bytes([buf[1], buf[2]]);
-                Some(InputEvent::Key { scancode, pressed: buf[3] != 0 })
+                Some(InputEvent::Key {
+                    scancode,
+                    pressed: buf[3] != 0,
+                })
             }
             TAG_MOVE => {
                 if buf.len() < 9 {
@@ -114,15 +117,24 @@ mod tests {
 
     #[test]
     fn key_roundtrip() {
-        roundtrip(InputEvent::Key { scancode: 0x04, pressed: true });
-        roundtrip(InputEvent::Key { scancode: 0xE1, pressed: false });
+        roundtrip(InputEvent::Key {
+            scancode: 0x04,
+            pressed: true,
+        });
+        roundtrip(InputEvent::Key {
+            scancode: 0xE1,
+            pressed: false,
+        });
     }
 
     #[test]
     fn mouse_roundtrip() {
         roundtrip(InputEvent::MouseMove { x: 1920, y: 1080 });
         roundtrip(InputEvent::MouseMove { x: -1, y: 0 });
-        roundtrip(InputEvent::MouseButton { button: MouseButton::Right, pressed: true });
+        roundtrip(InputEvent::MouseButton {
+            button: MouseButton::Right,
+            pressed: true,
+        });
         roundtrip(InputEvent::Wheel { dx: 0, dy: -3 });
     }
 

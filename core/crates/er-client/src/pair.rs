@@ -41,48 +41,77 @@ pub fn run_pair(
 ) -> Result<PairReport, String> {
     let target_gw = Gateway::new(gateway_base, "", "");
     let _ = target_gw.send_sms(phone_a);
-    let target_tok = target_gw.login(phone_a, sms_code).map_err(|e| format!("target login: {e}"))?;
+    let target_tok = target_gw
+        .login(phone_a, sms_code)
+        .map_err(|e| format!("target login: {e}"))?;
     let target_gw = Gateway::new(gateway_base, &target_tok, "");
-    let target_dev = target_gw.bind_device("macos").map_err(|e| format!("target bind: {e}"))?;
+    let target_dev = target_gw
+        .bind_device("macos")
+        .map_err(|e| format!("target bind: {e}"))?;
 
     let ctrl_gw = Gateway::new(gateway_base, "", "");
     let _ = ctrl_gw.send_sms(phone_b);
-    let ctrl_tok = ctrl_gw.login(phone_b, sms_code).map_err(|e| format!("ctrl login: {e}"))?;
+    let ctrl_tok = ctrl_gw
+        .login(phone_b, sms_code)
+        .map_err(|e| format!("ctrl login: {e}"))?;
     let ctrl_gw = Gateway::new(gateway_base, &ctrl_tok, "");
-    let ctrl_dev = ctrl_gw.bind_device("macos").map_err(|e| format!("ctrl bind: {e}"))?;
+    let ctrl_dev = ctrl_gw
+        .bind_device("macos")
+        .map_err(|e| format!("ctrl bind: {e}"))?;
 
     let target_id = DeviceIdentity::random();
     let ctrl_id = DeviceIdentity::random();
 
     let target_gw = Gateway::new(gateway_base, &target_tok, &target_dev.device_token);
     target_gw
-        .register_identity(&target_dev.device_id, &encode_pubkey(target_id.public().as_bytes()))
+        .register_identity(
+            &target_dev.device_id,
+            &encode_pubkey(target_id.public().as_bytes()),
+        )
         .map_err(|e| format!("register target identity: {e}"))?;
     let ctrl_gw = Gateway::new(gateway_base, &ctrl_tok, &ctrl_dev.device_token);
     ctrl_gw
-        .register_identity(&ctrl_dev.device_id, &encode_pubkey(ctrl_id.public().as_bytes()))
+        .register_identity(
+            &ctrl_dev.device_id,
+            &encode_pubkey(ctrl_id.public().as_bytes()),
+        )
         .map_err(|e| format!("register ctrl identity: {e}"))?;
 
     let code = target_dev.raw_code.replace(' ', "");
-    let captcha = target_gw.rotate_code(&code).map_err(|e| format!("rotate: {e}"))?;
-    let session_id =
-        ctrl_gw.request_connect(&code, &captcha).map_err(|e| format!("connect: {e}"))?;
-    target_gw.consent(&session_id, true).map_err(|e| format!("consent: {e}"))?;
+    let captcha = target_gw
+        .rotate_code(&code)
+        .map_err(|e| format!("rotate: {e}"))?;
+    let session_id = ctrl_gw
+        .request_connect(&code, &captcha)
+        .map_err(|e| format!("connect: {e}"))?;
+    target_gw
+        .consent(&session_id, true)
+        .map_err(|e| format!("consent: {e}"))?;
 
-    let target_ticket = target_gw.relay_ticket(&session_id).map_err(|e| format!("target ticket: {e}"))?;
-    let ctrl_ticket = ctrl_gw.relay_ticket(&session_id).map_err(|e| format!("ctrl ticket: {e}"))?;
-    let keys = ctrl_gw.session_keys(&session_id).map_err(|e| format!("keys: {e}"))?;
+    let target_ticket = target_gw
+        .relay_ticket(&session_id)
+        .map_err(|e| format!("target ticket: {e}"))?;
+    let ctrl_ticket = ctrl_gw
+        .relay_ticket(&session_id)
+        .map_err(|e| format!("ctrl ticket: {e}"))?;
+    let keys = ctrl_gw
+        .session_keys(&session_id)
+        .map_err(|e| format!("keys: {e}"))?;
 
     let keys_match_registered = keys.controller_pubkey
         == encode_pubkey(ctrl_id.public().as_bytes())
         && keys.target_pubkey == encode_pubkey(target_id.public().as_bytes());
 
-    let mut ctrl_relay =
-        RelayClient::new(relay_addr, &session_id, &ctrl_dev.device_id).map_err(|e| e.to_string())?;
-    let mut target_relay =
-        RelayClient::new(relay_addr, &session_id, &target_dev.device_id).map_err(|e| e.to_string())?;
-    ctrl_relay.register(&ctrl_ticket).map_err(|e| e.to_string())?;
-    target_relay.register(&target_ticket).map_err(|e| e.to_string())?;
+    let mut ctrl_relay = RelayClient::new(relay_addr, &session_id, &ctrl_dev.device_id)
+        .map_err(|e| e.to_string())?;
+    let mut target_relay = RelayClient::new(relay_addr, &session_id, &target_dev.device_id)
+        .map_err(|e| e.to_string())?;
+    ctrl_relay
+        .register(&ctrl_ticket)
+        .map_err(|e| e.to_string())?;
+    target_relay
+        .register(&target_ticket)
+        .map_err(|e| e.to_string())?;
     std::thread::sleep(Duration::from_millis(400));
 
     let (mut ctrl_crypto, ctrl_eph) = CryptoSession::new(&session_id, true);
@@ -135,7 +164,9 @@ pub fn run_pair(
     };
     let mut codec = OpenH264Codec::new(cfg).map_err(|e| e.to_string())?;
     let frame = cap.grab().map_err(|e| e.to_string())?;
-    let encoded = codec.encode_bgra(&frame.data, frame.ts_ms).map_err(|e| e.to_string())?;
+    let encoded = codec
+        .encode_bgra(&frame.data, frame.ts_ms)
+        .map_err(|e| e.to_string())?;
 
     let sealed = ctrl_crypto.seal(&encoded);
     let plaintext_marker_absent = !sealed.windows(4).any(|w| w == [0, 0, 0, 1]);

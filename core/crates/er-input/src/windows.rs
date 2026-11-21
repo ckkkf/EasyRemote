@@ -201,7 +201,13 @@ fn key_input(vk: Word, scan: Word, up: bool, extended: bool) -> INPUT {
     INPUT {
         type_: INPUT_KEYBOARD,
         u: INPUT_UNION {
-            ki: KEYBDINPUT { w_vk: vk, w_scan: scan, dw_flags: flags, time: 0, dw_extra_info: 0 },
+            ki: KEYBDINPUT {
+                w_vk: vk,
+                w_scan: scan,
+                dw_flags: flags,
+                time: 0,
+                dw_extra_info: 0,
+            },
         },
     }
 }
@@ -210,7 +216,14 @@ fn mouse_input(dx: Long, dy: Long, data: Dword, flags: Dword) -> INPUT {
     INPUT {
         type_: INPUT_MOUSE,
         u: INPUT_UNION {
-            mi: MOUSEINPUT { dx, dy, mouse_data: data, dw_flags: flags, time: 0, dw_extra_info: 0 },
+            mi: MOUSEINPUT {
+                dx,
+                dy,
+                mouse_data: data,
+                dw_flags: flags,
+                time: 0,
+                dw_extra_info: 0,
+            },
         },
     }
 }
@@ -248,7 +261,10 @@ impl WindowsInjector {
         unsafe {
             let _ = SetProcessDpiAwarenessContext(DPI_AWARENESS_PER_MONITOR_V2);
         }
-        Self { live, dpi_ready: true }
+        Self {
+            live,
+            dpi_ready: true,
+        }
     }
 
     /// 读取当前光标位置（自检用）。
@@ -332,7 +348,12 @@ impl Injector for WindowsInjector {
                     return Ok(());
                 }
                 let _ = dx;
-                send_one(mouse_input(0, 0, (*dy * WHEEL_DELTA) as Dword, MOUSEEVENTF_WHEEL))
+                send_one(mouse_input(
+                    0,
+                    0,
+                    (*dy * WHEEL_DELTA) as Dword,
+                    MOUSEEVENTF_WHEEL,
+                ))
             }
         }
     }

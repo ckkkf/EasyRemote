@@ -43,7 +43,9 @@ pub struct DeviceIdentity {
 impl DeviceIdentity {
     /// 从 32 字节种子派生（生产应由安全存储提供）。
     pub fn from_seed(seed: &[u8; 32]) -> Self {
-        Self { signing: SigningKey::from_bytes(seed) }
+        Self {
+            signing: SigningKey::from_bytes(seed),
+        }
     }
 
     /// 生成随机身份（仅测试/首次注册用）。
@@ -94,7 +96,10 @@ impl Handshake {
         ephemeral.copy_from_slice(&buf[..32]);
         let mut signature = [0u8; 64];
         signature.copy_from_slice(&buf[32..]);
-        Ok(Self { ephemeral, signature })
+        Ok(Self {
+            ephemeral,
+            signature,
+        })
     }
 
     pub fn ephemeral_key(&self) -> PublicKey {
@@ -124,7 +129,10 @@ pub fn sign_handshake(
 ) -> Handshake {
     let payload = signing_payload(session_id, ephemeral.as_bytes(), role);
     let sig = identity.signing.sign(&payload);
-    Handshake { ephemeral: *ephemeral.as_bytes(), signature: sig.to_bytes() }
+    Handshake {
+        ephemeral: *ephemeral.as_bytes(),
+        signature: sig.to_bytes(),
+    }
 }
 
 /// 验证对端握手：签名必须由 peer_identity 对应的私钥产生。
@@ -136,7 +144,9 @@ pub fn verify_handshake(
 ) -> Result<(), IdentityError> {
     let payload = signing_payload(session_id, &hs.ephemeral, role);
     let sig = Signature::from_bytes(&hs.signature);
-    peer_identity.verify_strict(&payload, &sig).map_err(|_| IdentityError::BadSignature)
+    peer_identity
+        .verify_strict(&payload, &sig)
+        .map_err(|_| IdentityError::BadSignature)
 }
 
 #[cfg(test)]
@@ -213,7 +223,10 @@ mod tests {
         let back = Handshake::decode(&hs.encode()).unwrap();
         assert_eq!(back.ephemeral, hs.ephemeral);
         assert_eq!(back.signature, hs.signature);
-        assert_eq!(Handshake::decode(&[0u8; 10]).unwrap_err(), IdentityError::Malformed);
+        assert_eq!(
+            Handshake::decode(&[0u8; 10]).unwrap_err(),
+            IdentityError::Malformed
+        );
     }
 
     /// 中继尝试替换临时公钥（中间人的典型手法）：签名覆盖了公钥，必然失败。
@@ -225,7 +238,10 @@ mod tests {
 
         let hs = sign_handshake(&a, SID, &a_eph, "controlled");
         // 保留合法签名，但把临时公钥换成攻击者的
-        let forged = Handshake { ephemeral: *mitm_eph.as_bytes(), signature: hs.signature };
+        let forged = Handshake {
+            ephemeral: *mitm_eph.as_bytes(),
+            signature: hs.signature,
+        };
         assert_eq!(
             verify_handshake(&a.public(), SID, &forged, "controlled"),
             Err(IdentityError::BadSignature),
@@ -262,7 +278,10 @@ mod tests {
     #[test]
     fn fingerprint_is_stable_and_distinct() {
         let (a, b) = ids();
-        assert_eq!(a.fingerprint(), DeviceIdentity::from_seed(&[1u8; 32]).fingerprint());
+        assert_eq!(
+            a.fingerprint(),
+            DeviceIdentity::from_seed(&[1u8; 32]).fingerprint()
+        );
         assert_ne!(a.fingerprint(), b.fingerprint());
         assert_eq!(a.fingerprint().len(), 32);
     }

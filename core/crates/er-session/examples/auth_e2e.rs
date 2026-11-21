@@ -24,8 +24,10 @@ fn main() {
     let sid = "ses-auth-e2e";
     let mut host = RelayClient::new(relay, sid, "devA").expect("host client");
     let mut ctrl = RelayClient::new(relay, sid, "devB").expect("ctrl client");
-    host.register_with_secret(SECRET, "devB", 600).expect("host register");
-    ctrl.register_with_secret(SECRET, "devA", 600).expect("ctrl register");
+    host.register_with_secret(SECRET, "devB", 600)
+        .expect("host register");
+    ctrl.register_with_secret(SECRET, "devA", 600)
+        .expect("ctrl register");
     std::thread::sleep(Duration::from_millis(400));
 
     // 两端各自的长期身份（生产上来自安全存储 / 注册时登记）
@@ -48,8 +50,14 @@ fn main() {
     msg2.extend_from_slice(&ctrl_hs.encode());
     ctrl.send(&msg2).expect("send ctrl handshake");
 
-    let saw_host = ctrl.recv_timeout(Duration::from_secs(3)).expect("recv").expect("no host hs");
-    let saw_ctrl = host.recv_timeout(Duration::from_secs(3)).expect("recv").expect("no ctrl hs");
+    let saw_host = ctrl
+        .recv_timeout(Duration::from_secs(3))
+        .expect("recv")
+        .expect("no host hs");
+    let saw_ctrl = host
+        .recv_timeout(Duration::from_secs(3))
+        .expect("recv")
+        .expect("no ctrl hs");
 
     let peer_host_hs = Handshake::decode(&saw_host[TAG.len()..]).expect("decode host hs");
     let peer_ctrl_hs = Handshake::decode(&saw_ctrl[TAG.len()..]).expect("decode ctrl hs");
@@ -88,7 +96,12 @@ fn main() {
     let mut codec = OpenH264Codec::new(cfg).expect("codec");
     let frame = cap.grab().expect("capture");
     let encoded = codec.encode_bgra(&frame.data, frame.ts_ms).expect("encode");
-    println!("captured {}x{}, encoded {} bytes", frame.width, frame.height, encoded.len());
+    println!(
+        "captured {}x{}, encoded {} bytes",
+        frame.width,
+        frame.height,
+        encoded.len()
+    );
 
     let sealed = host_crypto.seal(&encoded);
     if sealed.windows(4).any(|w| w == [0, 0, 0, 1]) {
@@ -97,7 +110,10 @@ fn main() {
     }
     host.send(&sealed).expect("send");
 
-    let got = ctrl.recv_timeout(Duration::from_secs(3)).expect("recv").expect("no data");
+    let got = ctrl
+        .recv_timeout(Duration::from_secs(3))
+        .expect("recv")
+        .expect("no data");
     let plain = match ctrl_crypto.open(&got) {
         Ok(p) => p,
         Err(e) => {

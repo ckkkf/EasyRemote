@@ -45,7 +45,14 @@ pub struct EncodeConfig {
 
 impl Default for EncodeConfig {
     fn default() -> Self {
-        Self { width: 1920, height: 1080, fps: 60, bitrate_kbps: 4000, gop: 60, bframes: 0 }
+        Self {
+            width: 1920,
+            height: 1080,
+            fps: 60,
+            bitrate_kbps: 4000,
+            gop: 60,
+            bframes: 0,
+        }
     }
 }
 
@@ -228,7 +235,10 @@ impl H264Decoder {
 
     /// 解一帧，返回 RGB 像素与尺寸。
     pub fn decode(&mut self, data: &[u8]) -> Result<Option<(usize, usize, Vec<u8>)>, CodecError> {
-        let yuv = self.decoder.decode(data).map_err(|e| CodecError::Internal(e.to_string()))?;
+        let yuv = self
+            .decoder
+            .decode(data)
+            .map_err(|e| CodecError::Internal(e.to_string()))?;
         let Some(yuv) = yuv else { return Ok(None) };
         let (w, h) = yuv.dimensions();
         let mut rgb = vec![0u8; yuv.estimate_rgb_u8_size()];
@@ -252,7 +262,13 @@ impl FakeEncoder {
         if cfg.width == 0 || cfg.height == 0 || cfg.fps == 0 || !cfg.is_low_latency() {
             return Err(CodecError::UnsupportedConfig);
         }
-        Ok(Self { cfg, kind, seq: 0, next_keyframe: true, fail_next: false })
+        Ok(Self {
+            cfg,
+            kind,
+            seq: 0,
+            next_keyframe: true,
+            fail_next: false,
+        })
     }
     pub fn fail_next(&mut self, v: bool) {
         self.fail_next = v;
@@ -285,7 +301,10 @@ impl Encoder for FakeEncoder {
             ts_ms: (frame_ts_ms & 0xFFFF_FFFF) as u32,
         };
         self.seq = self.seq.wrapping_add(1);
-        Ok(Packet { header, data: vec![0u8; len] })
+        Ok(Packet {
+            header,
+            data: vec![0u8; len],
+        })
     }
 
     fn request_keyframe(&mut self) {
@@ -298,7 +317,11 @@ mod tests {
     use super::*;
 
     fn cfg(w: u32, h: u32) -> EncodeConfig {
-        EncodeConfig { width: w, height: h, ..Default::default() }
+        EncodeConfig {
+            width: w,
+            height: h,
+            ..Default::default()
+        }
     }
 
     #[test]
@@ -308,15 +331,24 @@ mod tests {
 
     #[test]
     fn bframes_violate_low_latency() {
-        let c = EncodeConfig { bframes: 2, ..Default::default() };
+        let c = EncodeConfig {
+            bframes: 2,
+            ..Default::default()
+        };
         assert!(!c.is_low_latency());
-        assert_eq!(FakeEncoder::new(c, EncoderKind::Software).unwrap_err(), CodecError::UnsupportedConfig);
+        assert_eq!(
+            FakeEncoder::new(c, EncoderKind::Software).unwrap_err(),
+            CodecError::UnsupportedConfig
+        );
     }
 
     #[test]
     fn dimension_mismatch_rejected() {
         let mut codec = OpenH264Codec::new(cfg(64, 64)).unwrap();
-        assert_eq!(codec.encode_bgra(&[0u8; 16], 0), Err(CodecError::DimensionMismatch));
+        assert_eq!(
+            codec.encode_bgra(&[0u8; 16], 0),
+            Err(CodecError::DimensionMismatch)
+        );
     }
 
     /// 真实编码：喂一帧渐变图，必须产出非空 H.264 数据。
@@ -360,7 +392,10 @@ mod tests {
         let encoded = codec.encode_bgra(&frame, 0).unwrap();
 
         let mut dec = H264Decoder::new().unwrap();
-        let decoded = dec.decode(&encoded).unwrap().expect("decoder returned nothing");
+        let decoded = dec
+            .decode(&encoded)
+            .unwrap()
+            .expect("decoder returned nothing");
         let (dw, dh, rgb) = decoded;
         assert_eq!((dw, dh), (w as usize, h as usize));
         assert!(rgb.iter().any(|b| *b != 0), "decoded pixels are all zero");

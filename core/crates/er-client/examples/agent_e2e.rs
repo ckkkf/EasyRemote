@@ -10,7 +10,9 @@ use std::thread;
 use er_client::agent::{ControllerAgent, TargetAgent};
 
 fn main() {
-    let base = std::env::args().nth(1).unwrap_or_else(|| "http://127.0.0.1:8080".into());
+    let base = std::env::args()
+        .nth(1)
+        .unwrap_or_else(|| "http://127.0.0.1:8080".into());
     let relay_addr: SocketAddr = std::env::args()
         .nth(2)
         .unwrap_or_else(|| "127.0.0.1:19121".into())
@@ -25,7 +27,9 @@ fn main() {
 
     let code = target.device_code();
     let captcha = target.rotate_captcha().expect("captcha");
-    let session_id = ctrl.request_session(&code, &captcha).expect("request session");
+    let session_id = ctrl
+        .request_session(&code, &captcha)
+        .expect("request session");
     println!("session={session_id}");
     target.consent(&session_id).expect("consent");
 
@@ -36,37 +40,57 @@ fn main() {
 
     // 2) 交换握手
     ctrl.announce(&mut c_relay, &c_msg).expect("ctrl announce");
-    target.announce(&mut t_relay, &t_msg).expect("target announce");
+    target
+        .announce(&mut t_relay, &t_msg)
+        .expect("target announce");
 
     // 3) 各自验签
-    target.finish(&mut t_relay, &mut t_crypto, &session_id).expect("target finish");
-    ctrl.finish(&mut c_relay, &mut c_crypto, &c_keys, &session_id).expect("ctrl finish");
+    target
+        .finish(&mut t_relay, &mut t_crypto, &session_id)
+        .expect("target finish");
+    ctrl.finish(&mut c_relay, &mut c_crypto, &c_keys, &session_id)
+        .expect("ctrl finish");
     println!("both handshakes verified against server-provided keys");
 
     // 4) 发帧 / 收帧
     let (tx, rx) = mpsc::channel::<usize>();
     let sender = thread::spawn(move || {
-        let sizes = ctrl.send_frames(&mut c_relay, &mut c_crypto, 5).expect("send frames");
+        let sizes = ctrl
+            .send_frames(&mut c_relay, &mut c_crypto, 5)
+            .expect("send frames");
         tx.send(sizes.len()).expect("signal");
         sizes
     });
 
-    let frames = target.recv_frames(&mut t_relay, &mut t_crypto, 5).expect("recv frames");
+    let frames = target
+        .recv_frames(&mut t_relay, &mut t_crypto, 5)
+        .expect("recv frames");
     let notified = rx.recv().expect("send count");
     let sent = sender.join().expect("sender thread");
 
-    println!("sent {} frames, received {} frames", sent.len(), frames.len());
+    println!(
+        "sent {} frames, received {} frames",
+        sent.len(),
+        frames.len()
+    );
     for (i, f) in frames.iter().enumerate() {
         println!("frame {i}: {}x{} {} bytes", f.width, f.height, f.h264_bytes);
     }
 
     if frames.len() != sent.len() || notified != sent.len() {
-        println!("FAIL: frame count mismatch ({}/{})", frames.len(), sent.len());
+        println!(
+            "FAIL: frame count mismatch ({}/{})",
+            frames.len(),
+            sent.len()
+        );
         std::process::exit(1);
     }
     if frames.iter().any(|f| f.width == 0 || f.height == 0) {
         println!("FAIL: bad frame dims");
         std::process::exit(1);
     }
-    println!("AGENT E2E PASSED ({} frames via independent single-end agents)", frames.len());
+    println!(
+        "AGENT E2E PASSED ({} frames via independent single-end agents)",
+        frames.len()
+    );
 }

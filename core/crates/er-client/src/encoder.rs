@@ -151,12 +151,11 @@ impl HybridEncoder {
         }
 
         #[cfg(target_os = "windows")]
-        let gpu_result: Option<Result<Option<Vec<u8>>, GpuFallback>> =
-            if self.policy.should_try() {
-                Some(self.gpu.try_encode(cap, &self.cfg, &mut self.policy))
-            } else {
-                None
-            };
+        let gpu_result: Option<Result<Option<Vec<u8>>, GpuFallback>> = if self.policy.should_try() {
+            Some(self.gpu.try_encode(cap, &self.cfg, &mut self.policy))
+        } else {
+            None
+        };
         #[cfg(not(target_os = "windows"))]
         let gpu_result: Option<Result<Option<Vec<u8>>, GpuFallback>> = None;
 
@@ -165,7 +164,9 @@ impl HybridEncoder {
         let backend = &mut self.backend;
         encode_frame_with_gpu(policy, backend, gpu_result, || {
             let frame = cap.grab().map_err(|e| format!("capture: {e}"))?;
-            let pkt = cpu.encode(frame.ts_ms, &frame.data).map_err(|e| e.to_string())?;
+            let pkt = cpu
+                .encode(frame.ts_ms, &frame.data)
+                .map_err(|e| e.to_string())?;
             Ok(Some(pkt.data))
         })
     }
@@ -206,13 +207,19 @@ impl HybridEncoder {
     ) -> Result<Option<Vec<u8>>, String> {
         let frame = cap.grab().map_err(|e| format!("capture: {e}"))?;
         let scaled = downscale_bgra(&frame.data, src_w, src_h, self.cfg.width, self.cfg.height)?;
-        let pkt = self.cpu.encode(frame.ts_ms, &scaled).map_err(|e| e.to_string())?;
+        let pkt = self
+            .cpu
+            .encode(frame.ts_ms, &scaled)
+            .map_err(|e| e.to_string())?;
         self.backend = "cpu-scaled";
         Ok(Some(pkt.data))
     }
 
     pub fn encode_bgra(&mut self, ts_ms: u64, data: &[u8]) -> Result<Vec<u8>, String> {
-        self.cpu.encode(ts_ms, data).map(|p| p.data).map_err(|e| e.to_string())
+        self.cpu
+            .encode(ts_ms, data)
+            .map(|p| p.data)
+            .map_err(|e| e.to_string())
     }
 
     pub fn request_keyframe(&mut self) {
@@ -243,7 +250,8 @@ pub fn downscale_bgra(
         let y1 = (((dy + 1) as u64 * src_h as u64) / dst_h as u64).max((y0 + 1) as u64) as usize;
         for dx in 0..dst_w {
             let x0 = (dx as u64 * src_w as u64 / dst_w as u64) as usize;
-            let x1 = (((dx + 1) as u64 * src_w as u64) / dst_w as u64).max((x0 + 1) as u64) as usize;
+            let x1 =
+                (((dx + 1) as u64 * src_w as u64) / dst_w as u64).max((x0 + 1) as u64) as usize;
             let (mut b, mut g, mut r, mut a, mut n) = (0u32, 0u32, 0u32, 0u32, 0u32);
             for y in y0..y1.min(src_h as usize) {
                 let row = y * src_w as usize * 4;
@@ -270,8 +278,8 @@ pub fn downscale_bgra(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use er_common::protocol::MediaHeader;
     use er_codec::{CodecError, EncoderKind, Packet};
+    use er_common::protocol::MediaHeader;
     use std::cell::Cell;
     use std::rc::Rc;
 
@@ -409,7 +417,10 @@ mod tests {
     #[test]
     fn downscale_shrinks_and_keeps_channels() {
         // 4x4 纯色 BGRA → 2x2，颜色必须还是同一个纯色
-        let src: Vec<u8> = std::iter::repeat([10u8, 20, 30, 255]).take(16).flatten().collect();
+        let src: Vec<u8> = std::iter::repeat([10u8, 20, 30, 255])
+            .take(16)
+            .flatten()
+            .collect();
         let dst = downscale_bgra(&src, 4, 4, 2, 2).expect("downscale");
         assert_eq!(dst.len(), 2 * 2 * 4);
         assert_eq!(&dst[0..4], &[10, 20, 30, 255]);
@@ -424,14 +435,30 @@ mod tests {
     /// ABR 改档：reconfigure 之后 config() 必须反映新参数（码率/分辨率/帧率）
     #[test]
     fn reconfigure_applies_new_config() {
-        let src = EncodeConfig { width: 64, height: 48, fps: 60, bitrate_kbps: 8000, gop: 60, bframes: 0 };
+        let src = EncodeConfig {
+            width: 64,
+            height: 48,
+            fps: 60,
+            bitrate_kbps: 8000,
+            gop: 60,
+            bframes: 0,
+        };
         let mut enc = HybridEncoder::new(src).expect("encoder");
         assert_eq!(enc.config().bitrate_kbps, 8000);
-        let next = EncodeConfig { width: 32, height: 24, fps: 30, bitrate_kbps: 1500, gop: 30, bframes: 0 };
+        let next = EncodeConfig {
+            width: 32,
+            height: 24,
+            fps: 30,
+            bitrate_kbps: 1500,
+            gop: 30,
+            bframes: 0,
+        };
         enc.reconfigure(next).expect("reconfigure");
         assert_eq!(enc.config(), next);
         assert!(enc.is_downscaled(64, 48));
-        let pkt = enc.encode_bgra(0, &vec![0u8; 32 * 24 * 4]).expect("encode at new size");
+        let pkt = enc
+            .encode_bgra(0, &vec![0u8; 32 * 24 * 4])
+            .expect("encode at new size");
         assert!(!pkt.is_empty());
     }
 

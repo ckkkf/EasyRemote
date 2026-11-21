@@ -129,7 +129,11 @@ impl QuicListener {
         let (server_cfg, cert_der) = make_server_config()?;
         let endpoint = Endpoint::server(server_cfg, bind).map_err(QuicError::Io)?;
         let local_addr = endpoint.local_addr().map_err(QuicError::Io)?;
-        Ok(Self { endpoint, local_addr, cert_der })
+        Ok(Self {
+            endpoint,
+            local_addr,
+            cert_der,
+        })
     }
 
     pub fn local_addr(&self) -> SocketAddr {
@@ -175,9 +179,7 @@ pub struct QuicTransport {
 
 impl QuicTransport {
     /// 启动服务端并等待一个连接，返回本地地址、传输实例、证书 DER。
-    pub async fn accept_one(
-        bind: SocketAddr,
-    ) -> Result<(SocketAddr, Self, Vec<u8>), QuicError> {
+    pub async fn accept_one(bind: SocketAddr) -> Result<(SocketAddr, Self, Vec<u8>), QuicError> {
         let listener = QuicListener::bind(bind)?;
         let addr = listener.local_addr();
         let cert = listener.cert_der().to_vec();
@@ -271,7 +273,11 @@ impl QuicTransport {
     /// 关闭连接前必须调用，否则排队中的控制帧会随连接销毁而丢失。
     pub async fn flush(&self, timeout: std::time::Duration) -> bool {
         let deadline = tokio::time::Instant::now() + timeout;
-        while self.pending_reliable.load(std::sync::atomic::Ordering::SeqCst) > 0 {
+        while self
+            .pending_reliable
+            .load(std::sync::atomic::Ordering::SeqCst)
+            > 0
+        {
             if tokio::time::Instant::now() >= deadline {
                 return false;
             }
@@ -297,8 +303,16 @@ impl QuicTransport {
             s.recv_frames += 1;
             s.bytes_recv += datagram.len() as u64;
         }
-        let channel = if header.frame_type == 2 { Channel::Audio } else { Channel::Video };
-        Some(Frame { channel, header: Some(header), payload })
+        let channel = if header.frame_type == 2 {
+            Channel::Audio
+        } else {
+            Channel::Video
+        };
+        Some(Frame {
+            channel,
+            header: Some(header),
+            payload,
+        })
     }
 
     /// 异步接收一条可靠流（控制/数据）。
@@ -317,7 +331,11 @@ impl QuicTransport {
             s.recv_frames += 1;
             s.bytes_recv += buf.len() as u64;
         }
-        Some(Frame { channel, header: None, payload: buf[1..].to_vec() })
+        Some(Frame {
+            channel,
+            header: None,
+            payload: buf[1..].to_vec(),
+        })
     }
 }
 
@@ -369,7 +387,9 @@ impl Transport for QuicTransport {
                 Ok(())
             }
             // 队列满：明确返回背压，而不是静默丢弃或无限堆内存
-            Err(tokio::sync::mpsc::error::TrySendError::Full(_)) => Err(TransportError::Backpressure),
+            Err(tokio::sync::mpsc::error::TrySendError::Full(_)) => {
+                Err(TransportError::Backpressure)
+            }
             Err(tokio::sync::mpsc::error::TrySendError::Closed(_)) => Err(TransportError::Closed),
         }
     }
@@ -394,7 +414,13 @@ mod tests {
     use std::time::Duration;
 
     fn hdr(seq: u16) -> MediaHeader {
-        MediaHeader { frame_type: 1, stream_id: 0, seq, flags: 0, ts_ms: 0 }
+        MediaHeader {
+            frame_type: 1,
+            stream_id: 0,
+            seq,
+            flags: 0,
+            ts_ms: 0,
+        }
     }
 
     /// 端到端：真实 QUIC 连接，双向往返数据报与可靠流。
@@ -434,8 +460,12 @@ mod tests {
         let bind: SocketAddr = "127.0.0.1:0".parse().unwrap();
         let mut client = QuicTransport::connect(bind, addr, cert).await.unwrap();
 
-        client.send_datagram(Channel::Video, hdr(7), vec![1, 2, 3]).unwrap();
-        client.send_reliable(Channel::Control, b"ping".to_vec()).unwrap();
+        client
+            .send_datagram(Channel::Video, hdr(7), vec![1, 2, 3])
+            .unwrap();
+        client
+            .send_reliable(Channel::Control, b"ping".to_vec())
+            .unwrap();
 
         let pong = tokio::time::timeout(Duration::from_secs(5), client.recv_reliable())
             .await

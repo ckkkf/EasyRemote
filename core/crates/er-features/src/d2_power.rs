@@ -47,7 +47,10 @@ impl<'a, T: SleepInhibitor> SleepGuard<'a, T> {
     /// 申请抑制并返回 guard。
     pub fn new(inhibitor: &'a mut T, keep_display: bool) -> Result<Self, PowerError> {
         inhibitor.acquire(keep_display)?;
-        Ok(Self { inhibitor, active: true })
+        Ok(Self {
+            inhibitor,
+            active: true,
+        })
     }
 
     /// 手动提前释放。

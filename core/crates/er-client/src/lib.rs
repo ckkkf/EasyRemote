@@ -8,8 +8,8 @@ pub mod link;
 
 #[cfg(target_os = "windows")]
 mod gpu_glue;
-pub mod signalling;
 pub mod pair;
+pub mod signalling;
 
 use serde::Deserialize;
 
@@ -66,16 +66,31 @@ pub struct Gateway {
 }
 
 impl Gateway {
-    pub fn new(base: impl Into<String>, token: impl Into<String>, device_token: impl Into<String>) -> Self {
-        Self { base: base.into(), token: token.into(), device_token: device_token.into() }
+    pub fn new(
+        base: impl Into<String>,
+        token: impl Into<String>,
+        device_token: impl Into<String>,
+    ) -> Self {
+        Self {
+            base: base.into(),
+            token: token.into(),
+            device_token: device_token.into(),
+        }
     }
 
     fn url(&self, path: &str) -> String {
         format!("{}{}", self.base, path)
     }
 
-    fn call(&self, method: &str, path: &str, body: Option<serde_json::Value>, with_device: bool) -> Result<serde_json::Value, ServiceError> {
-        let mut req = ureq::request(method, &self.url(path)).set("content-type", "application/json");
+    fn call(
+        &self,
+        method: &str,
+        path: &str,
+        body: Option<serde_json::Value>,
+        with_device: bool,
+    ) -> Result<serde_json::Value, ServiceError> {
+        let mut req =
+            ureq::request(method, &self.url(path)).set("content-type", "application/json");
         if !self.token.is_empty() {
             req = req.set("authorization", &format!("Bearer {}", self.token));
         }
@@ -87,24 +102,37 @@ impl Gateway {
             None => req.call(),
         };
         match resp {
-            Ok(r) => r.into_json::<serde_json::Value>().map_err(|e| ServiceError {
-                code: "PARSE".into(),
-                message: e.to_string(),
-            }),
+            Ok(r) => r
+                .into_json::<serde_json::Value>()
+                .map_err(|e| ServiceError {
+                    code: "PARSE".into(),
+                    message: e.to_string(),
+                }),
             Err(ureq::Error::Status(_, r)) => {
                 let err = r.into_json::<ErrorBody>().unwrap_or(ErrorBody {
                     code: "HTTP".into(),
                     message: "request failed".into(),
                 });
-                Err(ServiceError { code: err.code, message: err.message })
+                Err(ServiceError {
+                    code: err.code,
+                    message: err.message,
+                })
             }
-            Err(e) => Err(ServiceError { code: "NET".into(), message: e.to_string() }),
+            Err(e) => Err(ServiceError {
+                code: "NET".into(),
+                message: e.to_string(),
+            }),
         }
     }
 
     /// 发送短信验证码（开发环境固定 123456）。
     pub fn send_sms(&self, phone: &str) -> Result<(), ServiceError> {
-        self.call("POST", "/v1/auth/sms", Some(serde_json::json!({ "phone": phone })), false)?;
+        self.call(
+            "POST",
+            "/v1/auth/sms",
+            Some(serde_json::json!({ "phone": phone })),
+            false,
+        )?;
         Ok(())
     }
 
@@ -116,16 +144,27 @@ impl Gateway {
             Some(serde_json::json!({ "phone": phone, "code": code })),
             false,
         )?;
-        v["token"].as_str().map(|s| s.to_string()).ok_or_else(|| ServiceError {
-            code: "PARSE".into(),
-            message: "missing token".into(),
-        })
+        v["token"]
+            .as_str()
+            .map(|s| s.to_string())
+            .ok_or_else(|| ServiceError {
+                code: "PARSE".into(),
+                message: "missing token".into(),
+            })
     }
 
     /// 绑定一台设备。
     pub fn bind_device(&self, platform: &str) -> Result<BoundDevice, ServiceError> {
-        let v = self.call("POST", "/v1/devices/bind", Some(serde_json::json!({ "platform": platform })), false)?;
-        serde_json::from_value(v).map_err(|e| ServiceError { code: "PARSE".into(), message: e.to_string() })
+        let v = self.call(
+            "POST",
+            "/v1/devices/bind",
+            Some(serde_json::json!({ "platform": platform })),
+            false,
+        )?;
+        serde_json::from_value(v).map_err(|e| ServiceError {
+            code: "PARSE".into(),
+            message: e.to_string(),
+        })
     }
 
     /// 登记设备身份公钥（32 字节 hex）。
@@ -147,14 +186,21 @@ impl Gateway {
             Some(serde_json::json!({ "device_code": device_code })),
             true,
         )?;
-        v["code"].as_str().map(|s| s.to_string()).ok_or_else(|| ServiceError {
-            code: "PARSE".into(),
-            message: "missing code".into(),
-        })
+        v["code"]
+            .as_str()
+            .map(|s| s.to_string())
+            .ok_or_else(|| ServiceError {
+                code: "PARSE".into(),
+                message: "missing code".into(),
+            })
     }
 
     /// 发起连接，返回 session id。
-    pub fn request_connect(&self, device_code: &str, captcha: &str) -> Result<String, ServiceError> {
+    pub fn request_connect(
+        &self,
+        device_code: &str,
+        captcha: &str,
+    ) -> Result<String, ServiceError> {
         // 必须带设备凭证：服务端用它在同账号多设备时确定 controller_id
         let v = self.call(
             "POST",
@@ -162,10 +208,13 @@ impl Gateway {
             Some(serde_json::json!({ "device_code": device_code, "captcha": captcha })),
             true,
         )?;
-        v["session_id"].as_str().map(|s| s.to_string()).ok_or_else(|| ServiceError {
-            code: "PARSE".into(),
-            message: "missing session_id".into(),
-        })
+        v["session_id"]
+            .as_str()
+            .map(|s| s.to_string())
+            .ok_or_else(|| ServiceError {
+                code: "PARSE".into(),
+                message: "missing session_id".into(),
+            })
     }
 
     /// 被控端授权。
@@ -187,16 +236,27 @@ impl Gateway {
             Some(serde_json::json!({ "session_id": session_id })),
             true,
         )?;
-        v["ticket"].as_str().map(|s| s.to_string()).ok_or_else(|| ServiceError {
-            code: "PARSE".into(),
-            message: "missing ticket".into(),
-        })
+        v["ticket"]
+            .as_str()
+            .map(|s| s.to_string())
+            .ok_or_else(|| ServiceError {
+                code: "PARSE".into(),
+                message: "missing ticket".into(),
+            })
     }
 
     /// 读取会话双方公钥。
     pub fn session_keys(&self, session_id: &str) -> Result<SessionKeys, ServiceError> {
-        let v = self.call("GET", &format!("/v1/connect/keys?session_id={session_id}"), None, false)?;
-        serde_json::from_value(v).map_err(|e| ServiceError { code: "PARSE".into(), message: e.to_string() })
+        let v = self.call(
+            "GET",
+            &format!("/v1/connect/keys?session_id={session_id}"),
+            None,
+            false,
+        )?;
+        serde_json::from_value(v).map_err(|e| ServiceError {
+            code: "PARSE".into(),
+            message: e.to_string(),
+        })
     }
 }
 

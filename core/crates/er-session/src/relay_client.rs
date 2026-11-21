@@ -7,7 +7,7 @@ use std::time::Duration;
 
 use crate::ticket::{issue, Ticket};
 use crate::wire::{
-    encode_frame, encode_register, fragment, Reassembler, FRAME_DATA, FRAME_REGISTER, FRAG_HEADER,
+    encode_frame, encode_register, fragment, Reassembler, FRAG_HEADER, FRAME_DATA, FRAME_REGISTER,
     MAX_DATAGRAM,
 };
 
@@ -119,7 +119,12 @@ impl RelayClient {
     }
 
     /// 便捷方法：用本地 secret 自签票据并注册。
-    pub fn register_with_secret(&self, secret: &[u8], peer_device: &str, ttl_secs: i64) -> Result<(), ClientError> {
+    pub fn register_with_secret(
+        &self,
+        secret: &[u8],
+        peer_device: &str,
+        ttl_secs: i64,
+    ) -> Result<(), ClientError> {
         let exp = now_unix() + ttl_secs;
         let tk = issue(secret, &self.session_id, &self.device_id, peer_device, exp);
         self.register(&tk)

@@ -32,10 +32,15 @@ fn real_main() {
     const MSG_DONE: u8 = 0x12;
 
     fn arg(i: usize, default: &str) -> String {
-        std::env::args().nth(i).unwrap_or_else(|| default.to_string())
+        std::env::args()
+            .nth(i)
+            .unwrap_or_else(|| default.to_string())
     }
     fn now_ms() -> u64 {
-        SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis() as u64).unwrap_or(0)
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_millis() as u64)
+            .unwrap_or(0)
     }
 
     let base = arg(1, "http://127.0.0.1:18090");
@@ -51,12 +56,19 @@ fn real_main() {
     let captcha = target.rotate_captcha().expect("captcha");
     std::fs::write(
         &hello_file,
-        format!("device_id={}\ndevice_code={}\ncaptcha={}\n", target.device_id(), code, captcha),
+        format!(
+            "device_id={}\ndevice_code={}\ncaptcha={}\n",
+            target.device_id(),
+            code,
+            captcha
+        ),
     )
     .expect("write hello");
     println!("RECV: ready device_code={code} captcha={captcha}");
 
-    let session_id = target.wait_for_session(&signal, Duration::from_secs(180)).expect("signalling");
+    let session_id = target
+        .wait_for_session(&signal, Duration::from_secs(180))
+        .expect("signalling");
     println!("RECV: session={session_id}");
     target.consent(&session_id).expect("consent");
     std::thread::sleep(Duration::from_millis(1200));

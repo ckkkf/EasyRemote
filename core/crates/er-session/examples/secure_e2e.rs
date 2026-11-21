@@ -26,8 +26,10 @@ fn main() {
     let sid = "ses-secure-1";
     let mut host = RelayClient::new(relay, sid, "devA").expect("host client");
     let mut ctrl = RelayClient::new(relay, sid, "devB").expect("ctrl client");
-    host.register_with_secret(SECRET, "devB", 600).expect("host register");
-    ctrl.register_with_secret(SECRET, "devA", 600).expect("ctrl register");
+    host.register_with_secret(SECRET, "devB", 600)
+        .expect("host register");
+    ctrl.register_with_secret(SECRET, "devA", 600)
+        .expect("ctrl register");
     std::thread::sleep(Duration::from_millis(400));
 
     // --- 密钥交换（公钥走中继明文，密钥本身永不过网）---
@@ -95,11 +97,21 @@ fn main() {
             return;
         }
     };
-    println!("source {}x{}, encoded {} bytes", frame.width, frame.height, encoded.len());
+    println!(
+        "source {}x{}, encoded {} bytes",
+        frame.width,
+        frame.height,
+        encoded.len()
+    );
 
     // --- 加密并发送 ---
     let sealed = host_crypto.seal(&encoded);
-    println!("sealed {} -> {} bytes (+{} overhead)", encoded.len(), sealed.len(), sealed.len() - encoded.len());
+    println!(
+        "sealed {} -> {} bytes (+{} overhead)",
+        encoded.len(),
+        sealed.len(),
+        sealed.len() - encoded.len()
+    );
     if sealed.windows(4).any(|w| w == [0, 0, 0, 1]) {
         println!("FAIL: Annex-B start code leaked into ciphertext");
         std::process::exit(1);
@@ -129,7 +141,10 @@ fn main() {
         println!("FAIL: decrypted payload differs from original");
         std::process::exit(1);
     }
-    println!("decrypted {} bytes, identical to source stream", plain.len());
+    println!(
+        "decrypted {} bytes, identical to source stream",
+        plain.len()
+    );
 
     // --- 解码验证画面可还原 ---
     let mut dec = match H264Decoder::new() {

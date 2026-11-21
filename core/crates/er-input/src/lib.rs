@@ -112,7 +112,11 @@ impl RecordingInjector {
         Self::default()
     }
     pub fn live() -> Self {
-        Self { events: Vec::new(), live: true, deny: false }
+        Self {
+            events: Vec::new(),
+            live: true,
+            deny: false,
+        }
     }
     pub fn count(&self) -> usize {
         self.events.len()
@@ -142,14 +146,42 @@ impl Injector for RecordingInjector {
 pub fn scancode_for(name: &str) -> Option<u16> {
     let key = name.to_ascii_lowercase();
     let code = match key.as_str() {
-        "a" => 0x04, "b" => 0x05, "c" => 0x06, "d" => 0x07, "e" => 0x08,
-        "f" => 0x09, "g" => 0x0A, "h" => 0x0B, "i" => 0x0C, "j" => 0x0D,
-        "k" => 0x0E, "l" => 0x0F, "m" => 0x10, "n" => 0x11, "o" => 0x12,
-        "p" => 0x13, "q" => 0x14, "r" => 0x15, "s" => 0x16, "t" => 0x17,
-        "u" => 0x18, "v" => 0x19, "w" => 0x1A, "x" => 0x1B, "y" => 0x1C,
+        "a" => 0x04,
+        "b" => 0x05,
+        "c" => 0x06,
+        "d" => 0x07,
+        "e" => 0x08,
+        "f" => 0x09,
+        "g" => 0x0A,
+        "h" => 0x0B,
+        "i" => 0x0C,
+        "j" => 0x0D,
+        "k" => 0x0E,
+        "l" => 0x0F,
+        "m" => 0x10,
+        "n" => 0x11,
+        "o" => 0x12,
+        "p" => 0x13,
+        "q" => 0x14,
+        "r" => 0x15,
+        "s" => 0x16,
+        "t" => 0x17,
+        "u" => 0x18,
+        "v" => 0x19,
+        "w" => 0x1A,
+        "x" => 0x1B,
+        "y" => 0x1C,
         "z" => 0x1D,
-        "1" => 0x1E, "2" => 0x1F, "3" => 0x20, "4" => 0x21, "5" => 0x22,
-        "6" => 0x23, "7" => 0x24, "8" => 0x25, "9" => 0x26, "0" => 0x27,
+        "1" => 0x1E,
+        "2" => 0x1F,
+        "3" => 0x20,
+        "4" => 0x21,
+        "5" => 0x22,
+        "6" => 0x23,
+        "7" => 0x24,
+        "8" => 0x25,
+        "9" => 0x26,
+        "0" => 0x27,
         "enter" | "return" => 0x28,
         "esc" | "escape" => 0x29,
         "backspace" => 0x2A,
@@ -167,9 +199,18 @@ pub fn scancode_for(name: &str) -> Option<u16> {
         "." => 0x37,
         "/" => 0x38,
         "capslock" => 0x39,
-        "f1" => 0x3A, "f2" => 0x3B, "f3" => 0x3C, "f4" => 0x3D,
-        "f5" => 0x3E, "f6" => 0x3F, "f7" => 0x40, "f8" => 0x41,
-        "f9" => 0x42, "f10" => 0x43, "f11" => 0x44, "f12" => 0x45,
+        "f1" => 0x3A,
+        "f2" => 0x3B,
+        "f3" => 0x3C,
+        "f4" => 0x3D,
+        "f5" => 0x3E,
+        "f6" => 0x3F,
+        "f7" => 0x40,
+        "f8" => 0x41,
+        "f9" => 0x42,
+        "f10" => 0x43,
+        "f11" => 0x44,
+        "f12" => 0x45,
         "printscreen" => 0x46,
         "scrolllock" => 0x47,
         "pause" => 0x48,
@@ -224,7 +265,11 @@ mod tests {
     #[test]
     fn recording_injector_counts_events() {
         let mut inj = RecordingInjector::live();
-        inj.inject(&InputEvent::Key { scancode: 0x04, pressed: true }).unwrap();
+        inj.inject(&InputEvent::Key {
+            scancode: 0x04,
+            pressed: true,
+        })
+        .unwrap();
         inj.inject(&InputEvent::MouseMove { x: 10, y: 20 }).unwrap();
         assert_eq!(inj.count(), 2);
         assert!(inj.is_live());
@@ -233,7 +278,11 @@ mod tests {
     #[test]
     fn observer_mode_injects_nothing() {
         let mut inj = RecordingInjector::new(); // live = false
-        inj.inject(&InputEvent::Key { scancode: 0x04, pressed: true }).unwrap();
+        inj.inject(&InputEvent::Key {
+            scancode: 0x04,
+            pressed: true,
+        })
+        .unwrap();
         assert_eq!(inj.count(), 0, "observer must not inject");
     }
 
@@ -242,14 +291,20 @@ mod tests {
         let mut inj = RecordingInjector::live();
         inj.deny = true;
         assert_eq!(
-            inj.inject(&InputEvent::Key { scancode: 0x04, pressed: true }),
+            inj.inject(&InputEvent::Key {
+                scancode: 0x04,
+                pressed: true
+            }),
             Err(InjectError::PermissionDenied)
         );
     }
 
     #[test]
     fn coordinate_normalization_roundtrip() {
-        let g = ScreenGeom { width: 1920, height: 1080 };
+        let g = ScreenGeom {
+            width: 1920,
+            height: 1080,
+        };
         let (nx, ny) = g.normalize(960, 540);
         let (x, y) = g.denormalize(nx, ny);
         assert!((x - 960).abs() <= 1, "x roundtrip {x}");
@@ -258,7 +313,10 @@ mod tests {
 
     #[test]
     fn coordinate_bounds() {
-        let g = ScreenGeom { width: 1920, height: 1080 };
+        let g = ScreenGeom {
+            width: 1920,
+            height: 1080,
+        };
         assert!(g.contains(0, 0));
         assert!(g.contains(1919, 1079));
         assert!(!g.contains(1920, 1079));
@@ -267,7 +325,10 @@ mod tests {
 
     #[test]
     fn denormalize_reaches_edges() {
-        let g = ScreenGeom { width: 1920, height: 1080 };
+        let g = ScreenGeom {
+            width: 1920,
+            height: 1080,
+        };
         assert_eq!(g.denormalize(0, 0), (0, 0));
         let (x, y) = g.denormalize(65535, 65535);
         assert!(x <= 1920 && y <= 1080);

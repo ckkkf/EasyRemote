@@ -101,7 +101,10 @@ impl CryptoSession {
         let out = cipher
             .encrypt(
                 Nonce::from_slice(&nonce_bytes),
-                Payload { msg: plaintext, aad: &self.aad },
+                Payload {
+                    msg: plaintext,
+                    aad: &self.aad,
+                },
             )
             .expect("chacha20poly1305 encrypt never fails for valid inputs");
         self.tx_nonce += 1;
@@ -129,7 +132,10 @@ impl CryptoSession {
         let pt = cipher
             .decrypt(
                 Nonce::from_slice(nonce_bytes),
-                Payload { msg: ct, aad: &self.aad },
+                Payload {
+                    msg: ct,
+                    aad: &self.aad,
+                },
             )
             .map_err(|_| CryptoError::DecryptFailed)?;
         self.rx_last = Some(counter);
@@ -201,7 +207,11 @@ mod tests {
         let (mut a, mut b) = pair("ses-1");
         let ct = a.seal(b"once");
         assert!(b.open(&ct).is_ok());
-        assert_eq!(b.open(&ct), Err(CryptoError::Replayed), "replay must be rejected");
+        assert_eq!(
+            b.open(&ct),
+            Err(CryptoError::Replayed),
+            "replay must be rejected"
+        );
     }
 
     #[test]
@@ -237,7 +247,10 @@ mod tests {
         let (mut a, mut b) = pair("ses-1");
         let ct = a.seal(b"x");
         // 让 a 尝试解自己的包：tx/rx 不同，必须失败
-        assert!(a.open(&ct).is_err(), "sender must not decrypt with its own tx key");
+        assert!(
+            a.open(&ct).is_err(),
+            "sender must not decrypt with its own tx key"
+        );
         assert!(b.open(&ct).is_ok());
     }
 }

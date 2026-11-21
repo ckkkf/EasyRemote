@@ -13,13 +13,14 @@ use er_capture::{Capture, ScreenCapture};
 use er_client::agent::TargetAgent;
 
 fn arg(i: usize, default: &str) -> String {
-    std::env::args().nth(i).unwrap_or_else(|| default.to_string())
+    std::env::args()
+        .nth(i)
+        .unwrap_or_else(|| default.to_string())
 }
 
 fn main() {
     let base = arg(1, "http://127.0.0.1:18090");
-    let relay_addr: SocketAddr =
-        arg(2, "127.0.0.1:19000").parse().expect("relay addr");
+    let relay_addr: SocketAddr = arg(2, "127.0.0.1:19000").parse().expect("relay addr");
     let phone = arg(3, "13700004101");
     let sms = arg(4, "123456");
     let signal = arg(5, &base.clone());
@@ -31,10 +32,20 @@ fn main() {
     let target = TargetAgent::start(&base, &phone, &sms, relay_addr).expect("target start");
     let code = target.device_code();
     let captcha = target.rotate_captcha().expect("captcha");
-    println!("WIN: device_id={} device_code={} captcha={}", target.device_id(), code, captcha);
+    println!(
+        "WIN: device_id={} device_code={} captcha={}",
+        target.device_id(),
+        code,
+        captcha
+    );
     std::fs::write(
         &hello_file,
-        format!("device_id={}\ndevice_code={}\ncaptcha={}\n", target.device_id(), code, captcha),
+        format!(
+            "device_id={}\ndevice_code={}\ncaptcha={}\n",
+            target.device_id(),
+            code,
+            captcha
+        ),
     )
     .expect("write hello");
 
@@ -50,12 +61,18 @@ fn main() {
     std::thread::sleep(Duration::from_millis(1000));
     let (mut relay, mut crypto, msg) = target.begin(&session_id).expect("begin");
     println!("WIN: relay registered");
-    target.announce(&mut relay, &msg).expect("announce target handshake");
-    target.finish(&mut relay, &mut crypto, &session_id).expect("handshake verify");
+    target
+        .announce(&mut relay, &msg)
+        .expect("announce target handshake");
+    target
+        .finish(&mut relay, &mut crypto, &session_id)
+        .expect("handshake verify");
     println!("WIN: handshake verified (ed25519 + x25519)");
 
     // ① 解码主控发来的真实帧
-    let got = target.recv_frames(&mut relay, &mut crypto, in_frames).expect("recv frames");
+    let got = target
+        .recv_frames(&mut relay, &mut crypto, in_frames)
+        .expect("recv frames");
     println!(
         "WIN: frames_received={} resolution={}x{} first_h264_bytes={}",
         got.len(),
@@ -70,7 +87,9 @@ fn main() {
         .expect("open primary display");
     println!("WIN: capture_display={}x{}", info.0, info.1);
     let t0 = std::time::Instant::now();
-    let sizes = target.send_frames(&mut relay, &mut crypto, out_frames).expect("send frames");
+    let sizes = target
+        .send_frames(&mut relay, &mut crypto, out_frames)
+        .expect("send frames");
     let total: usize = sizes.iter().sum();
     println!(
         "WIN: frames_sent={} bytes_total={} ms={} dims={}x{}",

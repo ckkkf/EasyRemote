@@ -112,13 +112,19 @@ fn macos_display_pixels() -> (u32, u32) {
     }
     unsafe {
         let id = CGMainDisplayID();
-        (CGDisplayPixelsWide(id) as u32, CGDisplayPixelsHigh(id) as u32)
+        (
+            CGDisplayPixelsWide(id) as u32,
+            CGDisplayPixelsHigh(id) as u32,
+        )
     }
 }
 
 fn open_xcap_primary() -> Result<(xcap::Monitor, u32, u32), CaptureError> {
     let monitors = xcap::Monitor::all().map_err(|_| CaptureError::Unavailable)?;
-    let display = monitors.into_iter().next().ok_or(CaptureError::Unavailable)?;
+    let display = monitors
+        .into_iter()
+        .next()
+        .ok_or(CaptureError::Unavailable)?;
     #[cfg(target_os = "macos")]
     {
         let (pw, ph) = macos_display_pixels();
@@ -153,7 +159,12 @@ fn xcap_grab(display: &xcap::Monitor) -> Result<RawFrame, CaptureError> {
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_millis() as u64)
         .unwrap_or(0);
-    Ok(RawFrame { width: w, height: h, ts_ms, data })
+    Ok(RawFrame {
+        width: w,
+        height: h,
+        ts_ms,
+        data,
+    })
 }
 
 impl ScreenCapture {
@@ -175,7 +186,12 @@ impl ScreenCapture {
         let (display, width, height) = open_xcap_primary()?;
         Ok(Self {
             backend: Backend::Xcap(display),
-            info: CaptureInfo { width, height, refresh_hz: 60, display_count: 1 },
+            info: CaptureInfo {
+                width,
+                height,
+                refresh_hz: 60,
+                display_count: 1,
+            },
             #[cfg(target_os = "windows")]
             fallback: None,
             last_data: None,
@@ -188,7 +204,12 @@ impl ScreenCapture {
         let (display, width, height) = open_xcap_primary()?;
         Ok(Self {
             backend: Backend::Xcap(display),
-            info: CaptureInfo { width, height, refresh_hz: 60, display_count: 1 },
+            info: CaptureInfo {
+                width,
+                height,
+                refresh_hz: 60,
+                display_count: 1,
+            },
             #[cfg(target_os = "windows")]
             fallback: None,
             last_data: None,
@@ -323,7 +344,12 @@ pub struct FakeCapture {
 impl FakeCapture {
     pub fn new(width: u32, height: u32) -> Self {
         Self {
-            info: CaptureInfo { width, height, refresh_hz: 60, display_count: 1 },
+            info: CaptureInfo {
+                width,
+                height,
+                refresh_hz: 60,
+                display_count: 1,
+            },
             frames: VecDeque::new(),
             lost: false,
             denied: false,
@@ -371,14 +397,24 @@ mod tests {
 
     #[test]
     fn frame_layout_is_bgra() {
-        let f = RawFrame { width: 2, height: 2, ts_ms: 0, data: vec![0u8; 16] };
+        let f = RawFrame {
+            width: 2,
+            height: 2,
+            ts_ms: 0,
+            data: vec![0u8; 16],
+        };
         assert!(f.is_well_formed());
         assert_eq!(RawFrame::expected_len(2, 2), 16);
     }
 
     #[test]
     fn malformed_frame_detected() {
-        let f = RawFrame { width: 2, height: 2, ts_ms: 0, data: vec![0u8; 15] };
+        let f = RawFrame {
+            width: 2,
+            height: 2,
+            ts_ms: 0,
+            data: vec![0u8; 15],
+        };
         assert!(!f.is_well_formed());
     }
 
@@ -425,10 +461,15 @@ mod tests {
                     RawFrame::expected_len(frame.width, frame.height)
                 );
                 // 全黑画面说明没真采到内容
-                assert!(frame.data.iter().any(|b| *b != 0), "captured frame is all zero");
+                assert!(
+                    frame.data.iter().any(|b| *b != 0),
+                    "captured frame is all zero"
+                );
                 eprintln!("captured {}x{} frame", frame.width, frame.height);
             }
-            Err(CaptureError::PermissionDenied) => eprintln!("skip: screen recording permission not granted"),
+            Err(CaptureError::PermissionDenied) => {
+                eprintln!("skip: screen recording permission not granted")
+            }
             Err(e) => eprintln!("skip: capture failed: {e}"),
         }
     }

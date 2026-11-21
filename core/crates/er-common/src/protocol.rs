@@ -84,7 +84,11 @@ pub enum EncodeError {
 
 impl Envelope {
     pub fn new(msg_type: MsgType, flags: u8, payload: Vec<u8>) -> Self {
-        Self { msg_type: msg_type as u8, flags, payload }
+        Self {
+            msg_type: msg_type as u8,
+            flags,
+            payload,
+        }
     }
 
     /// 编码为字节流。
@@ -173,11 +177,32 @@ impl MediaHeader {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum InputEvent {
-    KeyDown { scancode: u32, modifiers: u32, ts_ms: u64 },
-    KeyUp { scancode: u32, modifiers: u32, ts_ms: u64 },
-    MouseMove { x: u16, y: u16, ts_ms: u64 },
-    MouseButton { button: u8, pressed: bool, x: u16, y: u16, ts_ms: u64 },
-    MouseWheel { delta: i16, ts_ms: u64 },
+    KeyDown {
+        scancode: u32,
+        modifiers: u32,
+        ts_ms: u64,
+    },
+    KeyUp {
+        scancode: u32,
+        modifiers: u32,
+        ts_ms: u64,
+    },
+    MouseMove {
+        x: u16,
+        y: u16,
+        ts_ms: u64,
+    },
+    MouseButton {
+        button: u8,
+        pressed: bool,
+        x: u16,
+        y: u16,
+        ts_ms: u64,
+    },
+    MouseWheel {
+        delta: i16,
+        ts_ms: u64,
+    },
 }
 
 impl InputEvent {
@@ -225,7 +250,9 @@ mod tests {
 
     #[test]
     fn envelope_rejects_truncated() {
-        let bytes = Envelope::new(MsgType::Hello, 0, b"abcdef".to_vec()).encode().unwrap();
+        let bytes = Envelope::new(MsgType::Hello, 0, b"abcdef".to_vec())
+            .encode()
+            .unwrap();
         assert!(Envelope::decode(&bytes[..bytes.len() - 2]).is_none());
     }
 
@@ -259,7 +286,11 @@ mod tests {
 
     #[test]
     fn input_event_serde() {
-        let ev = InputEvent::MouseMove { x: 100, y: 200, ts_ms: 1 };
+        let ev = InputEvent::MouseMove {
+            x: 100,
+            y: 200,
+            ts_ms: 1,
+        };
         let json = serde_json::to_string(&ev).unwrap();
         assert!(json.contains("mouse_move"));
         let back: InputEvent = serde_json::from_str(&json).unwrap();

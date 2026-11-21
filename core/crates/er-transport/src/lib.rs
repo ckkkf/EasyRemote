@@ -65,7 +65,12 @@ pub struct Stats {
 /// 传输接口。实现方负责连接、打洞与中继切换。
 pub trait Transport {
     /// 发送不可靠数据报（视频/音频）。队列满时丢最旧帧，绝不阻塞。
-    fn send_datagram(&mut self, channel: Channel, header: MediaHeader, payload: Vec<u8>) -> Result<(), TransportError>;
+    fn send_datagram(
+        &mut self,
+        channel: Channel,
+        header: MediaHeader,
+        payload: Vec<u8>,
+    ) -> Result<(), TransportError>;
 
     /// 发送可靠数据（控制/数据）。不允许丢弃，队列满返回 Backpressure。
     fn send_reliable(&mut self, channel: Channel, payload: Vec<u8>) -> Result<(), TransportError>;
@@ -113,7 +118,12 @@ impl MemoryTransport {
 }
 
 impl Transport for MemoryTransport {
-    fn send_datagram(&mut self, channel: Channel, header: MediaHeader, payload: Vec<u8>) -> Result<(), TransportError> {
+    fn send_datagram(
+        &mut self,
+        channel: Channel,
+        header: MediaHeader,
+        payload: Vec<u8>,
+    ) -> Result<(), TransportError> {
         if self.closed {
             return Err(TransportError::Closed);
         }
@@ -129,7 +139,11 @@ impl Transport for MemoryTransport {
         }
         self.stats.bytes_sent += payload.len() as u64;
         self.stats.sent_datagrams += 1;
-        self.datagram_queue.push_back(Frame { channel, header: Some(header), payload });
+        self.datagram_queue.push_back(Frame {
+            channel,
+            header: Some(header),
+            payload,
+        });
         Ok(())
     }
 
@@ -148,13 +162,20 @@ impl Transport for MemoryTransport {
         }
         self.stats.bytes_sent += payload.len() as u64;
         self.stats.sent_reliable += 1;
-        self.reliable_queue.push_back(Frame { channel, header: None, payload });
+        self.reliable_queue.push_back(Frame {
+            channel,
+            header: None,
+            payload,
+        });
         Ok(())
     }
 
     fn recv(&mut self) -> Option<Frame> {
         // 可靠通道优先，避免控制指令被视频帧饿死
-        let frame = self.reliable_queue.pop_front().or_else(|| self.datagram_queue.pop_front())?;
+        let frame = self
+            .reliable_queue
+            .pop_front()
+            .or_else(|| self.datagram_queue.pop_front())?;
         self.stats.recv_frames += 1;
         self.stats.bytes_recv += frame.payload.len() as u64;
         Some(frame)
@@ -176,7 +197,13 @@ mod tests {
     use super::*;
 
     fn hdr(seq: u16) -> MediaHeader {
-        MediaHeader { frame_type: 1, stream_id: 0, seq, flags: 0, ts_ms: 0 }
+        MediaHeader {
+            frame_type: 1,
+            stream_id: 0,
+            seq,
+            flags: 0,
+            ts_ms: 0,
+        }
     }
 
     #[test]
@@ -190,7 +217,8 @@ mod tests {
     #[test]
     fn datagram_roundtrip_and_stats() {
         let mut t = MemoryTransport::new(8, 1200);
-        t.send_datagram(Channel::Video, hdr(1), vec![0u8; 100]).unwrap();
+        t.send_datagram(Channel::Video, hdr(1), vec![0u8; 100])
+            .unwrap();
         let f = t.recv().expect("frame");
         assert_eq!(f.channel, Channel::Video);
         assert_eq!(f.payload.len(), 100);
@@ -203,7 +231,8 @@ mod tests {
     fn datagram_drops_oldest_when_full() {
         let mut t = MemoryTransport::new(2, 1200);
         for seq in 0..4u16 {
-            t.send_datagram(Channel::Video, hdr(seq), vec![seq as u8]).unwrap();
+            t.send_datagram(Channel::Video, hdr(seq), vec![seq as u8])
+                .unwrap();
         }
         assert_eq!(t.stats().dropped_datagrams, 2);
         assert_eq!(t.recv().unwrap().header.unwrap().seq, 2);
@@ -216,7 +245,10 @@ mod tests {
         let mut t = MemoryTransport::new(2, 1200);
         t.send_reliable(Channel::Control, vec![1]).unwrap();
         t.send_reliable(Channel::Control, vec![2]).unwrap();
-        assert_eq!(t.send_reliable(Channel::Control, vec![3]), Err(TransportError::Backpressure));
+        assert_eq!(
+            t.send_reliable(Channel::Control, vec![3]),
+            Err(TransportError::Backpressure)
+        );
         assert_eq!(t.stats().dropped_datagrams, 0);
     }
 
@@ -231,23 +263,41 @@ mod tests {
     #[test]
     fn rejects_oversized_frames() {
         let mut t = MemoryTransport::new(4, 16);
-        assert_eq!(t.send_datagram(Channel::Video, hdr(1), vec![0u8; 32]), Err(TransportError::TooLarge));
-        assert_eq!(t.send_reliable(Channel::Data, vec![0u8; 32]), Err(TransportError::TooLarge));
+        assert_eq!(
+            t.send_datagram(Channel::Video, hdr(1), vec![0u8; 32]),
+            Err(TransportError::TooLarge)
+        );
+        assert_eq!(
+            t.send_reliable(Channel::Data, vec![0u8; 32]),
+            Err(TransportError::TooLarge)
+        );
     }
 
     #[test]
     fn wrong_channel_kind_rejected() {
         let mut t = MemoryTransport::new(4, 1200);
-        assert_eq!(t.send_datagram(Channel::Control, hdr(1), vec![0]), Err(TransportError::Backpressure));
-        assert_eq!(t.send_reliable(Channel::Video, vec![0]), Err(TransportError::Backpressure));
+        assert_eq!(
+            t.send_datagram(Channel::Control, hdr(1), vec![0]),
+            Err(TransportError::Backpressure)
+        );
+        assert_eq!(
+            t.send_reliable(Channel::Video, vec![0]),
+            Err(TransportError::Backpressure)
+        );
     }
 
     #[test]
     fn closed_transport_rejects() {
         let mut t = MemoryTransport::new(4, 1200);
         t.close();
-        assert_eq!(t.send_datagram(Channel::Video, hdr(1), vec![0]), Err(TransportError::Closed));
-        assert_eq!(t.send_reliable(Channel::Data, vec![0]), Err(TransportError::Closed));
+        assert_eq!(
+            t.send_datagram(Channel::Video, hdr(1), vec![0]),
+            Err(TransportError::Closed)
+        );
+        assert_eq!(
+            t.send_reliable(Channel::Data, vec![0]),
+            Err(TransportError::Closed)
+        );
         assert!(t.recv().is_none());
     }
 }

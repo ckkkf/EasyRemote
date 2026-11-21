@@ -21,12 +21,42 @@ pub struct QualityLevel {
 
 /// 预设档位，从高到低。
 pub const LADDER: [QualityLevel; 6] = [
-    QualityLevel { name: "1080p60", bitrate_kbps: 8000, fps: 60, downscale: 1 },
-    QualityLevel { name: "1080p30", bitrate_kbps: 5000, fps: 30, downscale: 1 },
-    QualityLevel { name: "900p30", bitrate_kbps: 3500, fps: 30, downscale: 1 },
-    QualityLevel { name: "720p30", bitrate_kbps: 2500, fps: 30, downscale: 2 },
-    QualityLevel { name: "540p30", bitrate_kbps: 1500, fps: 30, downscale: 2 },
-    QualityLevel { name: "360p15", bitrate_kbps: 800, fps: 15, downscale: 3 },
+    QualityLevel {
+        name: "1080p60",
+        bitrate_kbps: 8000,
+        fps: 60,
+        downscale: 1,
+    },
+    QualityLevel {
+        name: "1080p30",
+        bitrate_kbps: 5000,
+        fps: 30,
+        downscale: 1,
+    },
+    QualityLevel {
+        name: "900p30",
+        bitrate_kbps: 3500,
+        fps: 30,
+        downscale: 1,
+    },
+    QualityLevel {
+        name: "720p30",
+        bitrate_kbps: 2500,
+        fps: 30,
+        downscale: 2,
+    },
+    QualityLevel {
+        name: "540p30",
+        bitrate_kbps: 1500,
+        fps: 30,
+        downscale: 2,
+    },
+    QualityLevel {
+        name: "360p15",
+        bitrate_kbps: 800,
+        fps: 15,
+        downscale: 3,
+    },
 ];
 
 /// 链路反馈。
@@ -108,7 +138,11 @@ impl AbrController {
 
         // 迟滞：单周期的假丢包（周期边界/乱序）不应触发降档
         self.severe_streak = if severe { self.severe_streak + 1 } else { 0 };
-        self.mild_streak = if mild && !severe { self.mild_streak + 1 } else { 0 };
+        self.mild_streak = if mild && !severe {
+            self.mild_streak + 1
+        } else {
+            0
+        };
         let severe = severe && self.severe_streak >= 2;
         let mild = mild && self.mild_streak >= 2;
 
@@ -160,11 +194,19 @@ impl AbrController {
     }
 
     fn decided(&self, reason: &'static str) -> Decision {
-        Decision { level: LADDER[self.index], changed: true, reason }
+        Decision {
+            level: LADDER[self.index],
+            changed: true,
+            reason,
+        }
     }
 
     fn unchanged(&self, reason: &'static str) -> Decision {
-        Decision { level: LADDER[self.index], changed: false, reason }
+        Decision {
+            level: LADDER[self.index],
+            changed: false,
+            reason,
+        }
     }
 }
 
@@ -173,7 +215,11 @@ mod tests {
     use super::*;
 
     fn fb(loss: f32, rtt: u32, queue: u32) -> LinkFeedback {
-        LinkFeedback { loss_pct: loss, rtt_ms: rtt, queue_ms: queue }
+        LinkFeedback {
+            loss_pct: loss,
+            rtt_ms: rtt,
+            queue_ms: queue,
+        }
     }
 
     #[test]
@@ -321,7 +367,11 @@ mod tests {
                 ups += 1;
             }
         }
-        assert!(ups > 0, "健康 40 周期后必须升档，实际 ups=0，bottom={}", bottom);
+        assert!(
+            ups > 0,
+            "健康 40 周期后必须升档，实际 ups=0，bottom={}",
+            bottom
+        );
         assert!(c.index() < bottom);
     }
 }

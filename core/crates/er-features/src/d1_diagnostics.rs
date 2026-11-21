@@ -27,7 +27,10 @@ impl NatType {
 
     /// 是否容易打洞成功。
     pub fn is_punch_friendly(self) -> bool {
-        matches!(self, NatType::Cone | NatType::RestrictedCone | NatType::PortRestricted)
+        matches!(
+            self,
+            NatType::Cone | NatType::RestrictedCone | NatType::PortRestricted
+        )
     }
 }
 
@@ -100,7 +103,11 @@ pub fn diagnose(r: &ProbeReport) -> Diagnosis {
     }
     if r.local_nat == NatType::Symmetric || r.peer_nat == NatType::Symmetric {
         causes.push(Cause::SymmetricNat);
-        let who = if r.local_nat == NatType::Symmetric { "你的" } else { "对方的" };
+        let who = if r.local_nat == NatType::Symmetric {
+            "你的"
+        } else {
+            "对方的"
+        };
         advice.push(format!(
             "{who}网络为对称型 NAT，与多数网络无法直连；如在公司网络可联系网管放行 UDP 443/3478"
         ));
@@ -114,7 +121,10 @@ pub fn diagnose(r: &ProbeReport) -> Diagnosis {
     let verdict = if r.qos_suspected {
         "已切换中继，且检测到疑似运营商限速".to_string()
     } else {
-        format!("P2P 打洞失败（尝试 {} 次），已切换中继转发", r.punch_attempts)
+        format!(
+            "P2P 打洞失败（尝试 {} 次），已切换中继转发",
+            r.punch_attempts
+        )
     };
 
     let impact = format!(
@@ -126,7 +136,12 @@ pub fn diagnose(r: &ProbeReport) -> Diagnosis {
         advice.push("如长期如此，可尝试更换网络环境".to_string());
     }
 
-    Diagnosis { verdict, causes, impact, advice }
+    Diagnosis {
+        verdict,
+        causes,
+        impact,
+        advice,
+    }
 }
 
 #[cfg(test)]

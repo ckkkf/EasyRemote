@@ -7,7 +7,10 @@
 use er_abr::{AbrController, LinkFeedback};
 
 fn main() {
-    println!("{:<8} {:<10} {:>10} {:>8} {:>10} {}", "loss%", "rtt(ms)", "queue(ms)", "level", "bitrate", "changed/reason");
+    println!(
+        "{:<8} {:<10} {:>10} {:>8} {:>10} {}",
+        "loss%", "rtt(ms)", "queue(ms)", "level", "bitrate", "changed/reason"
+    );
     for &(loss, rtt, queue) in &[
         (0.0f32, 70u32, 0u32),
         (5.0, 70, 0),
@@ -20,7 +23,11 @@ fn main() {
         let mut changed_any = false;
         let mut reason = "";
         for _ in 0..3 {
-            let d = ctl.on_feedback(&LinkFeedback { loss_pct: loss, rtt_ms: rtt, queue_ms: queue });
+            let d = ctl.on_feedback(&LinkFeedback {
+                loss_pct: loss,
+                rtt_ms: rtt,
+                queue_ms: queue,
+            });
             if d.changed {
                 changed_any = true;
             }
@@ -29,13 +36,7 @@ fn main() {
         }
         println!(
             "{:<8.1} {:<10} {:>10} {:>8} {:>10} {} / {}",
-            loss,
-            rtt,
-            queue,
-            last.name,
-            last.bitrate_kbps,
-            changed_any,
-            reason
+            loss, rtt, queue, last.name, last.bitrate_kbps, changed_any, reason
         );
     }
     println!("NOTE: ABR 在真实会话中未被驱动（数据面无丢包反馈回路），以上只是离线策略曲线。");

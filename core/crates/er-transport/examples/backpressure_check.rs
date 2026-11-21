@@ -42,7 +42,13 @@ async fn main() {
     }
 
     // datagram 仍应可用
-    let hdr = MediaHeader { frame_type: 1, stream_id: 0, seq: 1, flags: 0, ts_ms: 0 };
+    let hdr = MediaHeader {
+        frame_type: 1,
+        stream_id: 0,
+        seq: 1,
+        flags: 0,
+        ts_ms: 0,
+    };
     let dg = client.send_datagram(Channel::Video, hdr, vec![0u8; 100]);
     let dg_ok = matches!(dg, Ok(()) | Err(TransportError::TooLarge));
 

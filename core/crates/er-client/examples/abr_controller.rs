@@ -18,7 +18,9 @@ use er_client::link::{FeedbackReport, LinkStats, VideoHeader};
 use er_codec::H264Decoder;
 
 fn arg(i: usize, default: &str) -> String {
-    std::env::args().nth(i).unwrap_or_else(|| default.to_string())
+    std::env::args()
+        .nth(i)
+        .unwrap_or_else(|| default.to_string())
 }
 
 fn main() {
@@ -54,13 +56,16 @@ fn main() {
     let captcha = field("captcha=");
 
     let ctrl = ControllerAgent::start(&base, &phone, &sms, relay_addr).expect("ctrl start");
-    let session_id = ctrl.request_session(&code, &captcha).expect("request session");
+    let session_id = ctrl
+        .request_session(&code, &captcha)
+        .expect("request session");
     println!("ABR_RX_BOOT: session={session_id} relay={relay_addr}");
     std::thread::sleep(Duration::from_millis(1500));
     let (mut relay, mut crypto, keys, msg) = ctrl.begin(&session_id).expect("ctrl begin");
     std::thread::sleep(Duration::from_millis(2500));
     ctrl.announce(&mut relay, &msg).expect("announce");
-    ctrl.finish(&mut relay, &mut crypto, &keys, &session_id).expect("handshake");
+    ctrl.finish(&mut relay, &mut crypto, &keys, &session_id)
+        .expect("handshake");
     println!("ABR_RX_BOOT: handshake_verified");
 
     let mut stats = LinkStats::new();
@@ -125,7 +130,9 @@ fn main() {
             next_cycle += Duration::from_millis(cycle_ms);
             let frag = relay.link_stats(400);
             if let Some(report) = stats.take_cycle(now_ms() as u32, frag) {
-                let copies = ctrl.send_feedback(&mut relay, &mut crypto, &report, 3).unwrap_or(0);
+                let copies = ctrl
+                    .send_feedback(&mut relay, &mut crypto, &report, 3)
+                    .unwrap_or(0);
                 reports += 1;
                 println!(
                     "ABR_RX_CYCLE: t={:.1}s seq={} cycle_expected={} cycle_received={} frame_loss={:.1}% cum_expected={} cum_received={} frag_recv={} frag_missing={} datagram_loss={:.1}% echo_ts={} bytes=0 sent_copies={}",

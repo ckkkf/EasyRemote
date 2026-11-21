@@ -50,7 +50,10 @@ fn main() {
 
         // 尺寸对齐到偶数（H.264 要求）
         let frame = if frame.width != cfg.width || frame.height != cfg.height {
-            println!("size mismatch {}x{} vs cfg {}x{}", frame.width, frame.height, cfg.width, cfg.height);
+            println!(
+                "size mismatch {}x{} vs cfg {}x{}",
+                frame.width, frame.height, cfg.width, cfg.height
+            );
             return;
         } else {
             frame
@@ -62,8 +65,12 @@ fn main() {
                 encode_ms.push(t1.elapsed().as_secs_f64() * 1000.0);
                 bytes.push(pkt.len());
                 if i == 0 || i == 9 {
-                    println!("frame {i}: capture {:.1}ms encode {:.1}ms {} bytes",
-                        capture_ms[i], encode_ms[i], pkt.len());
+                    println!(
+                        "frame {i}: capture {:.1}ms encode {:.1}ms {} bytes",
+                        capture_ms[i],
+                        encode_ms[i],
+                        pkt.len()
+                    );
                 }
             }
             Err(e) => {
@@ -76,8 +83,22 @@ fn main() {
     let avg = |v: &Vec<f64>| v.iter().sum::<f64>() / v.len() as f64;
     let max = |v: &Vec<f64>| v.iter().cloned().fold(0.0, f64::max);
     println!("---");
-    println!("capture avg {:.2}ms max {:.2}ms", avg(&capture_ms), max(&capture_ms));
-    println!("encode  avg {:.2}ms max {:.2}ms", avg(&encode_ms), max(&encode_ms));
-    println!("pipeline avg {:.2}ms (capture+encode)", avg(&capture_ms) + avg(&encode_ms));
-    println!("bitrate  avg {:.0} kbps", bytes.iter().sum::<usize>() as f64 * 8.0 / 1000.0 / bytes.len() as f64 * 60.0);
+    println!(
+        "capture avg {:.2}ms max {:.2}ms",
+        avg(&capture_ms),
+        max(&capture_ms)
+    );
+    println!(
+        "encode  avg {:.2}ms max {:.2}ms",
+        avg(&encode_ms),
+        max(&encode_ms)
+    );
+    println!(
+        "pipeline avg {:.2}ms (capture+encode)",
+        avg(&capture_ms) + avg(&encode_ms)
+    );
+    println!(
+        "bitrate  avg {:.0} kbps",
+        bytes.iter().sum::<usize>() as f64 * 8.0 / 1000.0 / bytes.len() as f64 * 60.0
+    );
 }

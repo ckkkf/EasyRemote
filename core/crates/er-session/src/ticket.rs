@@ -45,7 +45,13 @@ fn mac(secret: &[u8], payload: &str) -> String {
 }
 
 /// 签发票据（测试与本地自托管用；生产由网关签发）。
-pub fn issue(secret: &[u8], session_id: &str, this_device: &str, peer_device: &str, exp: i64) -> String {
+pub fn issue(
+    secret: &[u8],
+    session_id: &str,
+    this_device: &str,
+    peer_device: &str,
+    exp: i64,
+) -> String {
     let payload = format!("{session_id}|{this_device}|{peer_device}|{exp}");
     let token = format!(
         "{}.{}",
@@ -115,7 +121,10 @@ mod tests {
     #[test]
     fn wrong_secret_rejected() {
         let tok = issue(SECRET, "s", "a", "b", 123);
-        assert_eq!(verify(b"another-secret-1234", &tok, 0), Err(TicketError::BadSignature));
+        assert_eq!(
+            verify(b"another-secret-1234", &tok, 0),
+            Err(TicketError::BadSignature)
+        );
     }
 
     #[test]
@@ -126,7 +135,10 @@ mod tests {
 
     #[test]
     fn malformed_rejected() {
-        assert_eq!(verify(SECRET, "not-a-ticket", 0), Err(TicketError::Malformed));
+        assert_eq!(
+            verify(SECRET, "not-a-ticket", 0),
+            Err(TicketError::Malformed)
+        );
         assert_eq!(verify(SECRET, "a.b.c", 0), Err(TicketError::Malformed));
     }
 }

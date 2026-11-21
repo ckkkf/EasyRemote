@@ -12,7 +12,9 @@ fn main() {
     #[cfg(target_os = "windows")]
     {
         use er_capture::dxgi::DxgiCapture;
-        let mode = std::env::args().nth(1).unwrap_or_else(|| "nonudge".to_string());
+        let mode = std::env::args()
+            .nth(1)
+            .unwrap_or_else(|| "nonudge".to_string());
         println!("=== DXGI 拓扑 ===");
         for l in er_capture::dxgi::topology() {
             println!("{l}");
@@ -43,7 +45,10 @@ fn main() {
             } else if mode == "zeromove" {
                 // 关键实验：dx=dy=0 的 MOUSEEVENTF_MOVE 算不算「输入事件」？
                 // 算的话就能唤醒显示器/DWM 而**不移动光标**，产品路径可以放心用。
-                println!("zeromove(sendinput, dx=0) #{i}: ok={}", cap.nudge_desktop_zero());
+                println!(
+                    "zeromove(sendinput, dx=0) #{i}: ok={}",
+                    cap.nudge_desktop_zero()
+                );
             }
             std::thread::sleep(std::time::Duration::from_millis(150));
         }

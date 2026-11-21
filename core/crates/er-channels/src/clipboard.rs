@@ -61,7 +61,13 @@ impl Default for ClipboardSync {
 
 impl ClipboardSync {
     pub fn new(max_bytes: usize) -> Self {
-        Self { max_bytes, last_hash: None, suppress_once: false, synced: 0, dropped: 0 }
+        Self {
+            max_bytes,
+            last_hash: None,
+            suppress_once: false,
+            synced: 0,
+            dropped: 0,
+        }
     }
 
     /// 本机剪贴板变化 → 决定是否发往对端。
@@ -147,7 +153,10 @@ mod tests {
 
         // B 应用后，本地监听器会看到同一内容 —— 必须被静音
         let echo = ClipUpdate::new(ClipKind::Text, "ping");
-        assert!(b.on_local_change(&echo).is_none(), "echo must be suppressed");
+        assert!(
+            b.on_local_change(&echo).is_none(),
+            "echo must be suppressed"
+        );
 
         // 而真正的新内容仍能发出
         let fresh = ClipUpdate::new(ClipKind::Text, "pong");

@@ -37,7 +37,9 @@ fn real_main() {
     use er_client::link::{encode_config_for, AbrDriver, FeedbackReport, VideoHeader};
 
     fn arg(i: usize, default: &str) -> String {
-        std::env::args().nth(i).unwrap_or_else(|| default.to_string())
+        std::env::args()
+            .nth(i)
+            .unwrap_or_else(|| default.to_string())
     }
 
     let base = arg(1, "http://127.0.0.1:18090");
@@ -61,17 +63,24 @@ fn real_main() {
     );
     std::fs::write(
         &hello_file,
-        format!("device_id={}\ndevice_code={device_code}\ncaptcha={captcha}\n", target.device_id()),
+        format!(
+            "device_id={}\ndevice_code={device_code}\ncaptcha={captcha}\n",
+            target.device_id()
+        ),
     )
     .expect("write hello");
 
-    let session_id = target.wait_for_session(&signal, Duration::from_secs(180)).expect("signalling");
+    let session_id = target
+        .wait_for_session(&signal, Duration::from_secs(180))
+        .expect("signalling");
     target.consent(&session_id).expect("consent");
     println!("ABR_TX_BOOT: session={session_id} consent=authorized");
     std::thread::sleep(Duration::from_millis(1200));
     let (mut relay, mut crypto, msg) = target.begin(&session_id).expect("begin");
     target.announce(&mut relay, &msg).expect("announce");
-    target.finish(&mut relay, &mut crypto, &session_id).expect("handshake");
+    target
+        .finish(&mut relay, &mut crypto, &session_id)
+        .expect("handshake");
     println!("ABR_TX_BOOT: handshake_verified");
 
     // 源尺寸决定各档分辨率

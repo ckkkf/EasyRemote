@@ -167,32 +167,32 @@ const BTN_CENTER: CGMouseButton = 2;
 pub fn hid_to_cgkeycode(hid: u16) -> Option<u16> {
     Some(match hid {
         // 字母
-        0x04 => 0,   // a
-        0x05 => 11,  // b
-        0x06 => 8,   // c
-        0x07 => 2,   // d
-        0x08 => 14,  // e
-        0x09 => 3,   // f
-        0x0A => 5,   // g
-        0x0B => 4,   // h
-        0x0C => 34,  // i
-        0x0D => 38,  // j
-        0x0E => 40,  // k
-        0x0F => 37,  // l
-        0x10 => 46,  // m
-        0x11 => 45,  // n
-        0x12 => 31,  // o
-        0x13 => 35,  // p
-        0x14 => 12,  // q
-        0x15 => 15,  // r
-        0x16 => 1,   // s
-        0x17 => 17,  // t
-        0x18 => 32,  // u
-        0x19 => 9,   // v
-        0x1A => 13,  // w
-        0x1B => 7,   // x
-        0x1C => 16,  // y
-        0x1D => 6,   // z
+        0x04 => 0,  // a
+        0x05 => 11, // b
+        0x06 => 8,  // c
+        0x07 => 2,  // d
+        0x08 => 14, // e
+        0x09 => 3,  // f
+        0x0A => 5,  // g
+        0x0B => 4,  // h
+        0x0C => 34, // i
+        0x0D => 38, // j
+        0x0E => 40, // k
+        0x0F => 37, // l
+        0x10 => 46, // m
+        0x11 => 45, // n
+        0x12 => 31, // o
+        0x13 => 35, // p
+        0x14 => 12, // q
+        0x15 => 15, // r
+        0x16 => 1,  // s
+        0x17 => 17, // t
+        0x18 => 32, // u
+        0x19 => 9,  // v
+        0x1A => 13, // w
+        0x1B => 7,  // x
+        0x1C => 16, // y
+        0x1D => 6,  // z
         // 数字
         0x1E => 18, // 1
         0x1F => 19, // 2
@@ -260,7 +260,11 @@ pub struct MacInjector {
 impl MacInjector {
     /// 创建注入器。live=false 时只校验不投递（隐私屏/观察者模式用）。
     pub fn new(live: bool) -> Self {
-        Self { live, display: MacDisplay::main(), mapped: 0 }
+        Self {
+            live,
+            display: MacDisplay::main(),
+            mapped: 0,
+        }
     }
 
     /// 主显示器几何（像素/points/原点）。
@@ -347,16 +351,24 @@ impl Injector for MacInjector {
                     return Ok(());
                 }
                 let (down, up, btn) = match button {
-                    MouseButton::Left => (KCG_EVENT_LEFT_MOUSE_DOWN, KCG_EVENT_LEFT_MOUSE_UP, BTN_LEFT),
-                    MouseButton::Right => {
-                        (KCG_EVENT_RIGHT_MOUSE_DOWN, KCG_EVENT_RIGHT_MOUSE_UP, BTN_RIGHT)
+                    MouseButton::Left => {
+                        (KCG_EVENT_LEFT_MOUSE_DOWN, KCG_EVENT_LEFT_MOUSE_UP, BTN_LEFT)
                     }
-                    MouseButton::Middle => {
-                        (KCG_EVENT_OTHER_MOUSE_DOWN, KCG_EVENT_OTHER_MOUSE_UP, BTN_CENTER)
-                    }
-                    MouseButton::X1 | MouseButton::X2 => {
-                        (KCG_EVENT_OTHER_MOUSE_DOWN, KCG_EVENT_OTHER_MOUSE_UP, BTN_CENTER)
-                    }
+                    MouseButton::Right => (
+                        KCG_EVENT_RIGHT_MOUSE_DOWN,
+                        KCG_EVENT_RIGHT_MOUSE_UP,
+                        BTN_RIGHT,
+                    ),
+                    MouseButton::Middle => (
+                        KCG_EVENT_OTHER_MOUSE_DOWN,
+                        KCG_EVENT_OTHER_MOUSE_UP,
+                        BTN_CENTER,
+                    ),
+                    MouseButton::X1 | MouseButton::X2 => (
+                        KCG_EVENT_OTHER_MOUSE_DOWN,
+                        KCG_EVENT_OTHER_MOUSE_UP,
+                        BTN_CENTER,
+                    ),
                 };
                 let pos = MacInjector::cursor_position().unwrap_or(CGPoint { x: 0.0, y: 0.0 });
                 unsafe {
@@ -441,11 +453,17 @@ mod tests {
     #[test]
     fn display_scale_is_pixels_per_point() {
         let d = MacDisplay::main();
-        assert!(d.pixel_width > 0 && d.pixel_height > 0, "display must have pixels: {d:?}");
+        assert!(
+            d.pixel_width > 0 && d.pixel_height > 0,
+            "display must have pixels: {d:?}"
+        );
         let s = d.scale();
         assert!((0.5..=4.0).contains(&s), "implausible scale {s} for {d:?}");
         let expect = d.pixel_width as f64 / d.point_width.max(1.0);
-        assert!((s - expect).abs() < 0.01, "scale {s} should track pixels/points {expect}");
+        assert!(
+            (s - expect).abs() < 0.01,
+            "scale {s} should track pixels/points {expect}"
+        );
     }
 
     /// 像素 → point → 像素 往返，误差 ≤1px（取整带来的）。
@@ -468,7 +486,11 @@ mod tests {
     /// 主屏原点必须被平移进 point 坐标（多屏时主屏 origin 可能非 0）。
     #[test]
     fn origin_is_added_in_point_space() {
-        let d = MacDisplay { origin_x: -1920.0, origin_y: 100.0, ..MacDisplay::main() };
+        let d = MacDisplay {
+            origin_x: -1920.0,
+            origin_y: 100.0,
+            ..MacDisplay::main()
+        };
         let p = d.pixel_to_point(0, 0);
         assert!((p.x - (-1920.0)).abs() < 0.01);
         assert!((p.y - 100.0).abs() < 0.01);
@@ -487,11 +509,18 @@ mod tests {
             }
         };
         let mut inj = MacInjector::new(true);
-        if inj.inject(&InputEvent::MouseMove { x: 200, y: 200 }).is_err() {
+        if inj
+            .inject(&InputEvent::MouseMove { x: 200, y: 200 })
+            .is_err()
+        {
             eprintln!("skip: injection denied");
             return;
         }
-        assert_eq!(inj.mapped_moves(), 1, "mouse move must go through coordinate mapping");
+        assert_eq!(
+            inj.mapped_moves(),
+            1,
+            "mouse move must go through coordinate mapping"
+        );
         std::thread::sleep(std::time::Duration::from_millis(120));
         let after = MacInjector::cursor_pixel().expect("cursor pos");
         let moved = (after.0 - 200).abs() <= 3 && (after.1 - 200).abs() <= 3;

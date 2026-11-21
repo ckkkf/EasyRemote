@@ -29,9 +29,7 @@ pub unsafe extern "C" fn er_run_pair_session(
     {
         return into_c_string("{\"ok\":false,\"error\":\"null argument\"}");
     }
-    let cstr = |p: *const c_char| -> String {
-        CStr::from_ptr(p).to_string_lossy().into_owned()
-    };
+    let cstr = |p: *const c_char| -> String { CStr::from_ptr(p).to_string_lossy().into_owned() };
     let gw = cstr(gateway_url);
     let relay = cstr(relay_addr);
     let pa = cstr(phone_a);
@@ -41,7 +39,11 @@ pub unsafe extern "C" fn er_run_pair_session(
     let result = catch_unwind(AssertUnwindSafe(|| {
         let addr = match relay.parse() {
             Ok(a) => a,
-            Err(e) => return into_c_string(&format!("{{\"ok\":false,\"error\":\"bad relay addr: {e}\"}}")),
+            Err(e) => {
+                return into_c_string(&format!(
+                    "{{\"ok\":false,\"error\":\"bad relay addr: {e}\"}}"
+                ))
+            }
         };
         match run_pair(&gw, addr, &pa, &pb, &code) {
             Ok(report) => {
@@ -58,12 +60,17 @@ pub unsafe extern "C" fn er_run_pair_session(
                 );
                 into_c_string(&json)
             }
-            Err(e) => into_c_string(&format!("{{\"ok\":false,\"error\":\"{}\"}}", escape_json(&e))),
+            Err(e) => into_c_string(&format!(
+                "{{\"ok\":false,\"error\":\"{}\"}}",
+                escape_json(&e)
+            )),
         }
     }));
     result.unwrap_or_else(|_| into_c_string("{\"ok\":false,\"error\":\"panic\"}"))
 }
 
 pub fn escape_json(s: &str) -> String {
-    s.replace('\\', "\\\\").replace('"', "\\\"").replace('\n', " ")
+    s.replace('\\', "\\\\")
+        .replace('"', "\\\"")
+        .replace('\n', " ")
 }

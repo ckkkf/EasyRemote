@@ -10,7 +10,10 @@ pub enum GpuFallback {
     /// 没有硬件编码器（非 Windows / 无 NVIDIA / 驱动起不来 NVENC 会话）
     NoHardwareEncoder,
     /// 采集纹理尺寸与 EncodeConfig 不一致（改分辨率、跨屏拖动、DPI 变化都会触发）
-    DimensionMismatch { expected: (u32, u32), actual: (u32, u32) },
+    DimensionMismatch {
+        expected: (u32, u32),
+        actual: (u32, u32),
+    },
     /// NVENC 注册输入纹理失败
     RegisterFailed(String),
     /// 编码阶段失败
@@ -37,7 +40,10 @@ impl GpuFallback {
     /// 这类失败是不是「永久性」的：尺寸不匹配和硬件缺失重试也没用，
     /// 编码/注册失败可能是瞬时的（设备被独占），允许有限重试。
     pub fn is_permanent(&self) -> bool {
-        matches!(self, GpuFallback::NoHardwareEncoder | GpuFallback::DimensionMismatch { .. })
+        matches!(
+            self,
+            GpuFallback::NoHardwareEncoder | GpuFallback::DimensionMismatch { .. }
+        )
     }
 }
 
@@ -64,7 +70,12 @@ pub struct GpuPath {
 
 impl GpuPath {
     pub fn new(max_attempts: u32) -> Self {
-        Self { state: GpuState::Uninitialized, attempts: 0, max_attempts: max_attempts.max(1), logged: false }
+        Self {
+            state: GpuState::Uninitialized,
+            attempts: 0,
+            max_attempts: max_attempts.max(1),
+            logged: false,
+        }
     }
 
     pub fn state(&self) -> &GpuState {
@@ -174,11 +185,22 @@ mod tests {
         p.mark_registered();
         assert_eq!(p.state(), &GpuState::Registered);
 
-        let err = p.check_dims((1920, 1080), (2880, 1620)).expect_err("必须报错");
-        assert_eq!(err, GpuFallback::DimensionMismatch { expected: (1920, 1080), actual: (2880, 1620) });
+        let err = p
+            .check_dims((1920, 1080), (2880, 1620))
+            .expect_err("必须报错");
+        assert_eq!(
+            err,
+            GpuFallback::DimensionMismatch {
+                expected: (1920, 1080),
+                actual: (2880, 1620)
+            }
+        );
         assert!(!p.should_try(), "尺寸不匹配必须停用 GPU 路径");
         let log = p.take_log().unwrap();
-        assert!(log.contains("1920x1080") && log.contains("2880x1620"), "日志要带两边尺寸: {log}");
+        assert!(
+            log.contains("1920x1080") && log.contains("2880x1620"),
+            "日志要带两边尺寸: {log}"
+        );
     }
 
     /// 尺寸一致时不能误判为失败。
@@ -195,9 +217,13 @@ mod tests {
     #[test]
     fn register_failure_retries_then_falls_back() {
         let mut p = GpuPath::new(2);
-        p.mark_failed(GpuFallback::RegisterFailed("nvEncRegisterResource: 4".into()));
+        p.mark_failed(GpuFallback::RegisterFailed(
+            "nvEncRegisterResource: 4".into(),
+        ));
         assert!(p.should_try(), "第一次失败还没到上限，应该允许重试");
-        p.mark_failed(GpuFallback::RegisterFailed("nvEncRegisterResource: 4".into()));
+        p.mark_failed(GpuFallback::RegisterFailed(
+            "nvEncRegisterResource: 4".into(),
+        ));
         assert!(!p.should_try(), "到上限必须停用");
         let log = p.take_log().unwrap();
         assert!(log.contains("register input texture failed"), "{log}");
@@ -214,11 +240,18 @@ mod tests {
         assert_eq!(p.state(), &GpuState::Registered);
 
         p.mark_encode_failed("nvEncEncodePicture: 8");
-        assert_eq!(p.state(), &GpuState::Registered, "单次编码失败还不该停用（未到上限）");
+        assert_eq!(
+            p.state(),
+            &GpuState::Registered,
+            "单次编码失败还不该停用（未到上限）"
+        );
 
         p.mark_encode_failed("nvEncEncodePicture: 8");
         p.mark_encode_failed("nvEncEncodePicture: 8");
-        assert!(matches!(p.state(), GpuState::Failed(GpuFallback::EncodeFailed(_))));
+        assert!(matches!(
+            p.state(),
+            GpuState::Failed(GpuFallback::EncodeFailed(_))
+        ));
         assert!(!p.should_try());
 
         p.reset();
@@ -233,7 +266,10 @@ mod tests {
     fn no_fallback_reason_panics() {
         let reasons = vec![
             GpuFallback::NoHardwareEncoder,
-            GpuFallback::DimensionMismatch { expected: (1, 1), actual: (2, 2) },
+            GpuFallback::DimensionMismatch {
+                expected: (1, 1),
+                actual: (2, 2),
+            },
             GpuFallback::RegisterFailed("x".into()),
             GpuFallback::EncodeFailed("y".into()),
             GpuFallback::NotAvailable("z".into()),

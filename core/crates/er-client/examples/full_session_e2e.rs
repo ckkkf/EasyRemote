@@ -17,7 +17,9 @@ use er_session::relay_client::RelayClient;
 const TAG: &[u8] = b"ER-HS:";
 
 fn main() {
-    let base = std::env::args().nth(1).unwrap_or_else(|| "http://127.0.0.1:8080".into());
+    let base = std::env::args()
+        .nth(1)
+        .unwrap_or_else(|| "http://127.0.0.1:8080".into());
     let relay_addr: SocketAddr = std::env::args()
         .nth(2)
         .unwrap_or_else(|| "127.0.0.1:19121".into())
@@ -27,7 +29,9 @@ fn main() {
     // ---------- 1. 两个账号登录并绑设备 ----------
     let target_gw = Gateway::new(&base, "", "");
     target_gw.send_sms("13700003001").expect("sms");
-    let target_tok = target_gw.login("13700003001", "123456").expect("target login");
+    let target_tok = target_gw
+        .login("13700003001", "123456")
+        .expect("target login");
     let target_gw = Gateway::new(&base, &target_tok, "");
     let target_dev = target_gw.bind_device("macos").expect("target bind");
 
@@ -36,7 +40,10 @@ fn main() {
     let ctrl_tok = ctrl_gw.login("13700003002", "123456").expect("ctrl login");
     let ctrl_gw = Gateway::new(&base, &ctrl_tok, "");
     let ctrl_dev = ctrl_gw.bind_device("macos").expect("ctrl bind");
-    println!("bound: target={} ctrl={}", target_dev.device_id, ctrl_dev.device_id);
+    println!(
+        "bound: target={} ctrl={}",
+        target_dev.device_id, ctrl_dev.device_id
+    );
 
     // ---------- 2. 登记身份公钥 ----------
     let target_id = DeviceIdentity::from_seed(&[31u8; 32]);
@@ -44,18 +51,26 @@ fn main() {
 
     let target_gw = Gateway::new(&base, &target_tok, &target_dev.device_token);
     target_gw
-        .register_identity(&target_dev.device_id, &encode_pubkey(target_id.public().as_bytes()))
+        .register_identity(
+            &target_dev.device_id,
+            &encode_pubkey(target_id.public().as_bytes()),
+        )
         .expect("register target identity");
     let ctrl_gw = Gateway::new(&base, &ctrl_tok, &ctrl_dev.device_token);
     ctrl_gw
-        .register_identity(&ctrl_dev.device_id, &encode_pubkey(ctrl_id.public().as_bytes()))
+        .register_identity(
+            &ctrl_dev.device_id,
+            &encode_pubkey(ctrl_id.public().as_bytes()),
+        )
         .expect("register ctrl identity");
     println!("identities registered");
 
     // ---------- 3. 建会话 ----------
     let target_code = target_dev.raw_code.replace(" ", "");
     let captcha = target_gw.rotate_code(&target_code).expect("rotate");
-    let session_id = ctrl_gw.request_connect(&target_code, &captcha).expect("connect request");
+    let session_id = ctrl_gw
+        .request_connect(&target_code, &captcha)
+        .expect("connect request");
     println!("session {} requested", session_id);
 
     let state = target_gw.consent(&session_id, true).expect("consent");
@@ -83,7 +98,9 @@ fn main() {
     let mut target_relay =
         RelayClient::new(relay_addr, &session_id, &target_dev.device_id).expect("target relay");
     ctrl_relay.register(&ctrl_ticket).expect("ctrl register");
-    target_relay.register(&target_ticket).expect("target register");
+    target_relay
+        .register(&target_ticket)
+        .expect("target register");
     std::thread::sleep(Duration::from_millis(400));
 
     // ---------- 6. 认证握手 ----------
@@ -100,10 +117,14 @@ fn main() {
     msg2.extend_from_slice(&target_hs.encode());
     target_relay.send(&msg2).expect("send target hs");
 
-    let saw_target =
-        ctrl_relay.recv_timeout(Duration::from_secs(3)).expect("recv").expect("no target hs");
-    let saw_ctrl =
-        target_relay.recv_timeout(Duration::from_secs(3)).expect("recv").expect("no ctrl hs");
+    let saw_target = ctrl_relay
+        .recv_timeout(Duration::from_secs(3))
+        .expect("recv")
+        .expect("no target hs");
+    let saw_ctrl = target_relay
+        .recv_timeout(Duration::from_secs(3))
+        .expect("recv")
+        .expect("no ctrl hs");
 
     let peer_target = Handshake::decode(&saw_target[TAG.len()..]).expect("decode target hs");
     let peer_ctrl = Handshake::decode(&saw_ctrl[TAG.len()..]).expect("decode ctrl hs");
@@ -141,13 +162,20 @@ fn main() {
     let mut codec = OpenH264Codec::new(cfg).expect("codec");
     let frame = cap.grab().expect("capture");
     let encoded = codec.encode_bgra(&frame.data, frame.ts_ms).expect("encode");
-    println!("captured {}x{}, encoded {} bytes", frame.width, frame.height, encoded.len());
+    println!(
+        "captured {}x{}, encoded {} bytes",
+        frame.width,
+        frame.height,
+        encoded.len()
+    );
 
     let sealed = ctrl_crypto.seal(&encoded);
     ctrl_relay.send(&sealed).expect("send sealed");
 
-    let got =
-        target_relay.recv_timeout(Duration::from_secs(3)).expect("recv").expect("no payload");
+    let got = target_relay
+        .recv_timeout(Duration::from_secs(3))
+        .expect("recv")
+        .expect("no payload");
     let plain = target_crypto.open(&got).expect("decrypt");
     if plain != encoded {
         println!("FAIL: payload mismatch");
@@ -162,7 +190,9 @@ fn main() {
                 println!("FAIL: dimension mismatch");
                 std::process::exit(1);
             }
-            println!("FULL SESSION E2E PASSED (real gateway, real relay, authenticated E2E encryption)");
+            println!(
+                "FULL SESSION E2E PASSED (real gateway, real relay, authenticated E2E encryption)"
+            );
         }
         _ => {
             println!("FAIL: decode failed");

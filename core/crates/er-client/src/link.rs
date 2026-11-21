@@ -129,8 +129,16 @@ impl FeedbackReport {
     /// 拿帧丢失率喂 ABR 会把 5% 的链路当重度拥塞，一路踩到底。
     pub fn to_link_feedback(&self, rtt_ms: u32) -> LinkFeedback {
         let frag_total = self.frag_received as u64 + self.frag_missing as u64;
-        let loss_pct = if frag_total > 0 { self.datagram_loss_pct } else { self.loss_pct };
-        LinkFeedback { loss_pct, rtt_ms, queue_ms: self.queue_ms }
+        let loss_pct = if frag_total > 0 {
+            self.datagram_loss_pct
+        } else {
+            self.loss_pct
+        };
+        LinkFeedback {
+            loss_pct,
+            rtt_ms,
+            queue_ms: self.queue_ms,
+        }
     }
 }
 
@@ -207,11 +215,7 @@ impl LinkStats {
     /// 是本报告里**丢包**的主口径。
     ///
     /// 周期内**一帧都没收到**时返回 None（没数据就没有可判定的丢帧率）。
-    pub fn take_cycle(
-        &mut self,
-        arrival_ms: u32,
-        frag: ReassemblyStats,
-    ) -> Option<FeedbackReport> {
+    pub fn take_cycle(&mut self, arrival_ms: u32, frag: ReassemblyStats) -> Option<FeedbackReport> {
         let (Some(cbase), cum_base) = (self.cycle_base_seq, self.cum_base_seq.unwrap_or(0)) else {
             return None;
         };
@@ -249,8 +253,12 @@ impl LinkStats {
             frag_received: frag.fragments_received.min(u32::MAX as u64) as u32,
             frag_missing: frag.fragments_missing.min(u32::MAX as u64) as u32,
             datagram_loss_pct: {
-                let dr = frag.fragments_received.saturating_sub(self.last_frag_received);
-                let dm = frag.fragments_missing.saturating_sub(self.last_frag_missing);
+                let dr = frag
+                    .fragments_received
+                    .saturating_sub(self.last_frag_received);
+                let dm = frag
+                    .fragments_missing
+                    .saturating_sub(self.last_frag_missing);
                 self.last_frag_received = frag.fragments_received;
                 self.last_frag_missing = frag.fragments_missing;
                 let total = dr + dm;
@@ -310,7 +318,12 @@ pub struct AbrDriver {
 impl AbrDriver {
     /// 诊断用：当前档位下标与健康/拥塞计数。
     pub fn debug_state(&self) -> (usize, u32, u32, u32) {
-        (self.ctrl.index(), self.ctrl.healthy_streak(), self.ctrl.severe_streak(), self.ctrl.mild_streak())
+        (
+            self.ctrl.index(),
+            self.ctrl.healthy_streak(),
+            self.ctrl.severe_streak(),
+            self.ctrl.mild_streak(),
+        )
     }
 
     pub fn new(src_w: u32, src_h: u32) -> Self {
@@ -341,7 +354,11 @@ impl AbrDriver {
     }
 
     /// 吃掉一份报告。返回 Some(新配置) 表示档位变了，调用方要重配编码器。
-    pub fn on_report(&mut self, report: &FeedbackReport, rtt_ms: u32) -> Option<(Decision, EncodeConfig)> {
+    pub fn on_report(
+        &mut self,
+        report: &FeedbackReport,
+        rtt_ms: u32,
+    ) -> Option<(Decision, EncodeConfig)> {
         self.feedbacks += 1;
         let fb = report.to_link_feedback(rtt_ms);
         let d = self.ctrl.on_feedback(&fb);
@@ -360,7 +377,12 @@ mod tests {
     use super::*;
 
     fn hdr(seq: u32, ts: u32) -> VideoHeader {
-        VideoHeader { seq, ts_ms: ts, width: 2880, height: 1620 }
+        VideoHeader {
+            seq,
+            ts_ms: ts,
+            width: 2880,
+            height: 1620,
+        }
     }
 
     #[test]
@@ -414,7 +436,10 @@ mod tests {
         assert!(s.take_cycle(1000, no_frag()).is_none());
         s.on_frame(&hdr(1, 10), 1000);
         assert!(s.take_cycle(1000, no_frag()).is_some());
-        assert!(s.take_cycle(1100, no_frag()).is_none(), "没新帧的周期不出报告");
+        assert!(
+            s.take_cycle(1100, no_frag()).is_none(),
+            "没新帧的周期不出报告"
+        );
     }
 
     #[test]
@@ -451,7 +476,11 @@ mod tests {
             datagram_loss_pct: 5.0,
         };
         let fb = r.to_link_feedback(30);
-        assert!((fb.loss_pct - 5.0).abs() < 0.001, "应取分片口径，得到 {}", fb.loss_pct);
+        assert!(
+            (fb.loss_pct - 5.0).abs() < 0.001,
+            "应取分片口径，得到 {}",
+            fb.loss_pct
+        );
     }
 
     #[test]
@@ -540,9 +569,19 @@ mod tests {
         let mut st = LinkStats::new();
         for i in 0..4u32 {
             let ts = i * 250;
-            st.on_frame(&VideoHeader { seq: i, ts_ms: ts, width: 960, height: 540 }, ts + 20);
+            st.on_frame(
+                &VideoHeader {
+                    seq: i,
+                    ts_ms: ts,
+                    width: 960,
+                    height: 540,
+                },
+                ts + 20,
+            );
         }
-        let fb = st.take_cycle(775, ReassemblyStats::default()).expect("report");
+        let fb = st
+            .take_cycle(775, ReassemblyStats::default())
+            .expect("report");
         assert_eq!(fb.loss_pct, 0.0);
         assert!(
             fb.queue_ms < 40,
@@ -550,7 +589,4 @@ mod tests {
             fb.queue_ms
         );
     }
-
-
-
 }

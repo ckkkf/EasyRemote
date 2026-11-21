@@ -94,14 +94,21 @@ impl TargetAgent {
     ) -> Result<Self, AgentError> {
         let anon = Gateway::new(gateway_base, "", "");
         let _ = anon.send_sms(phone);
-        let token = anon.login(phone, sms_code).map_err(|e| AgentError(e.to_string()))?;
+        let token = anon
+            .login(phone, sms_code)
+            .map_err(|e| AgentError(e.to_string()))?;
         let gw = Gateway::new(gateway_base, &token, "");
-        let device = gw.bind_device(local_platform()).map_err(|e| AgentError(e.to_string()))?;
+        let device = gw
+            .bind_device(local_platform())
+            .map_err(|e| AgentError(e.to_string()))?;
 
         let identity = DeviceIdentity::random();
         let authed = Gateway::new(gateway_base, &token, &device.device_token);
         authed
-            .register_identity(&device.device_id, &encode_pubkey(identity.public().as_bytes()))
+            .register_identity(
+                &device.device_id,
+                &encode_pubkey(identity.public().as_bytes()),
+            )
             .map_err(|e| AgentError(e.to_string()))?;
 
         Ok(Self {
@@ -129,7 +136,8 @@ impl TargetAgent {
             &self.device.device_token,
         )
         .map_err(|e| AgentError(e.to_string()))?;
-        sig.wait_for_request(timeout).map_err(|e| AgentError(e.to_string()))
+        sig.wait_for_request(timeout)
+            .map_err(|e| AgentError(e.to_string()))
     }
 
     pub fn device_code(&self) -> String {
@@ -142,12 +150,17 @@ impl TargetAgent {
 
     /// 轮换验证码并返回给主控（真实产品里是显示在屏幕上）。
     pub fn rotate_captcha(&self) -> Result<String, AgentError> {
-        self.gw.rotate_code(&self.device_code()).map_err(|e| AgentError(e.to_string()))
+        self.gw
+            .rotate_code(&self.device_code())
+            .map_err(|e| AgentError(e.to_string()))
     }
 
     /// 授权会话。
     pub fn consent(&self, session_id: &str) -> Result<(), AgentError> {
-        let state = self.gw.consent(session_id, true).map_err(|e| AgentError(e.to_string()))?;
+        let state = self
+            .gw
+            .consent(session_id, true)
+            .map_err(|e| AgentError(e.to_string()))?;
         if state != "authorized" {
             fail!("consent state = {}", state);
         }
@@ -160,12 +173,20 @@ impl TargetAgent {
         &self,
         session_id: &str,
     ) -> Result<(RelayClient, CryptoSession, Vec<u8>), AgentError> {
-        let ticket = self.gw.relay_ticket(session_id).map_err(|e| AgentError(e.to_string()))?;
-        let keys = self.gw.session_keys(session_id).map_err(|e| AgentError(e.to_string()))?;
+        let ticket = self
+            .gw
+            .relay_ticket(session_id)
+            .map_err(|e| AgentError(e.to_string()))?;
+        let keys = self
+            .gw
+            .session_keys(session_id)
+            .map_err(|e| AgentError(e.to_string()))?;
 
         let mut relay = RelayClient::new(self.relay_addr, session_id, &self.device.device_id)
             .map_err(|e| AgentError(e.to_string()))?;
-        relay.register(&ticket).map_err(|e| AgentError(e.to_string()))?;
+        relay
+            .register(&ticket)
+            .map_err(|e| AgentError(e.to_string()))?;
 
         let (crypto, eph) = CryptoSession::new(session_id, false);
         let hs = sign_handshake(&self.identity, session_id, &eph, "controlled");
@@ -176,12 +197,11 @@ impl TargetAgent {
     }
 
     /// 握手第二步：把本方握手消息发出去。
-    pub fn announce(
-        &self,
-        relay: &mut RelayClient,
-        msg: &[u8],
-    ) -> Result<(), AgentError> {
-        relay.send(msg).map(|_| ()).map_err(|e| AgentError(e.to_string()))
+    pub fn announce(&self, relay: &mut RelayClient, msg: &[u8]) -> Result<(), AgentError> {
+        relay
+            .send(msg)
+            .map(|_| ())
+            .map_err(|e| AgentError(e.to_string()))
     }
 
     /// 握手第二步：等待对端握手、验签、派生密钥。
@@ -215,7 +235,9 @@ impl TargetAgent {
             .gw
             .relay_ticket(session_id)
             .map_err(|e| AgentError(format!("rejoin ticket: {e}")))?;
-        relay.register(&ticket).map_err(|e| AgentError(e.to_string()))
+        relay
+            .register(&ticket)
+            .map_err(|e| AgentError(e.to_string()))
     }
 
     /// 接收输入事件并注入。
@@ -243,14 +265,18 @@ impl TargetAgent {
                 Ok(None) => continue,
                 Err(e) => return Err(AgentError(e.to_string())),
             };
-            let plain = crypto.open(&sealed).map_err(|e| AgentError(e.to_string()))?;
+            let plain = crypto
+                .open(&sealed)
+                .map_err(|e| AgentError(e.to_string()))?;
             if plain.is_empty() || plain[0] != MSG_INPUT {
                 continue;
             }
             let Some(ev) = er_input::InputEvent::decode(&plain[1..]) else {
                 continue;
             };
-            injector.inject(&ev).map_err(|e| AgentError(e.to_string()))?;
+            injector
+                .inject(&ev)
+                .map_err(|e| AgentError(e.to_string()))?;
             got.push(ev);
         }
         if got.is_empty() {
@@ -315,7 +341,9 @@ fn recv_video_frames(
     // 后续帧只做完整性校验，尺寸沿用首帧。
     let mut dims: Option<(usize, usize)> = None;
     while out.len() < count && Instant::now() < deadline {
-        let Some(sealed) = relay.recv_timeout(Duration::from_secs(3)).map_err(|e| AgentError(e.to_string()))?
+        let Some(sealed) = relay
+            .recv_timeout(Duration::from_secs(3))
+            .map_err(|e| AgentError(e.to_string()))?
         else {
             break;
         };
@@ -344,7 +372,11 @@ fn recv_video_frames(
             }
         }
         let (w, h) = dims.expect("dims set");
-        out.push(FrameInfo { width: w, height: h, h264_bytes: plain.len() });
+        out.push(FrameInfo {
+            width: w,
+            height: h,
+            h264_bytes: plain.len(),
+        });
     }
     if out.is_empty() {
         fail!("no frames decoded");
@@ -432,7 +464,12 @@ fn send_screen_frames(
     let mut enc = crate::encoder::HybridEncoder::new(cfg).map_err(AgentError)?;
     // 不要在这里打 backend：还没编过任何一帧，它必然是初始值 "cpu"，
     // 会让人误以为走了 CPU 路径（上一轮 step3 的误判就是这么来的）。
-    println!("CODEC: init kind={:?} {}x{}", enc.cpu_kind(), cfg.width, cfg.height);
+    println!(
+        "CODEC: init kind={:?} {}x{}",
+        enc.cpu_kind(),
+        cfg.width,
+        cfg.height
+    );
 
     // 新订阅者/新会话：先制造一次画面变化，否则静止桌面下 DXGI 不出帧，
     // 观众会一直等不到首帧（零位移输入，不动光标）
@@ -493,17 +530,29 @@ impl ControllerAgent {
     ) -> Result<Self, AgentError> {
         let anon = Gateway::new(gateway_base, "", "");
         let _ = anon.send_sms(phone);
-        let token = anon.login(phone, sms_code).map_err(|e| AgentError(e.to_string()))?;
+        let token = anon
+            .login(phone, sms_code)
+            .map_err(|e| AgentError(e.to_string()))?;
         let gw = Gateway::new(gateway_base, &token, "");
-        let device = gw.bind_device(local_platform()).map_err(|e| AgentError(e.to_string()))?;
+        let device = gw
+            .bind_device(local_platform())
+            .map_err(|e| AgentError(e.to_string()))?;
 
         let identity = DeviceIdentity::random();
         let authed = Gateway::new(gateway_base, &token, &device.device_token);
         authed
-            .register_identity(&device.device_id, &encode_pubkey(identity.public().as_bytes()))
+            .register_identity(
+                &device.device_id,
+                &encode_pubkey(identity.public().as_bytes()),
+            )
             .map_err(|e| AgentError(e.to_string()))?;
 
-        Ok(Self { gw: authed, device, identity, relay_addr })
+        Ok(Self {
+            gw: authed,
+            device,
+            identity,
+            relay_addr,
+        })
     }
 
     pub fn device_id(&self) -> &str {
@@ -512,7 +561,9 @@ impl ControllerAgent {
 
     /// 用设备码 + 验证码发起连接。
     pub fn request_session(&self, device_code: &str, captcha: &str) -> Result<String, AgentError> {
-        self.gw.request_connect(device_code, captcha).map_err(|e| AgentError(e.to_string()))
+        self.gw
+            .request_connect(device_code, captcha)
+            .map_err(|e| AgentError(e.to_string()))
     }
 
     /// 握手第一步：注册中继并构造好本方握手消息（**不发送**）。
@@ -520,12 +571,20 @@ impl ControllerAgent {
         &self,
         session_id: &str,
     ) -> Result<(RelayClient, CryptoSession, SessionKeys, Vec<u8>), AgentError> {
-        let ticket = self.gw.relay_ticket(session_id).map_err(|e| AgentError(e.to_string()))?;
-        let keys = self.gw.session_keys(session_id).map_err(|e| AgentError(e.to_string()))?;
+        let ticket = self
+            .gw
+            .relay_ticket(session_id)
+            .map_err(|e| AgentError(e.to_string()))?;
+        let keys = self
+            .gw
+            .session_keys(session_id)
+            .map_err(|e| AgentError(e.to_string()))?;
 
         let mut relay = RelayClient::new(self.relay_addr, session_id, &self.device.device_id)
             .map_err(|e| AgentError(e.to_string()))?;
-        relay.register(&ticket).map_err(|e| AgentError(e.to_string()))?;
+        relay
+            .register(&ticket)
+            .map_err(|e| AgentError(e.to_string()))?;
 
         let (crypto, eph) = CryptoSession::new(session_id, true);
         let hs = sign_handshake(&self.identity, session_id, &eph, "operator");
@@ -535,12 +594,11 @@ impl ControllerAgent {
     }
 
     /// 握手第二步：把本方握手消息发出去。
-    pub fn announce(
-        &self,
-        relay: &mut RelayClient,
-        msg: &[u8],
-    ) -> Result<(), AgentError> {
-        relay.send(msg).map(|_| ()).map_err(|e| AgentError(e.to_string()))
+    pub fn announce(&self, relay: &mut RelayClient, msg: &[u8]) -> Result<(), AgentError> {
+        relay
+            .send(msg)
+            .map(|_| ())
+            .map_err(|e| AgentError(e.to_string()))
     }
 
     /// 握手第二步：等待对端握手、验签、派生密钥。
@@ -576,7 +634,9 @@ impl ControllerAgent {
             msg.push(MSG_INPUT);
             msg.extend_from_slice(&body);
             let sealed = crypto.seal(&msg);
-            relay.send(&sealed).map_err(|err| AgentError(err.to_string()))?;
+            relay
+                .send(&sealed)
+                .map_err(|err| AgentError(err.to_string()))?;
         }
         Ok(events.len())
     }
@@ -590,7 +650,9 @@ impl ControllerAgent {
             .gw
             .relay_ticket(session_id)
             .map_err(|e| AgentError(format!("rejoin ticket: {e}")))?;
-        relay.register(&ticket).map_err(|e| AgentError(e.to_string()))
+        relay
+            .register(&ticket)
+            .map_err(|e| AgentError(e.to_string()))
     }
 
     /// 采集本机主屏并发送若干帧（主控侧）。
@@ -636,7 +698,10 @@ impl ControllerAgent {
 }
 
 /// 等到一个可解析的对端握手（忽略重复副本与噪声）。
-fn wait_peer_handshake(relay: &mut RelayClient, timeout: Duration) -> Result<Handshake, AgentError> {
+fn wait_peer_handshake(
+    relay: &mut RelayClient,
+    timeout: Duration,
+) -> Result<Handshake, AgentError> {
     let deadline = Instant::now() + timeout;
     while Instant::now() < deadline {
         match relay.recv_timeout(Duration::from_secs(2)) {

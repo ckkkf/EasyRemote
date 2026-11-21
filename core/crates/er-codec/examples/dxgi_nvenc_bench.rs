@@ -153,7 +153,10 @@ fn wait_cpu(cap: &mut DxgiCapture, attempts: usize) -> Result<RawFrame, String> 
 
 #[cfg(target_os = "windows")]
 fn windows_main() -> Result<(), String> {
-    let iters: usize = std::env::args().nth(1).and_then(|s| s.parse().ok()).unwrap_or(20);
+    let iters: usize = std::env::args()
+        .nth(1)
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(20);
 
     println!("=== 环境 ===");
     let p = nvenc::probe();
@@ -194,7 +197,10 @@ fn windows_main() -> Result<(), String> {
         gop: 60,
         bframes: 0,
     };
-    println!("encode cfg      = {}x{} @{}fps gop={}", cfg.width, cfg.height, cfg.fps, cfg.gop);
+    println!(
+        "encode cfg      = {}x{} @{}fps gop={}",
+        cfg.width, cfg.height, cfg.fps, cfg.gop
+    );
 
     // 先探一次：桌面是否真的在出帧
     println!("\n=== Desktop Duplication 取帧探测 ===");
@@ -263,7 +269,10 @@ fn windows_main() -> Result<(), String> {
             rep.max_cap = rep.max_cap.max(cap_ms);
             rep.max_enc = rep.max_enc.max(enc_ms);
             if i == 0 || i + 1 == iters {
-                println!("A frame {i}: capture {cap_ms:.2}ms encode {enc_ms:.2}ms {} bytes", pkt.len());
+                println!(
+                    "A frame {i}: capture {cap_ms:.2}ms encode {enc_ms:.2}ms {} bytes",
+                    pkt.len()
+                );
             }
         }
         rep.wall_ms = t_all.elapsed().as_secs_f64() * 1000.0;
@@ -306,7 +315,10 @@ fn windows_main() -> Result<(), String> {
             rep.max_cap = rep.max_cap.max(cap_ms);
             rep.max_enc = rep.max_enc.max(enc_ms);
             if i == 0 || i + 1 == iters {
-                println!("B frame {i}: capture {cap_ms:.2}ms encode {enc_ms:.2}ms {} bytes", pkt.len());
+                println!(
+                    "B frame {i}: capture {cap_ms:.2}ms encode {enc_ms:.2}ms {} bytes",
+                    pkt.len()
+                );
             }
         }
         rep.wall_ms = t_all.elapsed().as_secs_f64() * 1000.0;
@@ -421,7 +433,10 @@ fn windows_main() -> Result<(), String> {
     let tex = cap
         .upload_bgra_texture(&src, cfg.width, cfg.height)
         .map_err(|e| format!("E upload_bgra_texture: {e}"))?;
-    println!("E texture = {tex:?} ({}x{} B8G8R8A8)", cfg.width, cfg.height);
+    println!(
+        "E texture = {tex:?} ({}x{} B8G8R8A8)",
+        cfg.width, cfg.height
+    );
     {
         let mut enc = NvencEncoder::new_d3d11(cfg, cap.device_raw())
             .map_err(|e| format!("E nvenc d3d11: {e}"))?;
@@ -472,7 +487,10 @@ fn windows_main() -> Result<(), String> {
             rep.enc_ms += enc_ms;
             rep.max_enc = rep.max_enc.max(enc_ms);
             if i == 0 || i + 1 == iters {
-                println!("E2 frame {i}: encode(含 register) {enc_ms:.2}ms {} bytes", pkt.len());
+                println!(
+                    "E2 frame {i}: encode(含 register) {enc_ms:.2}ms {} bytes",
+                    pkt.len()
+                );
             }
         }
         rep.wall_ms = t_all.elapsed().as_secs_f64() * 1000.0;
@@ -480,7 +498,10 @@ fn windows_main() -> Result<(), String> {
     }
 
     // ---------------- 汇总 ----------------
-    println!("\n=== 汇总（{} 帧/路径，{}x{}）===", iters, cfg.width, cfg.height);
+    println!(
+        "\n=== 汇总（{} 帧/路径，{}x{}）===",
+        iters, cfg.width, cfg.height
+    );
     println!(
         "{:<28} {:>12} {:>12} {:>12} {:>10} {:>16} {:>8}",
         "路径", "capture_ms", "encode_ms", "aux_ms", "e2e_fps", "decode", "idr_B"
@@ -498,11 +519,23 @@ fn windows_main() -> Result<(), String> {
         println!(
             "{:<28} {:>12} {:>12.2} {:>12.2} {:>10} {:>16} {:>8}",
             name,
-            if has_capture { format!("{:.2}", rep.avg_cap()) } else { "n/a".into() },
+            if has_capture {
+                format!("{:.2}", rep.avg_cap())
+            } else {
+                "n/a".into()
+            },
             rep.avg_enc(),
             rep.avg_aux(),
-            if has_capture { format!("{:.2}", rep.fps()) } else { "n/a".into() },
-            if ok { format!("{dims} OK") } else { format!("{dims} WANT {want}") },
+            if has_capture {
+                format!("{:.2}", rep.fps())
+            } else {
+                "n/a".into()
+            },
+            if ok {
+                format!("{dims} OK")
+            } else {
+                format!("{dims} WANT {want}")
+            },
             rep.idr_bytes
         );
         lines.push(format!(
@@ -520,10 +553,22 @@ fn windows_main() -> Result<(), String> {
         ));
     }
 
-    let get = |prefix: &str| reports.iter().find(|(n, _)| n.starts_with(prefix)).map(|(_, r)| r.avg_cap());
+    let get = |prefix: &str| {
+        reports
+            .iter()
+            .find(|(n, _)| n.starts_with(prefix))
+            .map(|(_, r)| r.avg_cap())
+    };
     let xcap_capture = get("xcap").unwrap_or(f64::NAN);
     let dxgi_capture = get("dxgi+NVENC(zero").unwrap_or(f64::NAN);
-    println!("\nCAPTURE_BUDGET_40MS: xcap_baseline={xcap_capture:.2}ms dxgi_zero_copy={}", if dxgi_capture.is_nan() { "n/a".into() } else { format!("{dxgi_capture:.2}ms") });
+    println!(
+        "\nCAPTURE_BUDGET_40MS: xcap_baseline={xcap_capture:.2}ms dxgi_zero_copy={}",
+        if dxgi_capture.is_nan() {
+            "n/a".into()
+        } else {
+            format!("{dxgi_capture:.2}ms")
+        }
+    );
     if let Some(reason) = &dxgi_blocked {
         println!("DXGI_BLOCKED_REASON: {reason}");
     }
@@ -532,11 +577,16 @@ fn windows_main() -> Result<(), String> {
         println!("METRIC {l}");
     }
     if !all_ok {
-        println!("VERDICT: FAIL (解码尺寸与 {}x{} 不一致)", cfg.width, cfg.height);
+        println!(
+            "VERDICT: FAIL (解码尺寸与 {}x{} 不一致)",
+            cfg.width, cfg.height
+        );
         return Err("decode dims mismatch".into());
     }
     if dxgi_blocked.is_some() {
-        println!("VERDICT: PARTIAL（NVENC DirectX 输入路径真机通过，DXGI 采集因桌面不出帧无法测量）");
+        println!(
+            "VERDICT: PARTIAL（NVENC DirectX 输入路径真机通过，DXGI 采集因桌面不出帧无法测量）"
+        );
         return Ok(());
     }
     println!("VERDICT: PASS");

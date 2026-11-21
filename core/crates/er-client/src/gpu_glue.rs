@@ -16,7 +16,10 @@ pub(crate) struct GpuGlue {
 
 impl GpuGlue {
     pub(crate) fn new() -> Self {
-        Self { enc: None, warned_idle: false }
+        Self {
+            enc: None,
+            warned_idle: false,
+        }
     }
 
     /// ABR 改档后必须丢掉旧会话：NVENC 会话的输入纹理尺寸在初始化时就固定了，
@@ -97,7 +100,8 @@ impl GpuGlue {
         let mut enc = self.enc.take().expect("just ensured");
         let out = enc.encode_d3d11_registered(now_ms());
         self.enc = Some(enc);
-        out.map(Some).map_err(|e| GpuFallback::EncodeFailed(e.to_string()))
+        out.map(Some)
+            .map_err(|e| GpuFallback::EncodeFailed(e.to_string()))
     }
 }
 

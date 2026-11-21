@@ -63,8 +63,12 @@ pub fn serve_host(
     timeout_secs: u64,
 ) -> Result<HostResult, String> {
     let (target, relay_addr) = {
-        let reg = registry().lock().map_err(|_| "registry poisoned".to_string())?;
-        let h = reg.get(host_id).ok_or_else(|| format!("unknown host: {host_id}"))?;
+        let reg = registry()
+            .lock()
+            .map_err(|_| "registry poisoned".to_string())?;
+        let h = reg
+            .get(host_id)
+            .ok_or_else(|| format!("unknown host: {host_id}"))?;
         // TargetAgent 不可 Clone，这里用一个轻量句柄：把需要的东西先取出来
         (h.device_code.clone(), ())
     };
@@ -73,8 +77,11 @@ pub fn serve_host(
     // 真正的等待与收帧要在持有 target 的情况下做，因此整个流程放在注册表锁内不合理，
     // 改为「取出再放回」：取走对象、执行、丢弃。
     let host = {
-        let mut reg = registry().lock().map_err(|_| "registry poisoned".to_string())?;
-        reg.remove(host_id).ok_or_else(|| format!("unknown host: {host_id}"))?
+        let mut reg = registry()
+            .lock()
+            .map_err(|_| "registry poisoned".to_string())?;
+        reg.remove(host_id)
+            .ok_or_else(|| format!("unknown host: {host_id}"))?
     };
 
     let session_id = host
@@ -82,18 +89,27 @@ pub fn serve_host(
         .wait_for_session(signal_base, std::time::Duration::from_secs(timeout_secs))
         .map_err(|e| e.to_string())?;
 
-    host.target.consent(&session_id).map_err(|e| e.to_string())?;
+    host.target
+        .consent(&session_id)
+        .map_err(|e| e.to_string())?;
     let (mut t_relay, mut t_crypto, t_msg) =
         host.target.begin(&session_id).map_err(|e| e.to_string())?;
-    host.target.announce(&mut t_relay, &t_msg).map_err(|e| e.to_string())?;
-    host.target.finish(&mut t_relay, &mut t_crypto, &session_id).map_err(|e| e.to_string())?;
+    host.target
+        .announce(&mut t_relay, &t_msg)
+        .map_err(|e| e.to_string())?;
+    host.target
+        .finish(&mut t_relay, &mut t_crypto, &session_id)
+        .map_err(|e| e.to_string())?;
 
     let frames_got = host
         .target
         .recv_frames(&mut t_relay, &mut t_crypto, frames)
         .map_err(|e| e.to_string())?;
 
-    Ok(HostResult { session_id, frames: frames_got })
+    Ok(HostResult {
+        session_id,
+        frames: frames_got,
+    })
 }
 
 /// 主控侧连接：只用设备码 + 验证码（与真实产品一致）。
@@ -114,12 +130,18 @@ pub fn connect_device(
 
     let (mut c_relay, mut c_crypto, c_keys, c_msg) =
         ctrl.begin(&session_id).map_err(|e| e.to_string())?;
-    ctrl.announce(&mut c_relay, &c_msg).map_err(|e| e.to_string())?;
+    ctrl.announce(&mut c_relay, &c_msg)
+        .map_err(|e| e.to_string())?;
     ctrl.finish(&mut c_relay, &mut c_crypto, &c_keys, &session_id)
         .map_err(|e| e.to_string())?;
 
-    let _ = ctrl.send_frames(&mut c_relay, &mut c_crypto, frames).map_err(|e| e.to_string())?;
-    Ok(HostResult { session_id, frames: Vec::new() })
+    let _ = ctrl
+        .send_frames(&mut c_relay, &mut c_crypto, frames)
+        .map_err(|e| e.to_string())?;
+    Ok(HostResult {
+        session_id,
+        frames: Vec::new(),
+    })
 }
 
 /// 释放主机资源。
@@ -132,6 +154,9 @@ pub fn release_host(host_id: &str) -> bool {
 
 fn nanos_hex() -> String {
     use std::time::{SystemTime, UNIX_EPOCH};
-    let nanos = SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or(0);
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or(0);
     format!("{nanos:x}")
 }

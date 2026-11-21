@@ -18,7 +18,12 @@ pub struct PrivacyColor {
 
 impl Default for PrivacyColor {
     fn default() -> Self {
-        Self { b: 0, g: 0, r: 0, a: 255 } // 黑
+        Self {
+            b: 0,
+            g: 0,
+            r: 0,
+            a: 255,
+        } // 黑
     }
 }
 
@@ -74,7 +79,15 @@ mod tests {
     fn no_residual_original_bytes() {
         let mut f = frame(8, 8);
         let original = f.data.clone();
-        apply_privacy(&mut f, PrivacyColor { b: 10, g: 20, r: 30, a: 255 });
+        apply_privacy(
+            &mut f,
+            PrivacyColor {
+                b: 10,
+                g: 20,
+                r: 30,
+                a: 255,
+            },
+        );
         assert!(
             f.data.chunks_exact(4).all(|px| px == [10, 20, 30, 255]),
             "no pixel may retain original content"

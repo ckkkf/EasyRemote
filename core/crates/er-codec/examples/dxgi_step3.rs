@@ -9,7 +9,9 @@
 
 #[cfg(target_os = "windows")]
 fn main() {
-    let mode = std::env::args().nth(1).unwrap_or_else(|| "lockstate".to_string());
+    let mode = std::env::args()
+        .nth(1)
+        .unwrap_or_else(|| "lockstate".to_string());
     match mode.as_str() {
         "lockstate" => lockstate(),
         "selfheal" => selfheal(),
@@ -156,7 +158,10 @@ fn selfheal() {
     }
     std::thread::sleep(std::time::Duration::from_millis(1200));
     // 模式切换后 duplication 到底返回什么 HRESULT？先打出来，别猜
-    println!("SELFHEAL acquire_debug_after_switch={}", cap.acquire_debug(50));
+    println!(
+        "SELFHEAL acquire_debug_after_switch={}",
+        cap.acquire_debug(50)
+    );
 
     // 3) 触发 ACCESS_LOST：切换分辨率后 duplication 失效，下一次 grab_gpu 应自愈重建
     let mut post_frames = 0usize;
@@ -226,7 +231,9 @@ fn selfheal() {
                     }
                 };
                 if tex1 != tex0 {
-                    println!("SELFHEAL input_texture_changed={tex0:p} -> {tex1:p}（重注册，未重建会话）");
+                    println!(
+                        "SELFHEAL input_texture_changed={tex0:p} -> {tex1:p}（重注册，未重建会话）"
+                    );
                     if let Err(e) = enc.register_d3d11_input(tex1) {
                         println!("SELFHEAL register_after_failed=\"{e}\"");
                         break;
@@ -264,7 +271,9 @@ fn selfheal() {
     if rebuilt && nvenc_reused && device_same {
         println!("RESULT: PASS (duplication 自愈；device 与 NVENC 会话均未重建)");
     } else if rebuilt && nvenc_reused && !device_same {
-        println!("RESULT: PASS (device 被驱动移除后整条重建，采集与编码均已恢复；device 指针必然变化)");
+        println!(
+            "RESULT: PASS (device 被驱动移除后整条重建，采集与编码均已恢复；device 指针必然变化)"
+        );
     } else if !rebuilt {
         println!("RESULT: INCONCLUSIVE (没有触发重建：该显示器的模式切换可能是空操作)");
         std::process::exit(1);

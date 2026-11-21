@@ -36,7 +36,9 @@ fn real_main() {
     use er_input::{Injector, InputEvent};
 
     fn arg(i: usize, default: &str) -> String {
-        std::env::args().nth(i).unwrap_or_else(|| default.to_string())
+        std::env::args()
+            .nth(i)
+            .unwrap_or_else(|| default.to_string())
     }
 
     /// 起一个「自己会动」的窗口来制造画面变化。**不碰鼠标**。
@@ -112,12 +114,19 @@ fn real_main() {
     );
     std::fs::write(
         &hello_file,
-        format!("device_id={}\ndevice_code={}\ncaptcha={}\n", target.device_id(), code, captcha),
+        format!(
+            "device_id={}\ndevice_code={}\ncaptcha={}\n",
+            target.device_id(),
+            code,
+            captcha
+        ),
     )
     .expect("write hello");
 
     println!("WIN: waiting_for_signalling ...");
-    let session_id = target.wait_for_session(&signal, Duration::from_secs(180)).expect("signalling");
+    let session_id = target
+        .wait_for_session(&signal, Duration::from_secs(180))
+        .expect("signalling");
     println!("WIN: session={session_id}");
     target.consent(&session_id).expect("consent");
     println!("WIN: consent=authorized");
@@ -126,11 +135,15 @@ fn real_main() {
     let (mut relay, mut crypto, msg) = target.begin(&session_id).expect("begin");
     println!("WIN: relay_registered local={}", relay.local_addr());
     target.announce(&mut relay, &msg).expect("announce");
-    target.finish(&mut relay, &mut crypto, &session_id).expect("handshake");
+    target
+        .finish(&mut relay, &mut crypto, &session_id)
+        .expect("handshake");
     println!("WIN: handshake_verified (ed25519 + x25519)");
 
     // ① 收主控发来的帧并解码
-    let got = target.recv_frames(&mut relay, &mut crypto, in_frames).expect("recv frames");
+    let got = target
+        .recv_frames(&mut relay, &mut crypto, in_frames)
+        .expect("recv frames");
     println!(
         "WIN: frames_received={} resolution={}x{} first_h264_bytes={}",
         got.len(),
@@ -149,7 +162,9 @@ fn real_main() {
     // 让窗口先真的画出来（首帧是 DXGI 变更的触发点）
     std::thread::sleep(Duration::from_millis(400));
     let t0 = Instant::now();
-    let sizes = target.send_frames(&mut relay, &mut crypto, out_frames).expect("send frames");
+    let sizes = target
+        .send_frames(&mut relay, &mut crypto, out_frames)
+        .expect("send frames");
     let encode_ms = t0.elapsed().as_millis();
     let scene_stopped = scene_stop(scene);
     println!(
@@ -175,11 +190,20 @@ fn real_main() {
 
     // ④ 收主控输入事件并**真注入**，注入前后各读一次光标
     let before = WindowsInjector::cursor_position();
-    println!("WIN: screen={}x{} cursor_before={:?}", screen.0, screen.1, before);
+    println!(
+        "WIN: screen={}x{} cursor_before={:?}",
+        screen.0, screen.1, before
+    );
 
-    let injected: Vec<InputEvent> =
-        target.recv_input(&mut relay, &mut crypto, &mut injector, want_input, Duration::from_secs(90))
-            .expect("recv input");
+    let injected: Vec<InputEvent> = target
+        .recv_input(
+            &mut relay,
+            &mut crypto,
+            &mut injector,
+            want_input,
+            Duration::from_secs(90),
+        )
+        .expect("recv input");
     // 注入后系统光标更新有短暂延迟
     std::thread::sleep(Duration::from_millis(250));
     let after = WindowsInjector::cursor_position();
@@ -190,7 +214,11 @@ fn real_main() {
             _ => None,
         })
         .collect();
-    println!("WIN: input_events_received={} kinds={:?}", injected.len(), injected);
+    println!(
+        "WIN: input_events_received={} kinds={:?}",
+        injected.len(),
+        injected
+    );
     println!("WIN: injected_moves={:?}", moves);
     println!("WIN: cursor_after={:?}", after);
 
