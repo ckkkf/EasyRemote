@@ -12,6 +12,7 @@ import 'pages/session_page.dart';
 import 'pages/settings_page.dart';
 import 'prefs.dart';
 import 'theme.dart';
+import 'version_gen.dart';
 
 /// 登录后的主框架：桌面端左侧带文字的导航栏，窄屏切换为底部导航。
 class HomeShell extends StatefulWidget {
@@ -256,7 +257,9 @@ class _Sidebar extends StatelessWidget {
                     children: [
                       Text('EasyRemote', style: text.titleMedium),
                       Text(
-                        'v1.0.0',
+                        // 版本号来自 scripts/check-version.mjs 生成的常量，
+                        // 别手写：之前这里硬编码 v1.0.0，跟 pubspec 的真实版本完全脱节。
+                        'v' + erAppVersion,
                         style: text.labelSmall?.copyWith(
                           color: scheme.onSurfaceVariant,
                         ),

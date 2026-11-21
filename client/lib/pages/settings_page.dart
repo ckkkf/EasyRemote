@@ -6,6 +6,7 @@ import '../models.dart';
 import '../prefs.dart';
 import '../shell.dart';
 import '../theme.dart';
+import '../version_gen.dart';
 
 /// 设置页：外观（浅色/深色/跟随系统）、画质、安全与设备信息。
 class SettingsPage extends StatefulWidget {
@@ -260,9 +261,9 @@ class _SettingsPageState extends State<SettingsPage> {
                     ),
                   ),
                   const Divider(height: 1),
-                  const ListTile(
-                    title: Text('版本'),
-                    subtitle: Text('EasyRemote 1.0.0 · 客户端'),
+                  ListTile(
+                    title: const Text('版本'),
+                    subtitle: Text('EasyRemote ' + erAppVersion + ' · 客户端'),
                     trailing: Icon(Icons.chevron_right_rounded, size: 18),
                   ),
                 ],

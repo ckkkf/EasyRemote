@@ -4,6 +4,7 @@ import 'package:easyremote_client/models.dart';
 import 'package:easyremote_client/prefs.dart';
 import 'package:easyremote_client/shell.dart';
 import 'package:easyremote_client/theme.dart';
+import 'package:easyremote_client/version_gen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -49,6 +50,10 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+
+    // 版本号必须来自生成物（scripts/check-version.mjs），不能手写。
+    expect(find.text('v' + erAppVersion), findsOneWidget,
+        reason: '侧边栏版本号要与 pubspec 一致，不允许硬编码');
 
     final settings = find.text('设置');
     final files = find.text('文件传输');
