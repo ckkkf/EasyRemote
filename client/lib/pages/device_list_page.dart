@@ -451,6 +451,10 @@ class _DeviceListPageState extends State<DeviceListPage> {
                 ),
                 children: [
                   _OwnDeviceCard(device: widget.ownDevice, onCopy: _copy),
+                  const SizedBox(height: 16),
+                  // 「允许被控」是本机状态，属于「这台机器能不能被连」，
+                  // 跟下面的设备列表不是一类东西，所以放在设备列表**上方**。
+                  _hostCard(context),
                   const SizedBox(height: 24),
                   Row(
                     children: [
@@ -552,8 +556,6 @@ class _DeviceListPageState extends State<DeviceListPage> {
                       },
                     ),
                   const SizedBox(height: 20),
-                  _hostCard(context),
-                  const SizedBox(height: 8),
                   Text('其他连接方式', style: text.titleMedium),
                   const SizedBox(height: 4),
                   Text(

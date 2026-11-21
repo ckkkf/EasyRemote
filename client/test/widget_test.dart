@@ -97,6 +97,15 @@ void main() {
     );
     await tester.pump();
     expect(find.text('842 615 037'), findsOneWidget);
+
+    // 「允许被控（本机共享）」描述的是本机状态，必须在设备列表**上方**。
+    final host = find.textContaining('允许被控');
+    expect(host, findsOneWidget);
+    expect(
+      tester.getTopLeft(host).dy,
+      lessThan(tester.getTopLeft(find.text('设备')).dy),
+      reason: '允许被控要放在设备列表上方，而不是列表后面',
+    );
   });
 
   testWidgets('自检页渲染输入与按钮', (tester) async {
