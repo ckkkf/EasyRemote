@@ -79,6 +79,47 @@ jobs:
           if-no-files-found: error
 
   # ---------------------------------------------------------------- 客户端 macOS
+
+  # ---------------------------------------------------------------- 客户端 Windows 版
+  # 之前只有 Web 和 macOS，Windows 包一直靠手工在验证机上编——CI 里补齐，
+  # 三个平台都从同一个 Release 出，才算「一个客户端多平台」。
+  client-windows:
+    name: 客户端 Windows 版
+    needs: verify
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      # 客户端要采集/编码/注入，必须有 Rust 核心 DLL；windows-latest 自带 rustup + MSVC
+      - name: 构建 Rust 核心（er_ffi.dll）
+        working-directory: core
+        run: cargo build -p er-ffi --release
+      - name: 安装依赖
+        working-directory: client
+        run: flutter pub get
+      - name: 构建 Windows（烧入服务端地址）
+        working-directory: client
+        run: flutter build windows --release --dart-define=ER_GATEWAY="${{ env.ER_GATEWAY }}"
+      - name: 放入 Rust 核心并打包
+        shell: pwsh
+        run: |
+          $rel = "client/build/windows/x64/runner/Release"
+          Copy-Item "core/target/release/er_ffi.dll" "$rel/er_ffi.dll" -Force
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          $out = "dist/easyremote-client-windows-x64"
+          Copy-Item $rel $out -Recurse -Force
+          "version: ${{ needs.verify.outputs.version }}`nbuilt_at: $((Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ"))`ngateway: $env:ER_GATEWAY`narch: x64" | Set-Content "$out/BUILD_INFO.txt"
+          Compress-Archive -Path $out -DestinationPath "$out.zip" -Force
+          Get-ChildItem dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: client-windows
+          path: dist/easyremote-client-windows-*.zip
+          if-no-files-found: error
+
   client-macos:
     name: 客户端 macOS 版
     needs: verify

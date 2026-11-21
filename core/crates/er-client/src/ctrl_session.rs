@@ -222,11 +222,28 @@ pub fn attach(
         .map_err(|e| e.to_string())?;
     let (mut relay_cli, mut crypto, keys, msg) =
         ctrl.begin(session_id).map_err(|e| e.to_string())?;
-    std::thread::sleep(Duration::from_millis(600));
+    // 时序对齐：被控端收到 consent 后要 sleep 1.2s → begin → 再 sleep 2.5s 才 announce，
+    // 也就是说它在中继上「可收包」大约在 3.7s 之后。主控 600ms 就 announce 的话，
+    // 中继会因对端未注册直接丢包，接着 finish 干等 15s —— 就是用户看到的
+    // 「no peer handshake within 15s」。这里对齐到 3s，并且握手失败时重发（幂等）。
+    std::thread::sleep(Duration::from_millis(3000));
     ctrl.announce(&mut relay_cli, &msg)
         .map_err(|e| e.to_string())?;
-    ctrl.finish(&mut relay_cli, &mut crypto, &keys, session_id)
-        .map_err(|e| e.to_string())?;
+    let mut handshake_ok = false;
+    for _ in 0..3 {
+        if ctrl
+            .finish(&mut relay_cli, &mut crypto, &keys, session_id)
+            .is_ok()
+        {
+            handshake_ok = true;
+            break;
+        }
+        let _ = ctrl.rejoin(&mut relay_cli, session_id);
+        let _ = ctrl.announce(&mut relay_cli, &msg);
+    }
+    if !handshake_ok {
+        return Err("handshake failed after 3 attempts".to_string());
+    }
 
     let latest: Arc<Mutex<Option<Frame>>> = Arc::new(Mutex::new(None));
     let stats: Arc<Mutex<CtrlStats>> = Arc::new(Mutex::new(CtrlStats {
