@@ -629,7 +629,12 @@ impl ControllerAgent {
         let identity = DeviceIdentity::random();
         gw.register_identity(device_id, &encode_pubkey(identity.public().as_bytes()))
             .map_err(|e| AgentError(e.to_string()))?;
-        Ok(Self { gw, device, identity, relay_addr })
+        Ok(Self {
+            gw,
+            device,
+            identity,
+            relay_addr,
+        })
     }
 
     pub fn start(

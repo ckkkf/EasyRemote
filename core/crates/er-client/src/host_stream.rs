@@ -76,14 +76,24 @@ pub fn start_host_stream(
         .map_err(|_| "stream registry poisoned".to_string())?
         .insert(
             host_id.to_string(),
-            HostStreamHandle { stop: stop.clone(), stats: stats.clone() },
+            HostStreamHandle {
+                stop: stop.clone(),
+                stats: stats.clone(),
+            },
         );
 
     let signal = signal_base.to_string();
     let stats_thread = stats.clone();
     let stop_thread = stop.clone();
     std::thread::spawn(move || {
-        if let Err(e) = run_host_stream(&target, &signal, fps, idle_timeout_secs, &stop_thread, &stats_thread) {
+        if let Err(e) = run_host_stream(
+            &target,
+            &signal,
+            fps,
+            idle_timeout_secs,
+            &stop_thread,
+            &stats_thread,
+        ) {
             if let Ok(mut s) = stats_thread.lock() {
                 s.last_error = e;
             }
@@ -126,7 +136,8 @@ fn run_host_stream(
             break;
         }
         // ① 回到等待：这里是最容易被写成「只跑一次」的地方
-        let session_id = match target.wait_for_session(signal, std::time::Duration::from_secs(3600)) {
+        let session_id = match target.wait_for_session(signal, std::time::Duration::from_secs(3600))
+        {
             Ok(s) => s,
             Err(e) => {
                 if let Ok(mut st) = stats.lock() {
@@ -151,10 +162,7 @@ fn run_host_stream(
         if target.announce(&mut relay, &msg).is_err() {
             continue;
         }
-        if target
-            .finish(&mut relay, &mut crypto, &session_id)
-            .is_err()
-        {
+        if target.finish(&mut relay, &mut crypto, &session_id).is_err() {
             continue;
         }
 

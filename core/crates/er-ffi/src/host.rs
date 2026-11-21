@@ -164,11 +164,12 @@ pub unsafe extern "C" fn er_host_set_password(
     let (Some(hid), Some(pw)) = (cstr(host_id), cstr(password)) else {
         return into_c_string("{\"ok\":false,\"error\":\"null argument\"}");
     };
-    let r = catch_unwind(AssertUnwindSafe(|| {
-        match set_host_password(&hid, &pw) {
-            Ok(()) => into_c_string("{\"ok\":true}"),
-            Err(e) => into_c_string(&format!("{{\"ok\":false,\"error\":\"{}\"}}", escape_json(&e))),
-        }
+    let r = catch_unwind(AssertUnwindSafe(|| match set_host_password(&hid, &pw) {
+        Ok(()) => into_c_string("{\"ok\":true}"),
+        Err(e) => into_c_string(&format!(
+            "{{\"ok\":false,\"error\":\"{}\"}}",
+            escape_json(&e)
+        )),
     }));
     r.unwrap_or_else(|_| into_c_string("{\"ok\":false,\"error\":\"panic\"}"))
 }
@@ -187,12 +188,15 @@ pub unsafe extern "C" fn er_host_start_stream(
     let (Some(hid), Some(sig)) = (cstr(host_id), cstr(signal_base)) else {
         return into_c_string("{\"ok\":false,\"error\":\"null argument\"}");
     };
-    let r = catch_unwind(AssertUnwindSafe(|| {
-        match er_client::host_stream::start_host_stream(&hid, &sig, fps, idle_timeout_secs) {
+    let r = catch_unwind(AssertUnwindSafe(
+        || match er_client::host_stream::start_host_stream(&hid, &sig, fps, idle_timeout_secs) {
             Ok(()) => into_c_string("{\"ok\":true}"),
-            Err(e) => into_c_string(&format!("{{\"ok\":false,\"error\":\"{}\"}}", escape_json(&e))),
-        }
-    }));
+            Err(e) => into_c_string(&format!(
+                "{{\"ok\":false,\"error\":\"{}\"}}",
+                escape_json(&e)
+            )),
+        },
+    ));
     r.unwrap_or_else(|_| into_c_string("{\"ok\":false,\"error\":\"panic\"}"))
 }
 
@@ -295,13 +299,17 @@ pub unsafe extern "C" fn er_host_prepare_ex(
                 return into_c_string(&format!("{{\"ok\":false,\"error\":\"bad relay: {e}\"}}"));
             }
         };
-        match er_client::conductor::prepare_host_from_session(&gw, addr, &tok, &did, &dcode, &dtok) {
+        match er_client::conductor::prepare_host_from_session(&gw, addr, &tok, &did, &dcode, &dtok)
+        {
             Ok((host_id, code)) => into_c_string(&format!(
                 "{{\"ok\":true,\"host_id\":\"{}\",\"device_code\":\"{}\"}}",
                 escape_json(&host_id),
                 escape_json(&code)
             )),
-            Err(e) => into_c_string(&format!("{{\"ok\":false,\"error\":\"{}\"}}", escape_json(&e))),
+            Err(e) => into_c_string(&format!(
+                "{{\"ok\":false,\"error\":\"{}\"}}",
+                escape_json(&e)
+            )),
         }
     }));
     r.unwrap_or_else(|_| into_c_string("{\"ok\":false,\"error\":\"panic\"}"))

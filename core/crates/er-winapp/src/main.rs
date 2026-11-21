@@ -15,7 +15,7 @@ use std::time::{Duration, Instant};
 use er_client::agent::ControllerAgent;
 use er_client::link::VideoHeader;
 use er_codec::H264Decoder;
-use er_input::{MouseButton, InputEvent};
+use er_input::{InputEvent, MouseButton};
 
 const MSG_VIDEO: u8 = er_client::agent::MSG_VIDEO;
 
@@ -28,9 +28,20 @@ enum NetCmd {
 /// 网络线程 → UI
 enum NetEvent {
     Status(String),
-    Ready { width: usize, height: usize },
-    Frame { width: usize, height: usize, rgb: Vec<u8> },
-    Stats { frames: u64, kb: u64, fps: f32 },
+    Ready {
+        width: usize,
+        height: usize,
+    },
+    Frame {
+        width: usize,
+        height: usize,
+        rgb: Vec<u8>,
+    },
+    Stats {
+        frames: u64,
+        kb: u64,
+        fps: f32,
+    },
     Failed(String),
 }
 
@@ -166,11 +177,8 @@ impl App {
                         continue;
                     }
                     let img = egui::ColorImage::from_rgb([width, height], &rgb);
-                    self.texture = Some(ctx.load_texture(
-                        "remote",
-                        img,
-                        egui::TextureOptions::LINEAR,
-                    ));
+                    self.texture =
+                        Some(ctx.load_texture("remote", img, egui::TextureOptions::LINEAR));
                     self.frame_size = (width, height);
                     if self.connected {
                         self.status = format!("已连接 · {width}x{height}");
@@ -227,7 +235,11 @@ impl App {
         let avail = ui.available_size();
         if self.frame_size.0 == 0 || self.frame_size.1 == 0 {
             ui.centered_and_justified(|ui| {
-                ui.label(if self.connecting { "正在连接…" } else { "连接后这里显示远端屏幕" });
+                ui.label(if self.connecting {
+                    "正在连接…"
+                } else {
+                    "连接后这里显示远端屏幕"
+                });
             });
             return;
         }
@@ -263,16 +275,34 @@ impl App {
         }
 
         if resp.clicked_by(egui::PointerButton::Primary) {
-            self.send_input(InputEvent::MouseButton { button: MouseButton::Left, pressed: true });
-            self.send_input(InputEvent::MouseButton { button: MouseButton::Left, pressed: false });
+            self.send_input(InputEvent::MouseButton {
+                button: MouseButton::Left,
+                pressed: true,
+            });
+            self.send_input(InputEvent::MouseButton {
+                button: MouseButton::Left,
+                pressed: false,
+            });
         }
         if resp.clicked_by(egui::PointerButton::Secondary) {
-            self.send_input(InputEvent::MouseButton { button: MouseButton::Right, pressed: true });
-            self.send_input(InputEvent::MouseButton { button: MouseButton::Right, pressed: false });
+            self.send_input(InputEvent::MouseButton {
+                button: MouseButton::Right,
+                pressed: true,
+            });
+            self.send_input(InputEvent::MouseButton {
+                button: MouseButton::Right,
+                pressed: false,
+            });
         }
         if resp.clicked_by(egui::PointerButton::Middle) {
-            self.send_input(InputEvent::MouseButton { button: MouseButton::Middle, pressed: true });
-            self.send_input(InputEvent::MouseButton { button: MouseButton::Middle, pressed: false });
+            self.send_input(InputEvent::MouseButton {
+                button: MouseButton::Middle,
+                pressed: true,
+            });
+            self.send_input(InputEvent::MouseButton {
+                button: MouseButton::Middle,
+                pressed: false,
+            });
         }
     }
 
@@ -282,12 +312,21 @@ impl App {
         }
         let events = ctx.input(|i| i.events.clone());
         for ev in events {
-            if let egui::Event::Key { key, pressed, repeat, .. } = ev {
+            if let egui::Event::Key {
+                key,
+                pressed,
+                repeat,
+                ..
+            } = ev
+            {
                 if repeat {
                     continue;
                 }
                 if let Some(sc) = key_to_scancode(key) {
-                    self.send_input(InputEvent::Key { scancode: sc, pressed });
+                    self.send_input(InputEvent::Key {
+                        scancode: sc,
+                        pressed,
+                    });
                 }
             }
         }
@@ -320,7 +359,10 @@ impl App {
                         2 => now.2,
                         _ => now.3,
                     };
-                    self.send_input(InputEvent::Key { scancode: sc, pressed });
+                    self.send_input(InputEvent::Key {
+                        scancode: sc,
+                        pressed,
+                    });
                 }
             }
         }
@@ -329,7 +371,10 @@ impl App {
         // 滚轮
         let scroll = ctx.input(|i| i.raw_scroll_delta);
         if scroll.y.abs() > 0.5 {
-            self.send_input(InputEvent::Wheel { dx: 0, dy: scroll.y.signum() as i32 * 3 });
+            self.send_input(InputEvent::Wheel {
+                dx: 0,
+                dy: scroll.y.signum() as i32 * 3,
+            });
         }
     }
 }
@@ -361,7 +406,10 @@ impl eframe::App for App {
             ui.add_space(2.0);
             ui.horizontal(|ui| {
                 ui.label("设备码");
-                ui.add_sized([120.0, 22.0], egui::TextEdit::singleline(&mut self.device_code));
+                ui.add_sized(
+                    [120.0, 22.0],
+                    egui::TextEdit::singleline(&mut self.device_code),
+                );
                 ui.label("验证码");
                 ui.add_sized([90.0, 22.0], egui::TextEdit::singleline(&mut self.captcha));
                 let busy = self.connecting || self.connected;
@@ -404,11 +452,19 @@ fn install_cjk_font(ctx: &egui::Context) {
         "C:\\Windows\\Fonts\\Deng.ttf",
     ];
     for path in candidates {
-        let Ok(bytes) = std::fs::read(path) else { continue };
+        let Ok(bytes) = std::fs::read(path) else {
+            continue;
+        };
         let mut fonts = egui::FontDefinitions::default();
-        fonts.font_data.insert("cjk".to_owned(), egui::FontData::from_owned(bytes).into());
+        fonts
+            .font_data
+            .insert("cjk".to_owned(), egui::FontData::from_owned(bytes).into());
         for family in [egui::FontFamily::Proportional, egui::FontFamily::Monospace] {
-            fonts.families.entry(family).or_default().insert(0, "cjk".to_owned());
+            fonts
+                .families
+                .entry(family)
+                .or_default()
+                .insert(0, "cjk".to_owned());
         }
         ctx.set_fonts(fonts);
         println!("FONT: loaded {path}");
@@ -443,7 +499,9 @@ fn read_conf() -> Conf {
         if line.is_empty() || line.starts_with('#') {
             continue;
         }
-        let Some((k, v)) = line.split_once('=') else { continue };
+        let Some((k, v)) = line.split_once('=') else {
+            continue;
+        };
         let v = v.trim().to_string();
         match k.trim() {
             "gateway" => c.gateway = Some(v),
@@ -462,28 +520,80 @@ fn read_conf() -> Conf {
 fn key_to_scancode(key: egui::Key) -> Option<u16> {
     use egui::Key as K;
     let name = match key {
-        K::A => "a", K::B => "b", K::C => "c", K::D => "d", K::E => "e",
-        K::F => "f", K::G => "g", K::H => "h", K::I => "i", K::J => "j",
-        K::K => "k", K::L => "l", K::M => "m", K::N => "n", K::O => "o",
-        K::P => "p", K::Q => "q", K::R => "r", K::S => "s", K::T => "t",
-        K::U => "u", K::V => "v", K::W => "w", K::X => "x", K::Y => "y",
+        K::A => "a",
+        K::B => "b",
+        K::C => "c",
+        K::D => "d",
+        K::E => "e",
+        K::F => "f",
+        K::G => "g",
+        K::H => "h",
+        K::I => "i",
+        K::J => "j",
+        K::K => "k",
+        K::L => "l",
+        K::M => "m",
+        K::N => "n",
+        K::O => "o",
+        K::P => "p",
+        K::Q => "q",
+        K::R => "r",
+        K::S => "s",
+        K::T => "t",
+        K::U => "u",
+        K::V => "v",
+        K::W => "w",
+        K::X => "x",
+        K::Y => "y",
         K::Z => "z",
-        K::Num0 => "0", K::Num1 => "1", K::Num2 => "2", K::Num3 => "3",
-        K::Num4 => "4", K::Num5 => "5", K::Num6 => "6", K::Num7 => "7",
-        K::Num8 => "8", K::Num9 => "9",
-        K::Enter => "enter", K::Escape => "esc", K::Backspace => "backspace",
-        K::Tab => "tab", K::Space => "space", K::Minus => "-",
-        K::Plus => "=", K::OpenBracket => "[", K::CloseBracket => "]",
-        K::Backslash => "\\", K::Semicolon => ";", K::Quote => "'",
-        K::Backtick => "`", K::Comma => ",", K::Period => ".", K::Slash => "/",
-        K::ArrowLeft => "left", K::ArrowRight => "right",
-        K::ArrowUp => "up", K::ArrowDown => "down",
-        K::Delete => "delete", K::Home => "home", K::End => "end",
-        K::PageUp => "pageup", K::PageDown => "pagedown",
+        K::Num0 => "0",
+        K::Num1 => "1",
+        K::Num2 => "2",
+        K::Num3 => "3",
+        K::Num4 => "4",
+        K::Num5 => "5",
+        K::Num6 => "6",
+        K::Num7 => "7",
+        K::Num8 => "8",
+        K::Num9 => "9",
+        K::Enter => "enter",
+        K::Escape => "esc",
+        K::Backspace => "backspace",
+        K::Tab => "tab",
+        K::Space => "space",
+        K::Minus => "-",
+        K::Plus => "=",
+        K::OpenBracket => "[",
+        K::CloseBracket => "]",
+        K::Backslash => "\\",
+        K::Semicolon => ";",
+        K::Quote => "'",
+        K::Backtick => "`",
+        K::Comma => ",",
+        K::Period => ".",
+        K::Slash => "/",
+        K::ArrowLeft => "left",
+        K::ArrowRight => "right",
+        K::ArrowUp => "up",
+        K::ArrowDown => "down",
+        K::Delete => "delete",
+        K::Home => "home",
+        K::End => "end",
+        K::PageUp => "pageup",
+        K::PageDown => "pagedown",
         K::Insert => "insert",
-        K::F1 => "f1", K::F2 => "f2", K::F3 => "f3", K::F4 => "f4",
-        K::F5 => "f5", K::F6 => "f6", K::F7 => "f7", K::F8 => "f8",
-        K::F9 => "f9", K::F10 => "f10", K::F11 => "f11", K::F12 => "f12",
+        K::F1 => "f1",
+        K::F2 => "f2",
+        K::F3 => "f3",
+        K::F4 => "f4",
+        K::F5 => "f5",
+        K::F6 => "f6",
+        K::F7 => "f7",
+        K::F8 => "f8",
+        K::F9 => "f9",
+        K::F10 => "f10",
+        K::F11 => "f11",
+        K::F12 => "f12",
         _ => return None,
     };
     er_input::scancode_for(name)
@@ -555,7 +665,10 @@ fn net_thread(
         send(NetEvent::Failed(format!("握手校验失败: {e}")));
         return;
     }
-    send(NetEvent::Ready { width: 0, height: 0 });
+    send(NetEvent::Ready {
+        width: 0,
+        height: 0,
+    });
 
     let mut dec = match H264Decoder::new() {
         Ok(d) => d,
@@ -596,14 +709,18 @@ fn net_thread(
         // ② 收消息（短超时，让循环保持响应）
         match relay_cli.recv_timeout(Duration::from_millis(10)) {
             Ok(Some(sealed)) => {
-                let Ok(plain) = crypto.open(&sealed) else { continue };
+                let Ok(plain) = crypto.open(&sealed) else {
+                    continue;
+                };
                 if plain.is_empty() || plain[0] != MSG_VIDEO {
                     continue;
                 }
                 if plain.len() < 1 + er_client::link::VIDEO_HEADER_LEN {
                     continue;
                 }
-                let Some(_hdr) = VideoHeader::decode(&plain[1..]) else { continue };
+                let Some(_hdr) = VideoHeader::decode(&plain[1..]) else {
+                    continue;
+                };
                 let payload = &plain[1 + er_client::link::VIDEO_HEADER_LEN..];
                 // 软解 1080p 很慢：限到 ~12fps，否则解码队列会越拖越长
                 if last_decode.elapsed() < Duration::from_millis(80) {
@@ -616,7 +733,11 @@ fn net_thread(
                         stat_frames += 1;
                         kb += (payload.len() as u64) / 1024;
                         let (w2, h2, small) = downsample(w, h, &rgb, 1280);
-                        let _ = evt_tx.send(NetEvent::Frame { width: w2, height: h2, rgb: small });
+                        let _ = evt_tx.send(NetEvent::Frame {
+                            width: w2,
+                            height: h2,
+                            rgb: small,
+                        });
                         ctx.request_repaint();
                     }
                     Ok(None) => {}

@@ -252,7 +252,11 @@ fn real_main() {
         }
         frames
             .iter()
-            .map(|f| FrameInfo { width: 0, height: 0, h264_bytes: f.len() })
+            .map(|f| FrameInfo {
+                width: 0,
+                height: 0,
+                h264_bytes: f.len(),
+            })
             .collect()
     };
     if got.is_empty() {
@@ -266,7 +270,10 @@ fn real_main() {
             got[0].h264_bytes
         );
     } else {
-        println!("WIN: frames_from_target={} (录像模式，码流已落盘)", got.len());
+        println!(
+            "WIN: frames_from_target={} (录像模式，码流已落盘)",
+            got.len()
+        );
     }
     println!("WIN: MSG_VIDEO={MSG_VIDEO} (帧头 seq/ts/dim 已随帧传输)");
     println!(

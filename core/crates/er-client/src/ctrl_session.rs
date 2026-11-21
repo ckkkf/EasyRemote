@@ -63,7 +63,8 @@ pub fn connect(
     device_code: &str,
     password: &str,
 ) -> Result<CtrlSession, String> {
-    let ctrl = ControllerAgent::start(gateway, phone, sms_code, relay).map_err(|e| e.to_string())?;
+    let ctrl =
+        ControllerAgent::start(gateway, phone, sms_code, relay).map_err(|e| e.to_string())?;
     let session_id = ctrl
         .request_session(device_code, password)
         .map_err(|e| e.to_string())?;
@@ -73,7 +74,8 @@ pub fn connect(
     let (mut relay_cli, mut crypto, keys, msg) =
         ctrl.begin(&session_id).map_err(|e| e.to_string())?;
     std::thread::sleep(Duration::from_millis(2500));
-    ctrl.announce(&mut relay_cli, &msg).map_err(|e| e.to_string())?;
+    ctrl.announce(&mut relay_cli, &msg)
+        .map_err(|e| e.to_string())?;
     ctrl.finish(&mut relay_cli, &mut crypto, &keys, &session_id)
         .map_err(|e| e.to_string())?;
 
@@ -107,7 +109,13 @@ pub fn connect(
         );
     });
 
-    Ok(CtrlSession { id, latest, stats, input_tx, stop })
+    Ok(CtrlSession {
+        id,
+        latest,
+        stats,
+        input_tx,
+        stop,
+    })
 }
 
 fn nanos_hex() -> String {
@@ -151,14 +159,18 @@ fn run_loop(
         // ② 收一帧（短超时，保证循环能响应 stop）
         match relay.recv_timeout(Duration::from_millis(10)) {
             Ok(Some(sealed)) => {
-                let Ok(plain) = crypto.open(&sealed) else { continue };
+                let Ok(plain) = crypto.open(&sealed) else {
+                    continue;
+                };
                 if plain.is_empty() || plain[0] != MSG_VIDEO {
                     continue;
                 }
                 if plain.len() < 1 + crate::link::VIDEO_HEADER_LEN {
                     continue;
                 }
-                let Some(_hdr) = VideoHeader::decode(&plain[1..]) else { continue };
+                let Some(_hdr) = VideoHeader::decode(&plain[1..]) else {
+                    continue;
+                };
                 let payload = &plain[1 + crate::link::VIDEO_HEADER_LEN..];
                 // 软解 1080p ~90ms：限到 ~12fps，否则解码队列越拖越长、UI 也追不上
                 if last_decode.elapsed() < Duration::from_millis(80) {
@@ -175,7 +187,11 @@ fn run_loop(
                         rgba.push(255);
                     }
                     if let Ok(mut g) = latest.lock() {
-                        *g = Some(Frame { width: w, height: h, rgba });
+                        *g = Some(Frame {
+                            width: w,
+                            height: h,
+                            rgba,
+                        });
                     }
                     if let Ok(mut s) = stats.lock() {
                         s.frames += 1;
@@ -207,7 +223,8 @@ pub fn attach(
     let (mut relay_cli, mut crypto, keys, msg) =
         ctrl.begin(session_id).map_err(|e| e.to_string())?;
     std::thread::sleep(Duration::from_millis(600));
-    ctrl.announce(&mut relay_cli, &msg).map_err(|e| e.to_string())?;
+    ctrl.announce(&mut relay_cli, &msg)
+        .map_err(|e| e.to_string())?;
     ctrl.finish(&mut relay_cli, &mut crypto, &keys, session_id)
         .map_err(|e| e.to_string())?;
 
@@ -242,5 +259,11 @@ pub fn attach(
         );
     });
 
-    Ok(CtrlSession { id, latest, stats, input_tx, stop })
+    Ok(CtrlSession {
+        id,
+        latest,
+        stats,
+        input_tx,
+        stop,
+    })
 }

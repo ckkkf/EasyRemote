@@ -16,7 +16,11 @@ impl ApplicationHandler for Probe {
                 .with_inner_size(winit::dpi::LogicalSize::new(800.0, 600.0)),
         ) {
             Ok(w) => {
-                println!("PROBE_WINDOW_OK size={:?} scale={:?}", w.inner_size(), w.scale_factor());
+                println!(
+                    "PROBE_WINDOW_OK size={:?} scale={:?}",
+                    w.inner_size(),
+                    w.scale_factor()
+                );
                 self.window = Some(w);
             }
             Err(e) => {

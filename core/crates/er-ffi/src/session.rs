@@ -125,9 +125,15 @@ pub unsafe extern "C" fn er_ctrl_connect(
                 if let Ok(mut reg) = ctrl_registry().lock() {
                     reg.insert(sid.clone(), Arc::new(sess));
                 }
-                into_c_string(&format!("{{\"ok\":true,\"session_id\":\"{}\"}}", escape_json(&sid)))
+                into_c_string(&format!(
+                    "{{\"ok\":true,\"session_id\":\"{}\"}}",
+                    escape_json(&sid)
+                ))
             }
-            Err(e) => into_c_string(&format!("{{\"ok\":false,\"error\":\"{}\"}}", escape_json(&e))),
+            Err(e) => into_c_string(&format!(
+                "{{\"ok\":false,\"error\":\"{}\"}}",
+                escape_json(&e)
+            )),
         }
     }));
     r.unwrap_or_else(|_| into_c_string("{\"ok\":false,\"error\":\"panic\"}"))
@@ -142,7 +148,10 @@ pub unsafe extern "C" fn er_ctrl_info(session_id: *const c_char) -> *mut c_char 
     let Some(sid) = cstr(session_id) else {
         return into_c_string("{\"connected\":false,\"error\":\"null argument\"}");
     };
-    let sess = ctrl_registry().lock().ok().and_then(|r| r.get(&sid).cloned());
+    let sess = ctrl_registry()
+        .lock()
+        .ok()
+        .and_then(|r| r.get(&sid).cloned());
     let Some(sess) = sess else {
         return into_c_string("{\"connected\":false,\"error\":\"unknown session\"}");
     };
@@ -172,18 +181,21 @@ pub unsafe extern "C" fn er_ctrl_info(session_id: *const c_char) -> *mut c_char 
 /// # Safety
 /// buf 必须可写 cap 字节；session_id 必须是以 NUL 结尾的字符串。
 #[no_mangle]
-pub unsafe extern "C" fn er_ctrl_frame(
-    session_id: *const c_char,
-    buf: *mut u8,
-    cap: usize,
-) -> i32 {
-    let Some(sid) = cstr(session_id) else { return -1 };
+pub unsafe extern "C" fn er_ctrl_frame(session_id: *const c_char, buf: *mut u8, cap: usize) -> i32 {
+    let Some(sid) = cstr(session_id) else {
+        return -1;
+    };
     if buf.is_null() {
         return -1;
     }
-    let sess = ctrl_registry().lock().ok().and_then(|r| r.get(&sid).cloned());
+    let sess = ctrl_registry()
+        .lock()
+        .ok()
+        .and_then(|r| r.get(&sid).cloned());
     let Some(sess) = sess else { return -2 };
-    let Some(frame) = sess.snapshot() else { return 0 };
+    let Some(frame) = sess.snapshot() else {
+        return 0;
+    };
     let need = frame.rgba.len();
     if cap < need {
         return -(need as i32);
@@ -203,8 +215,13 @@ pub unsafe extern "C" fn er_ctrl_input(
     a: i32,
     b: i32,
 ) -> i32 {
-    let Some(sid) = cstr(session_id) else { return -1 };
-    let sess = ctrl_registry().lock().ok().and_then(|r| r.get(&sid).cloned());
+    let Some(sid) = cstr(session_id) else {
+        return -1;
+    };
+    let sess = ctrl_registry()
+        .lock()
+        .ok()
+        .and_then(|r| r.get(&sid).cloned());
     let Some(sess) = sess else { return -2 };
     let ev = match kind {
         0 => er_input::InputEvent::MouseMove { x: a, y: b },
@@ -217,7 +234,10 @@ pub unsafe extern "C" fn er_ctrl_input(
             pressed: b != 0,
         },
         2 => er_input::InputEvent::Wheel { dx: a, dy: b },
-        3 => er_input::InputEvent::Key { scancode: a as u16, pressed: b != 0 },
+        3 => er_input::InputEvent::Key {
+            scancode: a as u16,
+            pressed: b != 0,
+        },
         _ => return -3,
     };
     sess.send_input(ev);
@@ -230,7 +250,9 @@ pub unsafe extern "C" fn er_ctrl_input(
 /// session_id 必须是以 NUL 结尾的字符串。
 #[no_mangle]
 pub unsafe extern "C" fn er_ctrl_close(session_id: *const c_char) -> i32 {
-    let Some(sid) = cstr(session_id) else { return 0 };
+    let Some(sid) = cstr(session_id) else {
+        return 0;
+    };
     let removed = ctrl_registry().lock().ok().and_then(|mut r| r.remove(&sid));
     match removed {
         Some(s) => {
@@ -286,9 +308,15 @@ pub unsafe extern "C" fn er_ctrl_attach(
                 if let Ok(mut reg) = ctrl_registry().lock() {
                     reg.insert(id.clone(), Arc::new(sess));
                 }
-                into_c_string(&format!("{{\"ok\":true,\"session_id\":\"{}\"}}", escape_json(&id)))
+                into_c_string(&format!(
+                    "{{\"ok\":true,\"session_id\":\"{}\"}}",
+                    escape_json(&id)
+                ))
             }
-            Err(e) => into_c_string(&format!("{{\"ok\":false,\"error\":\"{}\"}}", escape_json(&e))),
+            Err(e) => into_c_string(&format!(
+                "{{\"ok\":false,\"error\":\"{}\"}}",
+                escape_json(&e)
+            )),
         }
     }));
     r.unwrap_or_else(|_| into_c_string("{\"ok\":false,\"error\":\"panic\"}"))

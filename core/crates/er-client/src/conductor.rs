@@ -168,8 +168,12 @@ fn nanos_hex() -> String {
 /// 返回的是 clone：`TargetAgent` 内部只有网关客户端与身份，克隆后共享同一设备身份，
 /// 不会重复绑设备。
 pub fn host_target(host_id: &str) -> Result<(TargetAgent, SocketAddr), String> {
-    let reg = registry().lock().map_err(|_| "registry poisoned".to_string())?;
-    let h = reg.get(host_id).ok_or_else(|| format!("unknown host: {host_id}"))?;
+    let reg = registry()
+        .lock()
+        .map_err(|_| "registry poisoned".to_string())?;
+    let h = reg
+        .get(host_id)
+        .ok_or_else(|| format!("unknown host: {host_id}"))?;
     Ok((h.target.clone(), h.relay_addr))
 }
 
@@ -220,8 +224,9 @@ pub fn prepare_host_from_session(
     device_code: &str,
     device_token: &str,
 ) -> Result<(String, String), String> {
-    let target = TargetAgent::from_session(gateway, token, device_id, device_code, device_token, relay)
-        .map_err(|e| e.to_string())?;
+    let target =
+        TargetAgent::from_session(gateway, token, device_id, device_code, device_token, relay)
+            .map_err(|e| e.to_string())?;
     let host_id = format!("host-{}", nanos_hex());
     registry()
         .lock()

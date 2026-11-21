@@ -33,7 +33,9 @@ fn real_main() {
     use er_input::{Injector, InputEvent};
 
     fn arg(i: usize, default: &str) -> String {
-        std::env::args().nth(i).unwrap_or_else(|| default.to_string())
+        std::env::args()
+            .nth(i)
+            .unwrap_or_else(|| default.to_string())
     }
 
     let base = arg(1, "http://127.0.0.1:18090");
@@ -58,7 +60,12 @@ fn real_main() {
     // 采集能力自检：屏录权限缺失时这里就报出来，而不是让主控端黑屏
     match ScreenCapture::open_primary() {
         Ok(mut cap) => match cap.grab() {
-            Ok(f) => println!("MAC: capture_ok {}x{} backend={}", f.width, f.height, cap.backend_name()),
+            Ok(f) => println!(
+                "MAC: capture_ok {}x{} backend={}",
+                f.width,
+                f.height,
+                cap.backend_name()
+            ),
             Err(e) => println!("MAC: capture_error={e}"),
         },
         Err(e) => println!("MAC: capture_unavailable={e}"),
@@ -97,146 +104,144 @@ fn real_main() {
     // 之前是单次结构，第一个主控走后（哪怕是测试）后面所有连接都石沉大海
     // —— 表现就是主控卡在「等待对方授权」，而被控端日志一片安静。
     loop {
-    println!("MAC: waiting_for_signalling ...");
+        println!("MAC: waiting_for_signalling ...");
 
-    let session_id = target
-        .wait_for_session(&signal, Duration::from_secs(3600))
-        .expect("signalling");
-    println!("MAC: session={session_id}");
-    if let Err(e) = target.consent(&session_id) {
-        println!("MAC: consent_failed={e}");
-        continue;
-    }
-    println!("MAC: consent=authorized");
-
-    std::thread::sleep(Duration::from_millis(1200));
-    let (mut relay, mut crypto, msg) = match target.begin(&session_id) {
-        Ok(v) => v,
-        Err(e) => {
-            println!("MAC: begin_failed={e}");
+        let session_id = target
+            .wait_for_session(&signal, Duration::from_secs(3600))
+            .expect("signalling");
+        println!("MAC: session={session_id}");
+        if let Err(e) = target.consent(&session_id) {
+            println!("MAC: consent_failed={e}");
             continue;
         }
-    };
-    println!("MAC: relay_registered local={}", relay.local_addr());
-    std::thread::sleep(Duration::from_millis(2500));
-    if let Err(e) = target.announce(&mut relay, &msg) {
-        println!("MAC: announce_failed={e}");
-        continue;
-    }
-    // 握手失败（主控没来/走了）不该让整个被控端崩掉：回到等待接下一个
-    if let Err(e) = target.finish(&mut relay, &mut crypto, &session_id) {
-        println!("MAC: handshake_failed={e}");
-        continue;
-    }
-    println!("MAC: handshake_verified (ed25519 + x25519)");
-    println!("MAC: streaming ...");
+        println!("MAC: consent=authorized");
 
-    let mut cap = ScreenCapture::open_primary().expect("capture");
-    let info = cap.info();
-    let cfg = EncodeConfig {
-        width: info.width & !1,
-        height: info.height & !1,
-        fps: fps as u32,
-        bitrate_kbps: 4000,
-        // is_low_latency() 要求 gop <= fps；写死 60 会在 30fps 下被拒（实测 unsupported config）
-        gop: fps as u32,
-        bframes: 0,
-    };
-    let mut enc = HybridEncoder::new(cfg).expect("encoder");
-    let mut injector = MacInjector::new(true);
-
-    let frame_budget = Duration::from_millis((1000 / fps).max(1));
-    let mut seq: u32 = 0;
-    let mut sent: u64 = 0;
-    let mut injected: u64 = 0;
-    let mut last_input = Instant::now();
-    let mut last_stat = Instant::now();
-    let mut last_rotate = Instant::now();
-
-    while duration_secs == 0 || t_start.elapsed().as_secs() < duration_secs {
-        // 主控断开判据：只在「没显式给时长」时启用（无人值守的默认模式）。
-        // 显式给了 duration 就按 duration 走——演示时用户可能只是盯着画面不动鼠标，
-        // 按静默超时退出会把正在看的会话掐断（实测 10 分钟就断了）。
-        if duration_secs == 0 && last_input.elapsed() > Duration::from_secs(1800) {
-            println!("MAC: no input for 1800s, assuming controller left");
-            break;
+        std::thread::sleep(Duration::from_millis(1200));
+        let (mut relay, mut crypto, msg) = match target.begin(&session_id) {
+            Ok(v) => v,
+            Err(e) => {
+                println!("MAC: begin_failed={e}");
+                continue;
+            }
+        };
+        println!("MAC: relay_registered local={}", relay.local_addr());
+        std::thread::sleep(Duration::from_millis(2500));
+        if let Err(e) = target.announce(&mut relay, &msg) {
+            println!("MAC: announce_failed={e}");
+            continue;
         }
+        // 握手失败（主控没来/走了）不该让整个被控端崩掉：回到等待接下一个
+        if let Err(e) = target.finish(&mut relay, &mut crypto, &session_id) {
+            println!("MAC: handshake_failed={e}");
+            continue;
+        }
+        println!("MAC: handshake_verified (ed25519 + x25519)");
+        println!("MAC: streaming ...");
 
-        // ① 先把积压的输入事件收干净（短超时，最多 32 条/轮，避免输入饿死采集）
-        let mut drained = 0;
-        while drained < 32 {
-            match relay.recv_timeout(Duration::from_millis(2)) {
-                Ok(Some(sealed)) => {
-                    if let Ok(plain) = crypto.open(&sealed) {
-                        if !plain.is_empty() && plain[0] == MSG_INPUT {
-                            if let Some(ev) = InputEvent::decode(&plain[1..]) {
-                                if injector.inject(&ev).is_ok() {
-                                    injected += 1;
+        let mut cap = ScreenCapture::open_primary().expect("capture");
+        let info = cap.info();
+        let cfg = EncodeConfig {
+            width: info.width & !1,
+            height: info.height & !1,
+            fps: fps as u32,
+            bitrate_kbps: 4000,
+            // is_low_latency() 要求 gop <= fps；写死 60 会在 30fps 下被拒（实测 unsupported config）
+            gop: fps as u32,
+            bframes: 0,
+        };
+        let mut enc = HybridEncoder::new(cfg).expect("encoder");
+        let mut injector = MacInjector::new(true);
+
+        let frame_budget = Duration::from_millis((1000 / fps).max(1));
+        let mut seq: u32 = 0;
+        let mut sent: u64 = 0;
+        let mut injected: u64 = 0;
+        let mut last_input = Instant::now();
+        let mut last_stat = Instant::now();
+        let mut last_rotate = Instant::now();
+
+        while duration_secs == 0 || t_start.elapsed().as_secs() < duration_secs {
+            // 主控断开判据：只在「没显式给时长」时启用（无人值守的默认模式）。
+            // 显式给了 duration 就按 duration 走——演示时用户可能只是盯着画面不动鼠标，
+            // 按静默超时退出会把正在看的会话掐断（实测 10 分钟就断了）。
+            if duration_secs == 0 && last_input.elapsed() > Duration::from_secs(1800) {
+                println!("MAC: no input for 1800s, assuming controller left");
+                break;
+            }
+
+            // ① 先把积压的输入事件收干净（短超时，最多 32 条/轮，避免输入饿死采集）
+            let mut drained = 0;
+            while drained < 32 {
+                match relay.recv_timeout(Duration::from_millis(2)) {
+                    Ok(Some(sealed)) => {
+                        if let Ok(plain) = crypto.open(&sealed) {
+                            if !plain.is_empty() && plain[0] == MSG_INPUT {
+                                if let Some(ev) = InputEvent::decode(&plain[1..]) {
+                                    if injector.inject(&ev).is_ok() {
+                                        injected += 1;
+                                    }
+                                    last_input = Instant::now();
                                 }
-                                last_input = Instant::now();
                             }
                         }
                     }
+                    Ok(None) => break,
+                    Err(_) => break,
                 }
-                Ok(None) => break,
-                Err(_) => break,
+                drained += 1;
             }
-            drained += 1;
-        }
 
-        // ② 采集一帧 → 编码 → 加密 → 中继
-        let t0 = Instant::now();
-        if let Ok(Some(encoded)) = enc.capture_and_encode(&mut cap) {
-            if !encoded.is_empty() {
-                seq = seq.wrapping_add(1);
-                let hdr = VideoHeader {
-                    seq,
-                    ts_ms: t_start.elapsed().as_millis() as u32,
-                    width: (cfg.width & 0xffff) as u16,
-                    height: (cfg.height & 0xffff) as u16,
-                };
-                let msg = encode_video_msg(&hdr, &encoded);
-                let sealed = crypto.seal(&msg);
-                if relay.send(&sealed).is_ok() {
-                    sent += 1;
+            // ② 采集一帧 → 编码 → 加密 → 中继
+            let t0 = Instant::now();
+            if let Ok(Some(encoded)) = enc.capture_and_encode(&mut cap) {
+                if !encoded.is_empty() {
+                    seq = seq.wrapping_add(1);
+                    let hdr = VideoHeader {
+                        seq,
+                        ts_ms: t_start.elapsed().as_millis() as u32,
+                        width: (cfg.width & 0xffff) as u16,
+                        height: (cfg.height & 0xffff) as u16,
+                    };
+                    let msg = encode_video_msg(&hdr, &encoded);
+                    let sealed = crypto.seal(&msg);
+                    if relay.send(&sealed).is_ok() {
+                        sent += 1;
+                    }
                 }
             }
-        }
 
-        // ③ 按目标帧率节流（编码耗时已占一部分预算）
-        let spent = t0.elapsed();
-        if spent < frame_budget {
-            std::thread::sleep(frame_budget - spent);
-        }
-
-        // 验证码自动轮换：服务端 TTL 10 分钟且一次即失效，长期挂着的被控端如果不换，
-        // 5 分钟后就只能重启进程才能拿到新码（实测用户每次都要等我重启）。
-        // 这里每 5 分钟 rotate 一次并打印，日志里永远有一条新的可用验证码。
-        if last_rotate.elapsed() >= Duration::from_secs(300) {
-            // 一次性验证码仍然轮换（兼容旧客户端与「验证码」入口），但面板显示的是长期密码。
-            match target.rotate_captcha() {
-                Ok(code) => println!("MAC: captcha_refreshed={code}"),
-                Err(e) => println!("MAC: captcha_refresh_failed={e}"),
+            // ③ 按目标帧率节流（编码耗时已占一部分预算）
+            let spent = t0.elapsed();
+            if spent < frame_budget {
+                std::thread::sleep(frame_budget - spent);
             }
-            last_rotate = Instant::now();
+
+            // 验证码自动轮换：服务端 TTL 10 分钟且一次即失效，长期挂着的被控端如果不换，
+            // 5 分钟后就只能重启进程才能拿到新码（实测用户每次都要等我重启）。
+            // 这里每 5 分钟 rotate 一次并打印，日志里永远有一条新的可用验证码。
+            if last_rotate.elapsed() >= Duration::from_secs(300) {
+                // 一次性验证码仍然轮换（兼容旧客户端与「验证码」入口），但面板显示的是长期密码。
+                match target.rotate_captcha() {
+                    Ok(code) => println!("MAC: captcha_refreshed={code}"),
+                    Err(e) => println!("MAC: captcha_refresh_failed={e}"),
+                }
+                last_rotate = Instant::now();
+            }
+
+            if last_stat.elapsed() >= Duration::from_secs(5) {
+                println!(
+                    "MAC: stats sent={sent} injected={injected} backend={} elapsed={}s",
+                    enc.backend(),
+                    t_start.elapsed().as_secs()
+                );
+                last_stat = Instant::now();
+            }
         }
 
-        if last_stat.elapsed() >= Duration::from_secs(5) {
-            println!(
-                "MAC: stats sent={sent} injected={injected} backend={} elapsed={}s",
-                enc.backend(),
-                t_start.elapsed().as_secs()
-            );
-            last_stat = Instant::now();
+        println!("MAC: session_closed sent={sent} injected={injected}, back to waiting",);
+        if duration_secs > 0 && t_start.elapsed().as_secs() >= duration_secs {
+            break;
         }
-    }
-
-    println!(
-        "MAC: session_closed sent={sent} injected={injected}, back to waiting",
-    );
-    if duration_secs > 0 && t_start.elapsed().as_secs() >= duration_secs {
-        break;
-    }
     }
 
     println!("MAC: HOST_DONE elapsed={}s", t_start.elapsed().as_secs());
@@ -264,7 +269,9 @@ fn ensure_host_password() -> String {
     seed ^= (std::process::id() as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15);
     let mut pw = String::with_capacity(8);
     for _ in 0..8 {
-        seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        seed = seed
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
         pw.push(char::from(b'0' + ((seed >> 33) % 10) as u8));
     }
     let _ = std::fs::create_dir_all(&dir);
