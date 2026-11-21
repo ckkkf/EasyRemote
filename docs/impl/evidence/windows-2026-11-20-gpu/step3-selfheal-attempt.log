@@ -1,0 +1,44 @@
+SELFHEAL begin size=2880x1620 device_ptr=0x26893e84110
+SELFHEAL nvenc_session_opened=true input_texture=0x268d8292360
+SELFHEAL encode_before_bytes=10224
+SELFHEAL switching Some((2880, 1620, 120)) -> (2880, 1620, 60)
+SELFHEAL acquire_debug_after_switch=ERR hresult=0x887a0001 msg=应用程序进行了无效的调用。调用的参数或某对象的状态不正确。
+启用 D3D 调试层以便通过调试消息查看详细信息。 (0x887A0001)
+SELFHEAL post_grab_err=Lost
+SELFHEAL rebuilds_before=0 rebuilds_after=2
+SELFHEAL device_ptr_after=0x268e28533f0 device_ptr_unchanged=false device_rebuilds=1
+SELFHEAL nvenc_session_recreated=true (device removed by driver)
+SELFHEAL final_grab_err=Lost last_rebuild_error=None
+SELFHEAL final_grab_err=Lost last_rebuild_error=None
+SELFHEAL final_grab_err=Lost last_rebuild_error=None
+SELFHEAL final_grab_err=Lost last_rebuild_error=None
+SELFHEAL final_grab_err=Lost last_rebuild_error=None
+SELFHEAL final_grab_err=Lost last_rebuild_error=None
+SELFHEAL final_grab_err=Lost last_rebuild_error=None
+SELFHEAL final_grab_err=Lost last_rebuild_error=None
+SELFHEAL final_grab_err=Lost last_rebuild_error=None
+SELFHEAL final_grab_err=Lost last_rebuild_error=None
+SELFHEAL final_grab_err=Lost last_rebuild_error=None
+SELFHEAL final_grab_err=Lost last_rebuild_error=None
+SELFHEAL final_grab_err=Lost last_rebuild_error=None
+SELFHEAL final_grab_err=Lost last_rebuild_error=None
+SELFHEAL final_grab_err=Lost last_rebuild_error=None
+SELFHEAL final_grab_err=Lost last_rebuild_error=None
+SELFHEAL final_grab_err=Lost last_rebuild_error=None
+SELFHEAL final_grab_err=Lost last_rebuild_error=None
+SELFHEAL final_grab_err=Lost last_rebuild_error=None
+SELFHEAL final_grab_err=Lost last_rebuild_error=None
+SELFHEAL final_grab_err=Lost last_rebuild_error=None
+SELFHEAL final_grab_err=Lost last_rebuild_error=None
+SELFHEAL final_grab_err=Lost last_rebuild_error=None
+SELFHEAL final_grab_err=Lost last_rebuild_error=None
+SELFHEAL final_grab_err=Lost last_rebuild_error=None
+SELFHEAL final_grab_err=Lost last_rebuild_error=None
+SELFHEAL final_grab_err=Lost last_rebuild_error=None
+SELFHEAL final_grab_err=Lost last_rebuild_error=None
+SELFHEAL final_grab_err=Lost last_rebuild_error=None
+SELFHEAL final_grab_err=Lost last_rebuild_error=None
+SELFHEAL encode_after_bytes=0
+SELFHEAL rebuilt=true device_unchanged=false nvenc_session_reused=false post_frames=0
+RESULT: FAIL
+EXIT=1 

@@ -1,0 +1,9 @@
+[package]
+name = "er-channels"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "EasyRemote 文件传输与剪贴板通道（PRD §5.4 / §5.5）"
+
+[dependencies]
+sha2 = "0.10"

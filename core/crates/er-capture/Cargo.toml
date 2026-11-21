@@ -1,0 +1,29 @@
+[package]
+name = "er-capture"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "EasyRemote 屏幕采集：抽象 + xcap 跨平台实现 + Windows DXGI Desktop Duplication"
+
+[dependencies]
+xcap = "0.4"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+# DXGI Desktop Duplication / D3D11：把采集变成 GPU 纹理（无 host 全帧拷贝），
+# 并让 NVENC 能直接注册这块 ID3D11Texture2D。
+# 版本与 xcap 已锁定的 windows 0.60 对齐，避免多出传递依赖。
+windows = { version = "0.60", default-features = false, features = [
+    "std",
+    "Win32_Foundation",
+    "Win32_Graphics_Direct3D",
+    "Win32_Graphics_Direct3D11",
+    "Win32_Graphics_Dxgi",
+    "Win32_Graphics_Dxgi_Common",
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_UI_Input_KeyboardAndMouse",
+    "Win32_System_Power",
+    # 锁屏检测：OpenInputDesktop + GetUserObjectInformationW(UOI_NAME)
+    "Win32_System_StationsAndDesktops",
+    # step3 自愈验证：EnumDisplaySettingsW / ChangeDisplaySettingsW 触发 ACCESS_LOST
+    "Win32_Graphics_Gdi",
+] }

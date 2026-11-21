@@ -1,0 +1,3 @@
+DXGI_LOCKSTATE adapter="NVIDIA GeForce RTX 3060 Laptop GPU" size=2880x1620 format=87 mode=Some((2880, 1620, 120))
+DXGI_LOCKSTATE is_locked=false
+RESULT: PASS (is_locked=false)

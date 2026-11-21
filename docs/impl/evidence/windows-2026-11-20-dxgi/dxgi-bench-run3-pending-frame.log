@@ -1,0 +1,84 @@
+DXGI_BENCH_START 2026/11/20 ���� 20:08:29.17 
+=== 环境 ===
+gpu             = Some("NVIDIA GeForce RTX 3060 Laptop GPU")
+driver          = Some("610.88")
+nvenc_api_max   = 0x000000d1
+nvenc_available = true
+probe_detail    = nvEnc session opened, H.264 encode GUID supported
+
+=== DXGI 拓扑 ===
+adapter#0 name="NVIDIA GeForce RTX 3060 Laptop GPU" vendor=0x10de luid=00000000:000148ed
+    output#0 attached=true rect=(0,0)-(2880,1620) device="\\\\.\\DISPLAY1"
+adapter#1 name="AMD Radeon(TM) Graphics" vendor=0x1002 luid=00000000:00016425
+    (no DXGI outputs)
+adapter#2 name="NVIDIA GeForce RTX 3060 Laptop GPU" vendor=0x10de luid=00000000:000207e2
+    (no DXGI outputs)
+adapter#3 name="Microsoft Basic Render Driver" vendor=0x1414 luid=00000000:000163af
+    (no DXGI outputs)
+
+=== DXGI DuplicateOutput 探测 ===
+adapter="NVIDIA GeForce RTX 3060 Laptop GPU" output#0 primary=true -> OK 2880x1620 format=87 current=2880x1620
+
+dxgi adapter = "NVIDIA GeForce RTX 3060 Laptop GPU" size = 2880x1620 format = 87 (B8G8R8A8_UNORM=87)
+encode cfg      = 2880x1620 @60fps gop=60
+
+=== Desktop Duplication 取帧探测 ===
+wake_display = true
+acquire #0: ERR hresult=0x887a0027 msg=超时值已过，资源还不可用。 (0x887A0027)
+nudge(sendinput) #0: ok=true
+acquire #1: OK texture=true last_present=0 accum=0 last_mouse=290110052534 ptr_shape_B=9216 ptr_pos=(1939,809) visible=true
+nudge(sendinput) #1: ok=true
+acquire #2: OK texture=true last_present=290111544171 accum=12 last_mouse=290110086730 ptr_shape_B=0 ptr_pos=(1937,809) visible=true
+nudge(sendinput) #2: ok=true
+acquire #3: OK texture=true last_present=290113040043 accum=18 last_mouse=290111596413 ptr_shape_B=0 ptr_pos=(1939,809) visible=true
+nudge(sendinput) #3: ok=true
+dxgi_live = true
+
+--- A: xcap + NVENC(copy)  xcap_size=2880x1620 ---
+A backend = cuda(copy)
+A frame 0: capture 663.28ms encode 9.82ms 13495 bytes
+A frame 19: capture 646.25ms encode 8.02ms 953 bytes
+
+--- B: DXGI + NVENC(copy) ---
+B backend = cuda(copy)
+B frame 0: capture 6.80ms encode 10.00ms 14848 bytes
+B frame 19: capture 5.67ms encode 7.99ms 1328 bytes
+
+--- C: DXGI + NVENC(zero-copy, 常驻注册) ---
+C backend = directx(zero-copy)
+C frame 0: capture 0.50ms gpu_blit 0.01ms encode 11.03ms 14848 bytes
+C frame 19: capture 0.42ms gpu_blit 0.00ms encode 6.29ms 1328 bytes
+
+--- D: DXGI + NVENC(direct register, 无 GPU 拷贝) ---
+D backend = directx(zero-copy)
+D frame 0: capture 0.44ms encode 8.00ms 14848 bytes
+D frame 19: capture 0.50ms encode 6.08ms 1328 bytes
+
+--- E: NVENC(DirectX) 纹理直编（不依赖 DXGI 采集）---
+E texture = 0x1f77ce0fce0 (2880x1620 B8G8R8A8)
+E backend = directx(zero-copy)
+E frame 0: encode 10.52ms 13495 bytes
+E frame 19: encode 6.18ms 905 bytes
+E2 backend = directx(zero-copy)
+E2 frame 0: encode(含 register) 8.20ms 13495 bytes
+E2 frame 19: encode(含 register) 5.65ms 905 bytes
+
+=== 汇总（20 帧/路径，2880x1620）===
+路径                             capture_ms    encode_ms       aux_ms    e2e_fps           decode    idr_B
+xcap+NVENC(copy)                   650.42         8.28         0.00       1.52     2880x1620 OK    13495
+dxgi+NVENC(copy)                     5.39         8.11         0.00      69.84     2880x1620 OK    14848
+dxgi+NVENC(zero-copy)                0.49         6.91         0.00     133.19     2880x1620 OK    14848
+dxgi+NVENC(direct)                   0.48         6.30         0.00     146.35     2880x1620 OK    14848
+nvenc(directx, 常驻注册)                  n/a         6.65         0.00        n/a     2880x1620 OK    13495
+nvenc(directx, 每帧注册)                  n/a         6.04         0.00        n/a     2880x1620 OK    13495
+
+CAPTURE_BUDGET_40MS: xcap_baseline=650.42ms dxgi_zero_copy=0.49ms
+RESULT: paths=6 all_dims_ok=true
+METRIC xcap+NVENC(copy) capture_ms=650.42 encode_ms=8.28 aux_ms=0.00 e2e_fps=1.52 decode=2880x1620 idr_bytes=13495 last_bytes=953 max_capture_ms=663.28 max_encode_ms=9.82
+METRIC dxgi+NVENC(copy) capture_ms=5.39 encode_ms=8.11 aux_ms=0.00 e2e_fps=69.84 decode=2880x1620 idr_bytes=14848 last_bytes=1328 max_capture_ms=6.80 max_encode_ms=10.00
+METRIC dxgi+NVENC(zero-copy) capture_ms=0.49 encode_ms=6.91 aux_ms=0.00 e2e_fps=133.19 decode=2880x1620 idr_bytes=14848 last_bytes=1328 max_capture_ms=0.66 max_encode_ms=11.03
+METRIC dxgi+NVENC(direct) capture_ms=0.48 encode_ms=6.30 aux_ms=0.00 e2e_fps=146.35 decode=2880x1620 idr_bytes=14848 last_bytes=1328 max_capture_ms=0.65 max_encode_ms=8.00
+METRIC nvenc(directx, 常驻注册) capture_ms=n/a encode_ms=6.65 aux_ms=0.00 e2e_fps=n/a decode=2880x1620 idr_bytes=13495 last_bytes=905 max_capture_ms=0.00 max_encode_ms=10.52
+METRIC nvenc(directx, 每帧注册) capture_ms=n/a encode_ms=6.04 aux_ms=0.00 e2e_fps=n/a decode=2880x1620 idr_bytes=13495 last_bytes=905 max_capture_ms=0.00 max_encode_ms=8.20
+VERDICT: PASS
+DXGI_BENCH_EXIT=0 

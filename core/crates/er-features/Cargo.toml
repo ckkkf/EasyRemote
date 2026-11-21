@@ -1,0 +1,8 @@
+[package]
+name = "er-features"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "EasyRemote 差异化能力：D1 网络诊断 / D2 防睡眠 / D3 会话水印（纯逻辑，可完整单测）"
+
+[dependencies]

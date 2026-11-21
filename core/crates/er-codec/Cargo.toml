@@ -1,0 +1,13 @@
+[package]
+name = "er-codec"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "EasyRemote 编解码：抽象 + 基于 OpenH264 的真实实现"
+
+[dependencies]
+er-common = { path = "../er-common" }
+openh264 = "0.6"
+
+[dev-dependencies]
+er-capture = { path = "../er-capture" }

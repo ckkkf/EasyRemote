@@ -1,0 +1,8 @@
+[package]
+name = "er-abr"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "自适应码率控制（PRD §5.2.4）"
+
+[dependencies]

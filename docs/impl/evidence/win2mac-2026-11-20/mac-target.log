@@ -1,0 +1,28 @@
+MAC: gateway=http://127.0.0.1:18090 relay=127.0.0.1:19000 signal=http://127.0.0.1:18090 pid=86244
+MAC: display pixels=1920x1080 points=1920x1080 origin=(0,0) scale=1
+MAC: permission_screen=ok (info=1920x1080 frame=1920x1080 nonzero_samples=8317)
+MAC: cursor_baseline_pixel=Some((492, 0)) (读不到 = 没有输入监控/辅助功能会话)
+MAC: device_id=dev-183af9b63c1dfed8 device_code=529048245 captcha=701301 (301ms)
+MAC: waiting_for_signalling ...
+MAC: session=ses-eaddbf6f23ffac37
+MAC: consent=authorized
+MAC: relay_registered local=127.0.0.1:63044
+MAC: handshake_verified (ed25519 + x25519)
+MAC: frames_received=5 resolution=320x240 first_h264_bytes=762
+CODEC: init kind=Software 1920x1080
+CODEC: prime_frame=false
+[OpenH264] this = 0x0x9c9400210, Warning:ParamValidation(), AdaptiveQuant(1) is not supported yet for screen content, auto turned off
+[OpenH264] this = 0x0x9c9400210, Warning:ParamValidation(), BackgroundDetection(1) is not supported yet for screen content, auto turned off
+[OpenH264] this = 0x0x9c9400210, Warning:bEnableFrameSkip = 0,bitrate can't be controlled for RC_QUALITY_MODE,RC_BITRATE_MODE and RC_TIMESTAMP_MODE without enabling skip frame.
+CODEC: backend_final=cpu
+MAC: frames_sent=5 bytes_total=93945 ms=1961
+MAC: cursor_baseline=Some((222, 59)) recheck=Some((222, 59)) stable=true
+MAC: input_events_received=3 kinds=[MouseMove { x: 400, y: 300 }, MouseMove { x: 363, y: 321 }, MouseMove { x: 400, y: 300 }]
+MAC: injected_moves=[(400, 300), (363, 321), (400, 300)]
+MAC: injected_mapped=3
+MAC: cursor_after=Some((400, 300))
+MAC: moved_to_target=true (target=Some((400, 300)) actual=Some((400, 300)) delta=(0, 0))
+MAC: cursor_stable_before_inject=true
+MAC: RESULT screen_permission=true frames_received=5 frames_sent=5 input_events=3 moved_to_target=true elapsed_ms=14925
+MAC: DONE session=ses-eaddbf6f23ffac37
+MAC: VERDICT PASS

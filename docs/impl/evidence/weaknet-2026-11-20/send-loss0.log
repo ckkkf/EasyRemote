@@ -1,0 +1,12 @@
+# 采集自 Mac 终端（weaknet_send 原始 stdout，含 OpenH264 的 stderr 警告行）
+# 场景：loss=0，300 帧 @16ms，320x240 合成渐变频图，编码器 = OpenH264（Mac 无 NVENC）
+SEND[loss0]: device_code=392963488 captcha=600457
+SEND[loss0]: session=ses-fab4bc21cfae80c1
+SEND[loss0]: handshake_verified
+SEND[loss0]: clock rtt_ms=72 offset_ms=-1899 ok=true
+SEND[loss0]: encoder_kind=Software 320x240
+[OpenH264] this = 0x0xa24c1c090, Warning:ParamValidation(), AdaptiveQuant(1) is not supported yet for screen content, auto turned off
+[OpenH264] this = 0x0xa24c1c090, Warning:ParamValidation(), BackgroundDetection(1) is not supported yet for screen content, auto turned off
+[OpenH264] this = 0x0xa24c1c090, Warning:bEnableFrameSkip = 0,bitrate can't be controlled for RC_QUALITY_MODE,RC_BITRATE_MODE and RC_TIMESTAMP_MODE without enabling skip frame.
+SEND[loss0]: frames_sent=300 frames_target=300 bytes_total=587935 encode_ms_avg=13.861 elapsed_ms=11070
+SEND[loss0]: DONE session=ses-fab4bc21cfae80c1

@@ -1,0 +1,22 @@
+[package]
+name = "er-client"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "客户端到服务端的真实调用：登录、绑设备、登记身份、建会话、取票据与公钥"
+
+[dependencies]
+tungstenite = "0.24"
+ureq = { version = "2", features = ["json"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+er-capture = { path = "../er-capture" }
+er-codec = { path = "../er-codec" }
+er-session = { path = "../er-session" }
+er-input = { path = "../er-input" }
+er-abr = { path = "../er-abr" }
+ed25519-dalek = "2"
+
+[dev-dependencies]
+# 单测里要构造 Packet（header 用 er_common::protocol::MediaHeader）
+er-common = { path = "../er-common" }

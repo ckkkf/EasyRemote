@@ -1,0 +1,8 @@
+[package]
+name = "er-input"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "输入注入（PRD §5.3）：键鼠事件模型、扫描码映射、注入抽象与平台实现"
+
+[dependencies]

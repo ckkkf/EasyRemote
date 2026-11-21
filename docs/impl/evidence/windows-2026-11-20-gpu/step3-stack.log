@@ -1,0 +1,5 @@
+2026/11/20 20:41:08 stack using in-memory store + signalling (set DATABASE_URL to use postgres), listening on 127.0.0.1:18090
+2026/11/20 20:41:08 stack listening on 127.0.0.1:18090
+2026/11/20 20:41:35 notify: session=ses-149c2327e72dcc4e from=dev-d9974f067ffcb2c1 to=dev-5c1c39e0345cad36 err=<nil>
+2026/11/20 20:43:42 notify: session=ses-3cdba0498cd5c4db from=dev-5663f8376c3a1800 to=dev-78a0a33f05397e82 err=<nil>
+2026/11/20 20:46:09 notify: session=ses-039db0cfe84f7d37 from=dev-6e2d304ef4fffc5d to=dev-c2b378aa486c4072 err=<nil>

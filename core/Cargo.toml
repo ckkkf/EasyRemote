@@ -1,0 +1,20 @@
+[workspace]
+members = [
+  "crates/er-common",
+  "crates/er-transport",
+  "crates/er-capture",
+  "crates/er-codec",
+  "crates/er-features",
+  "crates/er-channels",
+  "crates/er-abr",
+  "crates/er-input",
+  "crates/er-ffi",
+  "crates/er-session",
+  "crates/er-client",
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"

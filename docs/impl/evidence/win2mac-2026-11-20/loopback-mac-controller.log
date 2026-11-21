@@ -1,0 +1,16 @@
+MAC: gateway=http://127.0.0.1:18090 relay=127.0.0.1:19000 device_code=657505915 captcha=358398
+MAC: session=ses-a1ab8a7563cd646f
+MAC: relay_registered local=127.0.0.1:54094
+MAC: handshake_verified (ed25519 + x25519)
+MAC: capture_ok 1920x1080
+CODEC: init kind=Software 1920x1080
+CODEC: prime_frame=false
+[OpenH264] this = 0x0x847010000, Warning:ParamValidation(), AdaptiveQuant(1) is not supported yet for screen content, auto turned off
+[OpenH264] this = 0x0x847010000, Warning:ParamValidation(), BackgroundDetection(1) is not supported yet for screen content, auto turned off
+[OpenH264] this = 0x0x847010000, Warning:bEnableFrameSkip = 0,bitrate can't be controlled for RC_QUALITY_MODE,RC_BITRATE_MODE and RC_TIMESTAMP_MODE without enabling skip frame.
+CODEC: backend_final=cpu
+MAC: frames_sent=5 bytes_total=106046
+MAC: input_events_sent=3 target=(400,300) sent_before_recv=true
+MAC: frames_from_target=5 resolution=1920x1080 first_h264_bytes=86423
+MAC: MSG_VIDEO=1 (帧头 seq/ts/dim 已随帧传输)
+MAC: DONE session=ses-a1ab8a7563cd646f

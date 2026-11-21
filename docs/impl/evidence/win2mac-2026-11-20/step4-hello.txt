@@ -1,0 +1,3 @@
+device_id=dev-183af9b63c1dfed8
+device_code=529048245
+captcha=701301

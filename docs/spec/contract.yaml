@@ -1,0 +1,258 @@
+# EasyRemote 接口契约（唯一来源）
+#
+# 规则：
+#   1. 这份文件是接口形状的唯一来源。改接口先改这里，再跑 node scripts/gen-contract.mjs。
+#   2. 生成物：server/internal/contract/types_gen.go / web-admin/src/contract.ts / client/lib/contract.dart
+#   3. 类型写法：string | int | bool | time | map<string> | any | 类型名 | list<类型>，末尾加 ? 表示可选。
+#   4. 成功响应统一信封 {code:0, name:"OK", data, trace_id}；错误信封见 docs/spec/error-codes.md。
+#   5. any 是待收敛的占位：网关侧业务体尚未逐个定型，先用 any 登记路由与信封，类型后续逐条替换。
+#   6. 路由清单必须与代码一致（scripts/check-routes.mjs 会校验，--strict 下不一致即红）。
+
+version: 2
+
+types:
+  OkResult:
+    ok: bool
+  Overview:
+    devices_total: int
+    devices_online: int
+    sessions_active: int
+    sessions_pending: int
+    generated_at: time
+  UserRow:
+    id: string
+    phone_mask: string
+    status: string
+    created_at: time
+  DeviceRow:
+    id: string
+    device_code: string
+    account_id: string
+    platform: string
+    online: bool
+    last_seen: time
+  SessionRow:
+    id: string
+    controller_id: string
+    target_id: string
+    state: string
+    reason: string?
+    started_at: time
+    ended_at: time?
+  AuditRow:
+    id: string
+    actor: string
+    role: string
+    action: string
+    object: string
+    before: string?
+    after: string?
+    ip: string
+    result: string
+    ts: time
+  AdminSession:
+    token: string
+    username: string
+    role: string
+    expires_at: time
+  ConfigField:
+    key: string
+    kind: string
+    default: string
+    min: int64?
+    max: int64?
+    help: string
+  ConfigView:
+    config: map<string>
+    fields: list<ConfigField>
+  ConfigPutResult:
+    config: map<string>
+    audited: bool
+
+endpoints:
+  SYS-01:
+    method: GET
+    path: /healthz
+    auth: none
+    response: OkResult
+    errors: []
+  ADM-01:
+    method: POST
+    path: /admin/v1/login
+    auth: none
+    response: AdminSession
+    errors: AUTH_INVALID_CREDENTIAL, AUTH_TOO_MANY_ATTEMPTS, ADMIN_MFA_REQUIRED
+  ADM-02:
+    method: POST
+    path: /admin/v1/logout
+    auth: admin
+    response: OkResult
+    errors: SRV_INTERNAL
+  ADM-03:
+    method: GET
+    path: /admin/v1/stats/overview
+    auth: admin
+    response: Overview
+    errors: ADMIN_SESSION_EXPIRED, ADMIN_FORBIDDEN
+  ADM-04:
+    method: GET
+    path: /admin/v1/users
+    auth: admin
+    response: list<UserRow>
+    errors: ADMIN_SESSION_EXPIRED, ADMIN_FORBIDDEN
+  ADM-05:
+    method: POST
+    path: /admin/v1/users/ban
+    auth: admin
+    response: OkResult
+    errors: ADMIN_SESSION_EXPIRED, ADMIN_FORBIDDEN, ADMIN_REASON_REQUIRED
+  ADM-06:
+    method: GET
+    path: /admin/v1/devices
+    auth: admin
+    response: list<DeviceRow>
+    errors: ADMIN_SESSION_EXPIRED, ADMIN_FORBIDDEN
+  ADM-07:
+    method: GET
+    path: /admin/v1/sessions
+    auth: admin
+    response: list<SessionRow>
+    errors: ADMIN_SESSION_EXPIRED, ADMIN_FORBIDDEN
+  ADM-08:
+    method: POST
+    path: /admin/v1/sessions/kill
+    auth: admin
+    response: OkResult
+    errors: ADMIN_SESSION_EXPIRED, ADMIN_FORBIDDEN, ADMIN_REASON_REQUIRED
+  ADM-09:
+    method: GET
+    path: /admin/v1/config
+    auth: admin
+    response: ConfigView
+    errors: ADMIN_SESSION_EXPIRED, ADMIN_FORBIDDEN
+  ADM-10:
+    method: PUT
+    path: /admin/v1/config
+    auth: admin
+    response: ConfigPutResult
+    errors: ADMIN_SESSION_EXPIRED, ADMIN_FORBIDDEN, ADMIN_CONFIG_INVALID
+  ADM-11:
+    method: GET
+    path: /admin/v1/audit
+    auth: admin
+    response: list<AuditRow>
+    errors: ADMIN_SESSION_EXPIRED, ADMIN_FORBIDDEN
+  GW-01:
+    method: POST
+    path: /v1/auth/sms
+    auth: none
+    response: OkResult
+    errors: AUTH_INVALID_CREDENTIAL, AUTH_SMS_RATE_LIMITED
+  GW-02:
+    method: POST
+    path: /v1/auth/login
+    auth: none
+    response: any
+    errors: AUTH_INVALID_CREDENTIAL, AUTH_TOO_MANY_ATTEMPTS
+  GW-03:
+    method: GET
+    path: /v1/devices
+    auth: bearer
+    response: any
+    errors: AUTH_TOKEN_EXPIRED, SRV_INTERNAL
+  GW-04:
+    method: POST
+    path: /v1/devices/bind
+    auth: bearer
+    response: any
+    errors: AUTH_TOKEN_EXPIRED, SRV_INTERNAL
+  GW-05:
+    method: POST
+    path: /v1/devices/verify-code
+    auth: device
+    response: any
+    errors: CONN_DEVICE_NOT_FOUND, ADMIN_FORBIDDEN
+  GW-06:
+    method: POST
+    path: /v1/connect/request
+    auth: bearer
+    response: any
+    errors: CONN_DEVICE_NOT_FOUND, CONN_DEVICE_OFFLINE, CONN_CAPTCHA_INVALID, CONN_RATE_LIMITED
+  GW-07:
+    method: POST
+    path: /v1/connect/consent
+    auth: device
+    response: any
+    errors: CONN_DEVICE_NOT_FOUND, ADMIN_FORBIDDEN
+  GW-08:
+    method: POST
+    path: /v1/connect/status
+    auth: bearer
+    response: any
+    errors: SESSION_NOT_FOUND, AUTH_TOKEN_EXPIRED
+  GW-09:
+    method: POST
+    path: /v1/devices/identity
+    auth: device
+    response: any
+    errors: CONN_DEVICE_NOT_FOUND, ADMIN_FORBIDDEN
+  GW-10:
+    method: POST
+    path: /v1/connect/keys
+    auth: bearer
+    response: any
+    errors: SESSION_NOT_FOUND, AUTH_TOKEN_EXPIRED
+  GW-11:
+    method: POST
+    path: /v1/relay/ticket
+    auth: device
+    response: any
+    errors: SESSION_NOT_FOUND, SESSION_AUTH_WINDOW_EXCEEDED, ADMIN_FORBIDDEN
+  GW-12:
+    method: POST
+    path: /v1/auth/email/code
+    auth: none
+    response: any
+    errors: AUTH_INVALID_CREDENTIAL, AUTH_SMS_RATE_LIMITED
+  GW-13:
+    method: POST
+    path: /v1/auth/email/login
+    auth: none
+    response: any
+    errors: AUTH_INVALID_CREDENTIAL, AUTH_TOO_MANY_ATTEMPTS
+  GW-14:
+    method: POST
+    path: /v1/files
+    auth: bearer
+    response: any
+    errors: AUTH_TOKEN_EXPIRED, FILE_READ_FAILED, CONN_RATE_LIMITED
+  GW-15:
+    method: GET
+    path: /v1/files/
+    auth: bearer
+    response: any
+    errors: AUTH_TOKEN_EXPIRED, FILE_NOT_FOUND, ADMIN_FORBIDDEN
+  GW-16:
+    method: POST
+    path: /v1/assist/create
+    auth: bearer
+    response: any
+    errors: CONN_DEVICE_NOT_FOUND, ADMIN_FORBIDDEN, CONN_RATE_LIMITED
+  GW-17:
+    method: POST
+    path: /v1/assist/redeem
+    auth: bearer
+    response: any
+    errors: CONN_ASSIST_CODE_INVALID, CONN_ASSIST_CODE_USED, CONN_ASSIST_CODE_EXPIRED, CONN_SELF_CONNECT
+  GW-18:
+    method: GET
+    path: /v1/config
+    auth: none
+    response: any
+    errors: SRV_INTERNAL
+  GW-19:
+    method: POST
+    path: /v1/net/reflect
+    auth: none
+    response: any
+    errors: SRV_INTERNAL

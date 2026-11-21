@@ -1,0 +1,72 @@
+# ---- 通用 ----
+.DS_Store
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
+*.iml
+
+# ---- 本地环境与密钥（绝不入库）----
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+id_rsa*
+id_ed25519*
+*.kdbx
+secrets/
+
+# ---- Rust ----
+core/target/
+spikes/**/target/
+**/target/
+target/
+
+# ---- Go ----
+server/stack
+server/gateway
+server/relay
+server/rendezvous
+server/admin
+server/udptun
+server/lossyproxy
+*.test
+*.out
+
+# ---- Flutter / Dart ----
+client/build/
+client/.dart_tool/
+client/.flutter-plugins
+client/.flutter-plugins-dependencies
+client/.packages
+client/.pub-cache/
+client/macos/Flutter/ephemeral/
+client/macos/Pods/
+client/**/*.g.dart
+client/**/*.freezed.dart
+.pub-cache/
+.pub/
+
+# ---- Node / Web ----
+node_modules/
+web-admin/dist/
+web-admin/.vite/
+npm-debug.log*
+yarn-error.log*
+
+# ---- Python ----
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+scripts/__pycache__/
+
+# ---- 本地工具产物 / 调试备份 ----
+.ralph/
+*.log
+!docs/impl/evidence/**/*.log

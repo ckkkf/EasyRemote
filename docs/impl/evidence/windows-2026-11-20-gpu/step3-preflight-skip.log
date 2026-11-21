@@ -1,0 +1,21 @@
+# step3 脚本前置守卫验证（2026-11-20，被控机仍处于锁屏状态）
+
+命令（Windows，经 ssh win）：
+    foreach ($s in @('run_lockstate.cmd','run_access_lost.cmd','run_bench_compare.cmd','run_xmachine_gpu.cmd')) { & cmd /c "C:\EasyRemote\$s" }
+
+原始输出：
+==== run_lockstate.cmd
+SKIP: desktop is locked (LogonUI.exe running). Unlock the desktop first; no PASS/FAIL produced.
+EXITCODE=4
+==== run_access_lost.cmd
+SKIP: desktop is locked (LogonUI.exe running). Unlock the desktop first; no PASS/FAIL produced.
+EXITCODE=4
+==== run_bench_compare.cmd
+SKIP: desktop is locked (LogonUI.exe running). Unlock the desktop first; no PASS/FAIL produced.
+EXITCODE=4
+==== run_xmachine_gpu.cmd
+SKIP: desktop is locked (LogonUI.exe running). Unlock the desktop first; no PASS/FAIL produced.
+EXITCODE=4
+
+结论：四个脚本在锁屏时都**明确 SKIP 并以退出码 4 退出**，不产生任何 PASS/FAIL 字样，
+不会产出误导性结论。这是当前（锁屏）唯一能做的运行级验证；真正的 step3 断言等解锁后跑。

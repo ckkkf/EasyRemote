@@ -1,0 +1,18 @@
+PROBE_START 2026/11/20 ���� 19:21:57.63 
+=== DXGI 输出枚举 ===
+adapter="NVIDIA GeForce RTX 3060 Laptop GPU" output#0 primary=true -> OK 2880x1620 format=87 current=2880x1620
+adapter="NVIDIA GeForce RTX 3060 Laptop GPU" size=2880x1620 format=87
+acquire #0: ERR hresult=0x887a0027 msg=超时值已过，资源还不可用。 (0x887A0027)
+nudge #0: moved=true
+acquire #1: ERR hresult=0x887a0027 msg=超时值已过，资源还不可用。 (0x887A0027)
+nudge #1: moved=true
+acquire #2: ERR hresult=0x887a0027 msg=超时值已过，资源还不可用。 (0x887A0027)
+nudge #2: moved=true
+acquire #3: ERR hresult=0x887a0027 msg=超时值已过，资源还不可用。 (0x887A0027)
+nudge #3: moved=true
+acquire #4: ERR hresult=0x887a0027 msg=超时值已过，资源还不可用。 (0x887A0027)
+nudge #4: moved=true
+acquire #5: ERR hresult=0x887a0027 msg=超时值已过，资源还不可用。 (0x887A0027)
+nudge #5: moved=true
+PROBE_DONE
+PROBE_EXIT=0 

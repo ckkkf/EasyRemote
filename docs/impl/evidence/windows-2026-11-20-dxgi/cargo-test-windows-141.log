@@ -1,0 +1,437 @@
+Warning: Permanently added '[<frp-host>]:<port>' (ED25519) to the list of known hosts.
+warning: field `cfg` is never read
+   --> crates\er-codec\src\lib.rs:243:5
+    |
+242 | pub struct FakeEncoder {
+    |            ----------- field in this struct
+243 |     cfg: EncodeConfig,
+    |     ^^^
+    |
+    = note: `FakeEncoder` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `er-codec` (lib) generated 1 warning
+warning: unused import: `Capture`
+  --> crates\er-codec\examples\nvenc_bench.rs:12:18
+   |
+12 | use er_capture::{Capture, ScreenCapture};
+   |                  ^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `Capture`
+ --> crates\er-capture\examples\privacy_check.rs:4:22
+  |
+4 |     use er_capture::{Capture, ScreenCapture};
+  |                      ^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `Encoder`
+ --> crates\er-codec\examples\pipeline_latency.rs:7:30
+  |
+7 | use er_codec::{EncodeConfig, Encoder, OpenH264Codec};
+  |                              ^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `er-codec` (example "nvenc_bench") generated 1 warning (run `cargo fix --example "nvenc_bench" -p er-codec` to apply 1 suggestion)
+warning: `er-codec` (lib test) generated 1 warning (1 duplicate)
+warning: `er-capture` (example "privacy_check") generated 1 warning (run `cargo fix --example "privacy_check" -p er-capture` to apply 1 suggestion)
+warning: `er-codec` (example "pipeline_latency") generated 1 warning (run `cargo fix --example "pipeline_latency" -p er-codec` to apply 1 suggestion)
+warning: unused import: `Capture`
+ --> crates\er-client\src\encoder.rs:7:18
+  |
+7 | use er_capture::{Capture, ScreenCapture};
+  |                  ^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: variable does not need to be mutable
+   --> crates\er-client\src\agent.rs:153:13
+    |
+153 |         let mut relay = RelayClient::new(self.relay_addr, session_id, &self.device.device_id)
+    |             ----^^^^^
+    |             |
+    |             help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: variable does not need to be mutable
+   --> crates\er-client\src\agent.rs:411:13
+    |
+411 |         let mut relay = RelayClient::new(self.relay_addr, session_id, &self.device.device_id)
+    |             ----^^^^^
+    |             |
+    |             help: remove this `mut`
+
+warning: field `gateway_base` is never read
+  --> crates\er-client\src\agent.rs:71:5
+   |
+65 | pub struct TargetAgent {
+   |            ----------- field in this struct
+...
+71 |     gateway_base: String,
+   |     ^^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `er-client` (lib) generated 4 warnings (run `cargo fix --lib -p er-client` to apply 3 suggestions)
+warning: `er-client` (lib test) generated 4 warnings (4 duplicates)
+warning: unused import: `CStr`
+ --> crates\er-ffi\src\lib.rs:9:31
+  |
+9 | use std::ffi::{c_char, c_int, CStr, CString};
+  |                               ^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `decode_pubkey`
+  --> crates\er-client\examples\full_session_e2e.rs:11:17
+   |
+11 | use er_client::{decode_pubkey, encode_pubkey, Gateway};
+   |                 ^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `Encoder`
+  --> crates\er-client\examples\full_session_e2e.rs:12:30
+   |
+12 | use er_codec::{EncodeConfig, Encoder, H264Decoder, OpenH264Codec};
+   |                              ^^^^^^^
+
+warning: unused import: `Injector`
+  --> crates\er-client\examples\xmachine_target.rs:31:20
+   |
+31 |     use er_input::{Injector, InputEvent};
+   |                    ^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `Encoder`
+  --> crates\er-client\examples\weaknet_send.rs:17:46
+   |
+17 | use er_codec::{create_encoder, EncodeConfig, Encoder};
+   |                                              ^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `Encoder`
+  --> crates\er-client\examples\xmachine_controller.rs:14:46
+   |
+14 | use er_codec::{create_encoder, EncodeConfig, Encoder};
+   |                                              ^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: variable does not need to be mutable
+   --> crates\er-client\examples\xmachine_controller.rs:103:12
+    |
+103 |         Ok(mut cap) => {
+    |            ----^^^
+    |            |
+    |            help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: `er-ffi` (lib) generated 1 warning (run `cargo fix --lib -p er-ffi` to apply 1 suggestion)
+warning: `er-client` (example "full_session_e2e") generated 2 warnings (run `cargo fix --example "full_session_e2e" -p er-client` to apply 1 suggestion)
+warning: `er-client` (example "xmachine_target") generated 1 warning (run `cargo fix --example "xmachine_target" -p er-client` to apply 1 suggestion)
+warning: `er-ffi` (lib test) generated 1 warning (1 duplicate)
+warning: `er-client` (example "weaknet_send") generated 1 warning
+warning: `er-client` (example "xmachine_controller") generated 2 warnings (run `cargo fix --example "xmachine_controller" -p er-client` to apply 1 suggestion)
+warning: unused dependency `er-features`
+  --> crates\er-ffi\Cargo.toml:15:1
+   |
+15 | er-features = { path = "../er-features" }
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `cargo::unused_dependencies` is set to `warn` by default
+help: consider removing the dependency on `er-features`
+warning: `er-ffi` (manifest) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.38s
+     Running unittests src\lib.rs (target\debug\build\er-abr/b76bbbab369abfb1\out\er_abr-b76bbbab369abfb1.exe)
+
+running 9 tests
+test tests::cannot_exceed_top_or_bottom ... ok
+test tests::high_rtt_counts_as_congestion ... ok
+test tests::severe_loss_drops_two_levels ... ok
+test tests::ladder_is_monotonic ... ok
+test tests::mild_loss_drops_one_level ... ok
+test tests::neutral_feedback_makes_no_change ... ok
+test tests::queue_backlog_is_severe ... ok
+test tests::healthy_streak_required_to_upgrade ... ok
+test tests::starts_at_requested_level ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\lib.rs (target\debug\build\er-capture/a4c12dca6a5e1a89\out\er_capture-a4c12dca6a5e1a89.exe)
+
+running 8 tests
+test privacy::tests::frame_shape_preserved ... ok
+test tests::frame_layout_is_bgra ... ok
+test tests::static_desktop_returns_none ... ok
+test tests::malformed_frame_detected ... ok
+test tests::permission_and_lost_are_distinguishable ... ok
+test privacy::tests::privacy_blacks_out_every_pixel ... ok
+test privacy::tests::no_residual_original_bytes ... ok
+test tests::real_capture_produces_well_formed_frame ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running unittests src\lib.rs (target\debug\build\er-channels/70d6ca6b6c6aeadd\out\er_channels-70d6ca6b6c6aeadd.exe)
+
+running 13 tests
+test clipboard::tests::kind_whitelist ... ok
+test clipboard::tests::duplicate_content_not_evaluated ... ok
+test clipboard::tests::text_syncs_both_ways ... ok
+test clipboard::tests::same_hash_different_kind_still_dedups ... ok
+test clipboard::tests::no_echo_loop ... ok
+test file_transfer::tests::duplicate_chunk_is_idempotent ... ok
+test file_transfer::tests::chunk_count_and_boundaries ... ok
+test file_transfer::tests::incomplete_finish_rejected ... ok
+test file_transfer::tests::wrong_file_hash_rejected ... ok
+test file_transfer::tests::corrupt_chunk_detected_with_index ... ok
+test clipboard::tests::oversized_content_rejected ... ok
+test file_transfer::tests::resume_from_contiguous_prefix ... ok
+test file_transfer::tests::full_transfer_roundtrip ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running unittests src\lib.rs (target\debug\build\er-client/37beb4e60053df8a\out\er_client-37beb4e60053df8a.exe)
+
+running 6 tests
+test gpu_policy::tests::dimension_mismatch_falls_back_and_reports_both_sizes ... ok
+test gpu_policy::tests::matching_dims_keep_gpu_path ... ok
+test gpu_policy::tests::no_fallback_reason_panics ... ok
+test gpu_policy::tests::no_hardware_encoder_falls_back_without_retry ... ok
+test gpu_policy::tests::register_failure_retries_then_falls_back ... ok
+test gpu_policy::tests::state_machine_transitions ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\lib.rs (target\debug\build\er-codec/ec3988e87c225139\out\er_codec-ec3988e87c225139.exe)
+
+running 7 tests
+test nvenc::tests::rejects_non_low_latency_config ... ok
+test tests::default_config_is_low_latency ... ok
+test tests::bframes_violate_low_latency ... ok
+test tests::dimension_mismatch_rejected ... ok
+[OpenH264] this = 0x00000215059D7E00, Warning:ParamValidation(), AdaptiveQuant(1) is not supported yet for screen content, auto turned off
+[OpenH264] this = 0x00000215059D7E00, Warning:ParamValidation(), BackgroundDetection(1) is not supported yet for screen content, auto turned off
+[OpenH264] this = 0x00000215059D7E00, Warning:bEnableFrameSkip = 0,bitrate can't be controlled for RC_QUALITY_MODE,RC_BITRATE_MODE and RC_TIMESTAMP_MODE without enabling skip frame.
+[OpenH264] this = 0x00000215059D8010, Warning:ParamValidation(), AdaptiveQuant(1) is not supported yet for screen content, auto turned off
+[OpenH264] this = 0x00000215059D8010, Warning:ParamValidation(), BackgroundDetection(1) is not supported yet for screen content, auto turned off
+[OpenH264] this = 0x00000215059D8010, Warning:bEnableFrameSkip = 0,bitrate can't be controlled for RC_QUALITY_MODE,RC_BITRATE_MODE and RC_TIMESTAMP_MODE without enabling skip frame.
+test tests::real_h264_roundtrip ... ok
+test tests::real_h264_encodes_frame ... ok
+test nvenc::tests::probe_never_panics ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s
+
+     Running unittests src\lib.rs (target\debug\build\er-common/0c077b31400a2937\out\er_common-0c077b31400a2937.exe)
+
+running 13 tests
+test errors::tests::codes_are_unique_and_ascending ... ok
+test protocol::tests::envelope_rejects_bad_magic ... ok
+test errors::tests::segments_are_valid ... ok
+test errors::tests::unknown_code_is_reported ... ok
+test protocol::tests::envelope_rejects_short_header ... ok
+test errors::tests::error_display_and_predicates ... ok
+test protocol::tests::envelope_rejects_truncated ... ok
+test protocol::tests::envelope_roundtrip ... ok
+test errors::tests::names_are_unique ... ok
+test protocol::tests::input_event_serde ... ok
+test protocol::tests::media_header_roundtrip ... ok
+test protocol::tests::msg_type_roundtrip ... ok
+test protocol::tests::role_serializes_as_string ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\lib.rs (target\debug\build\er-features/a42283be6b6918d9\out\er_features-a42283be6b6918d9.exe)
+
+running 18 tests
+test d1_diagnostics::tests::direct_connection_reports_healthy ... ok
+test d1_diagnostics::tests::qos_mention_off_peak ... ok
+test d1_diagnostics::tests::impact_mentions_relay_latency ... ok
+test d2_power::tests::guard_releases_on_early_return ... ok
+test d1_diagnostics::tests::symmetric_nat_explains_why ... ok
+test d3_watermark::tests::opacity_is_clamped_to_safe_range ... ok
+test d1_diagnostics::tests::udp_blocked_gives_actionable_advice ... ok
+test d2_power::tests::display_follows_privacy_screen_setting ... ok
+test d2_power::tests::guard_acquires_and_releases_on_drop ... ok
+test d1_diagnostics::tests::only_symmetric_blocks_punching ... ok
+test d2_power::tests::release_without_acquire_is_ok ... ok
+test d2_power::tests::manual_release_is_not_double_released ... ok
+test d3_watermark::tests::deterministic_layout ... ok
+test d3_watermark::tests::empty_frame_produces_no_tiles ... ok
+test d1_diagnostics::tests::high_loss_on_direct_connection_is_called_out ... ok
+test d3_watermark::tests::spacing_never_smaller_than_four_fonts ... ok
+test d3_watermark::tests::tiles_cover_full_frame ... ok
+test d3_watermark::tests::tiles_extend_beyond_edges_so_no_gap ... ok
+
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\lib.rs (target\debug\build\er-ffi/e4e471396452343a\out\er_ffi-e4e471396452343a.exe)
+
+running 5 tests
+test tests::null_pointers_are_checked ... ok
+test tests::privacy_scrub_flattens_buffer ... ok
+test tests::privacy_scrub_rejects_bad_input ... ok
+test tests::string_roundtrip_frees_cleanly ... ok
+test tests::session_lifecycle_does_not_crash ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.18s
+
+     Running unittests src\lib.rs (target\debug\build\er-input/173d34ca398e8d6a\out\er_input-173d34ca398e8d6a.exe)
+
+running 17 tests
+test tests::coordinate_bounds ... ok
+test tests::modifiers_recognized ... ok
+test tests::permission_denied_surfaces ... ok
+test tests::scancode_mapping_is_case_insensitive ... ok
+test wire::tests::key_roundtrip ... ok
+test wire::tests::truncated_rejected ... ok
+test tests::recording_injector_counts_events ... ok
+test tests::coordinate_normalization_roundtrip ... ok
+test tests::observer_mode_injects_nothing ... ok
+test windows::tests::unknown_hid_rejected ... ok
+test wire::tests::mouse_roundtrip ... ok
+test windows::tests::letters_map_to_distinct_vk ... ok
+test wire::tests::unknown_button_rejected ... ok
+test windows::tests::known_keys_map_correctly ... ok
+test windows::tests::observer_mode_does_not_post ... ok
+test tests::denormalize_reaches_edges ... ok
+test wire::tests::unknown_tag_rejected ... ok
+
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\lib.rs (target\debug\build\er-session/106a62dffeaa2811\out\er_session-106a62dffeaa2811.exe)
+
+running 35 tests
+test backoff::tests::attempt_limit_respected ... ok
+test backoff::tests::delay_is_capped ... ok
+test backoff::tests::fast_policy_is_quick_but_capped ... ok
+test backoff::tests::default_schedule_matches_prd ... ok
+test backoff::tests::schedule_is_monotonic_non_decreasing ... ok
+test backoff::tests::zero_base_means_no_wait ... ok
+test identity::tests::fingerprint_is_stable_and_distinct ... ok
+test crypto::tests::different_session_aad_breaks_decryption ... ok
+test crypto::tests::truncated_rejected ... ok
+test identity::tests::encoding_roundtrip ... ok
+test crypto::tests::ciphertext_differs_from_plaintext ... ok
+test crypto::tests::replay_rejected ... ok
+test ticket::tests::expired_rejected ... ok
+test crypto::tests::tampering_detected ... ok
+test ticket::tests::issue_and_verify_roundtrip ... ok
+test ticket::tests::malformed_rejected ... ok
+test crypto::tests::roundtrip_both_directions ... ok
+test ticket::tests::payload_layout_matches_go ... ok
+test crypto::tests::keys_are_directional ... ok
+test crypto::tests::wrong_direction_key_fails ... ok
+test ticket::tests::tampered_signature_rejected ... ok
+test ticket::tests::wrong_secret_rejected ... ok
+test wire::tests::arbitrary_sid_length ... ok
+test wire::tests::empty_payload_roundtrip ... ok
+test wire::tests::fragmentation_and_reassembly ... ok
+test wire::tests::frame_roundtrip ... ok
+test wire::tests::out_of_order_reassembly ... ok
+test wire::tests::register_roundtrip ... ok
+test identity::tests::different_peer_ephemeral_yields_different_keys ... ok
+test wire::tests::short_frames_rejected ... ok
+test identity::tests::mitm_ephemeral_substitution_rejected ... ok
+test identity::tests::session_binding_prevents_replay_elsewhere ... ok
+test identity::tests::role_binding_prevents_role_swap ... ok
+test identity::tests::signature_verifies ... ok
+test identity::tests::impostor_signature_rejected ... ok
+
+test result: ok. 35 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running unittests src\bin\tk_probe.rs (target\debug\build\er-session/41068503ae7c7518\out\tk_probe-41068503ae7c7518.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\lib.rs (target\debug\build\er-transport/89dfb4ea7b509c3f\out\er_transport-89dfb4ea7b509c3f.exe)
+
+running 10 tests
+test tests::channel_reliability ... ok
+test tests::closed_transport_rejects ... ok
+test quic::tests::rejects_oversized_datagram ... ok
+test tests::datagram_drops_oldest_when_full ... ok
+test tests::datagram_roundtrip_and_stats ... ok
+test tests::rejects_oversized_frames ... ok
+test tests::reliable_is_served_before_video ... ok
+test tests::reliable_never_drops ... ok
+test tests::wrong_channel_kind_rejected ... ok
+test quic::tests::quic_end_to_end ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.14s
+
+   Doc-tests er_abr
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests er_capture
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests er_channels
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests er_client
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests er_codec
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests er_common
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests er_features
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests er_ffi
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests er_input
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests er_session
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests er_transport
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

@@ -1,0 +1,43 @@
+   Compiling er-capture v0.1.0 (C:\EasyRemote\core\crates\er-capture)
+warning: field `cfg` is never read
+   --> crates\er-codec\src\lib.rs:243:5
+    |
+242 | pub struct FakeEncoder {
+    |            ----------- field in this struct
+243 |     cfg: EncodeConfig,
+    |     ^^^
+    |
+    = note: `FakeEncoder` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `er-codec` (lib) generated 1 warning
+   Compiling er-codec v0.1.0 (C:\EasyRemote\core\crates\er-codec)
+warning: unused import: `Capture`
+  --> crates\er-codec\examples\nvenc_bench.rs:12:18
+   |
+12 | use er_capture::{Capture, ScreenCapture};
+   |                  ^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `Capture`
+ --> crates\er-capture\examples\privacy_check.rs:4:22
+  |
+4 |     use er_capture::{Capture, ScreenCapture};
+  |                      ^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `Encoder`
+ --> crates\er-codec\examples\pipeline_latency.rs:7:30
+  |
+7 | use er_codec::{EncodeConfig, Encoder, OpenH264Codec};
+  |                              ^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `er-capture` (example "privacy_check") generated 1 warning (run `cargo fix --example "privacy_check" -p er-capture` to apply 1 suggestion)
+warning: `er-codec` (example "nvenc_bench") generated 1 warning (run `cargo fix --example "nvenc_bench" -p er-codec` to apply 1 suggestion)
+warning: `er-codec` (example "pipeline_latency") generated 1 warning (run `cargo fix --example "pipeline_latency" -p er-codec` to apply 1 suggestion)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.75s
+EXIT=0

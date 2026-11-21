@@ -1,0 +1,23 @@
+2026/11/20 19:27:48 lossyproxy 127.0.0.1:19100 -> 127.0.0.1:19000 loss=0.000 delay=0s jitter=0s reorder=0.000 seed=11
+2026/11/20 19:27:50 stats down_in=0 down_drop=0 up_in=0 up_drop=0
+2026/11/20 19:27:52 stats down_in=0 down_drop=0 up_in=0 up_drop=0
+2026/11/20 19:27:54 stats down_in=0 down_drop=0 up_in=0 up_drop=0
+2026/11/20 19:27:56 stats down_in=0 down_drop=0 up_in=0 up_drop=0
+2026/11/20 19:27:58 stats down_in=0 down_drop=0 up_in=0 up_drop=0
+2026/11/20 19:28:00 stats down_in=0 down_drop=0 up_in=0 up_drop=0
+2026/11/20 19:28:02 stats down_in=0 down_drop=0 up_in=0 up_drop=0
+2026/11/20 19:28:02 new session 127.0.0.1:63001
+2026/11/20 19:28:04 stats down_in=2 down_drop=0 up_in=0 up_drop=0
+2026/11/20 19:28:06 stats down_in=3 down_drop=0 up_in=39 up_drop=0
+2026/11/20 19:28:08 stats down_in=3 down_drop=0 up_in=93 up_drop=0
+2026/11/20 19:28:10 stats down_in=3 down_drop=0 up_in=150 up_drop=0
+2026/11/20 19:28:12 stats down_in=3 down_drop=0 up_in=204 up_drop=0
+2026/11/20 19:28:14 stats down_in=3 down_drop=0 up_in=257 up_drop=0
+2026/11/20 19:28:16 stats down_in=3 down_drop=0 up_in=303 up_drop=0
+2026/11/20 19:28:18 stats down_in=3 down_drop=0 up_in=303 up_drop=0
+2026/11/20 19:28:20 stats down_in=3 down_drop=0 up_in=303 up_drop=0
+2026/11/20 19:28:22 stats down_in=3 down_drop=0 up_in=303 up_drop=0
+2026/11/20 19:28:24 stats down_in=3 down_drop=0 up_in=303 up_drop=0
+2026/11/20 19:28:26 stats down_in=3 down_drop=0 up_in=303 up_drop=0
+2026/11/20 19:28:28 stats down_in=3 down_drop=0 up_in=303 up_drop=0
+2026/11/20 19:28:30 stats down_in=3 down_drop=0 up_in=303 up_drop=0

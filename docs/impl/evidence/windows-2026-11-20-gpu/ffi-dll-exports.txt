@@ -1,0 +1,11 @@
+# Windows er_ffi.dll 导出表（dumpbin /exports，2026-11-20）
+
+    Dump of file target\debug\er_ffi.dll
+      4    3 00007E70 er_encoder_backend = er_encoder_backend
+      5    4 00007F60 er_encoder_kind = er_encoder_kind
+      8    7 000081B0 er_grab_and_encode = er_grab_and_encode
+     10    9 000083D0 er_hardware_encoder_available = er_hardware_encoder_available
+
+结论：本轮新增/修改的 4 个 ABI 都在真实 dll 里导出（不是只在 Rust 源码里存在）。
+注意：**导出存在 ≠ 运行正确**——Windows 上还没有调用过它们（被控机锁屏，且 er-ffi 的
+GPU 路径要真机跑才有意义）。macOS 上是 ctypes 直接调通的（见 review-round32）。

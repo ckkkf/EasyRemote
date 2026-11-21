@@ -1,0 +1,24 @@
+WIN: gateway=http://127.0.0.1:18090 relay=127.0.0.1:19000 signal=http://127.0.0.1:18090
+WIN: pid=26700 hardware_encoder_available=true
+WIN: device_id=dev-c2b378aa486c4072 device_code=818237778 captcha=780900 (633ms)
+WIN: waiting_for_signalling ...
+WIN: session=ses-039db0cfe84f7d37
+WIN: consent=authorized
+WIN: relay_registered local=127.0.0.1:63889
+WIN: handshake_verified (ed25519 + x25519)
+WIN: frames_received=5 resolution=1920x1080 first_h264_bytes=66964
+WIN: capture_display=2880x1620
+CODEC: init kind=Nvenc 2880x1620
+CODEC: prime_frame=true
+CODEC: backend=gpu-zero-copy
+CODEC: backend_final=gpu-zero-copy
+WIN: frames_sent=8 bytes_total=40551 ms=954 dims=2880x1620
+WIN: screen=2880x1620 cursor_before=Some((401, 294))
+WIN: input_events_received=3 kinds=[MouseMove { x: 400, y: 300 }, MouseMove { x: 363, y: 321 }, MouseMove { x: 400, y: 300 }]
+WIN: injected_moves=[(400, 300), (363, 321), (400, 300)]
+WIN: cursor_after=Some((404, 298))
+WIN: moved_to_target=false (target=Some((400, 300)) actual=Some((404, 298)))
+WIN: RESULT frames_received=5 frames_sent=8 input_events=3 moved_to_target=false elapsed_ms=9964
+WIN: DONE session=ses-039db0cfe84f7d37
+WIN: VERDICT FAIL
+TARGET_EXIT=1 

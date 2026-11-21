@@ -1,0 +1,12 @@
+RECV: ready device_code=392963488 captcha=600457
+RECV: session=ses-fab4bc21cfae80c1
+RECV: handshake_verified
+RECV: frames_sent_by_peer=300
+RECV: frames_delivered=300
+RECV: frames_lost=0
+RECV: missing_index=none
+RECV: decode_ok=300 decode_fail=0
+RECV: latency_ms p50=28 p95=31 max=76
+RECV: bytes_total=587935 span_ms=11024
+RECV: RESULT sent=300 delivered=300 lost=0 loss_ratio=0.000 span_ms=11024
+RECV: DONE session=ses-fab4bc21cfae80c1

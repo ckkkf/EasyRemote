@@ -1,0 +1,17 @@
+[package]
+name = "er-transport"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "EasyRemote 传输抽象与 QUIC 实现"
+
+[dependencies]
+er-common = { path = "../er-common" }
+quinn = { version = "0.11", default-features = false, features = ["runtime-tokio", "rustls-ring"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std"] }
+rcgen = "0.13"
+tokio = { version = "1", features = ["rt", "net", "time", "macros", "sync", "io-util"] }
+bytes = "1"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "net", "io-util"] }

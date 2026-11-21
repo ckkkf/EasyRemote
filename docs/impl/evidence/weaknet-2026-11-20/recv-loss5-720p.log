@@ -1,0 +1,12 @@
+RECV: ready device_code=356786402 captcha=171257
+RECV: session=ses-f0fa3bed53ed73d6
+RECV: handshake_verified
+RECV: frames_sent_by_peer=150
+RECV: frames_delivered=135
+RECV: frames_lost=15
+RECV: missing_index=[5, 8, 15, 37, 49, 59, 71, 73, 89, 105, 113, 116, 121, 136, 139]
+RECV: decode_ok=69 decode_fail=66
+RECV: latency_ms p50=30 p95=46 max=70
+RECV: bytes_total=1665554 span_ms=24993
+RECV: RESULT sent=150 delivered=135 lost=15 loss_ratio=0.100 span_ms=24993
+RECV: DONE session=ses-f0fa3bed53ed73d6

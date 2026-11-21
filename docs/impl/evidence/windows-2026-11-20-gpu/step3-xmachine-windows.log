@@ -1,0 +1,21 @@
+WIN: gateway=http://127.0.0.1:18090 relay=127.0.0.1:19000 signal=http://127.0.0.1:18090
+WIN: pid=12320 hardware_encoder_available=true
+WIN: device_id=dev-3a256a2df903996a device_code=652187181 captcha=275105 (629ms)
+WIN: waiting_for_signalling ...
+WIN: session=ses-876a12ed367897c1
+WIN: consent=authorized
+WIN: relay_registered local=127.0.0.1:53839
+WIN: handshake_verified (ed25519 + x25519)
+WIN: frames_received=5 resolution=1920x1080 first_h264_bytes=65149
+WIN: capture_display=2880x1620
+CODEC: backend=cpu kind=Nvenc 2880x1620
+CODEC: backend_final=cpu
+WIN: frames_sent=8 bytes_total=67560 ms=3378 dims=2880x1620
+WIN: screen=2880x1620 cursor_before=Some((1642, 961))
+WIN: input_events_received=3 kinds=[MouseMove { x: 400, y: 300 }, MouseMove { x: 363, y: 321 }, MouseMove { x: 400, y: 300 }]
+WIN: injected_moves=[(400, 300), (363, 321), (400, 300)]
+WIN: cursor_after=Some((399, 299))
+WIN: moved_to_target=true (target=Some((400, 300)) actual=Some((399, 299)))
+WIN: RESULT frames_received=5 frames_sent=8 input_events=3 moved_to_target=true elapsed_ms=30948
+WIN: DONE session=ses-876a12ed367897c1
+WIN: VERDICT PASS

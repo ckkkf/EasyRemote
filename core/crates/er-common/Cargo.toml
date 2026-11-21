@@ -1,0 +1,12 @@
+[package]
+name = "er-common"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "EasyRemote 协议与错误码（纯逻辑，无 IO 依赖）"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+
+[dev-dependencies]
+serde_json = "1"

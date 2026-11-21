@@ -1,0 +1,57 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8"><title>EasyRemote · 品牌色板定稿</title>
+<link rel="stylesheet" href="tokens.css">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--er-font-sans);background:var(--er-surface-container-low);color:var(--er-on-surface);padding:56px 40px 90px;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1180px;margin:0 auto}
+.k{font-family:var(--er-font-mono);font-size:11px;letter-spacing:.16em;color:var(--er-primary);margin-bottom:14px}
+h1{font-size:38px;letter-spacing:-.03em;font-weight:650;margin-bottom:14px}
+.lede{font-size:14.5px;line-height:1.7;color:var(--er-on-surface-variant);max-width:66ch}
+.sec{margin-top:40px}
+.sec h2{font-size:12px;font-weight:600;letter-spacing:.1em;color:var(--er-on-surface-variant);margin-bottom:13px;font-family:var(--er-font-mono)}
+.grid{display:grid;grid-template-columns:repeat(6,1fr);gap:10px}
+.sw{border-radius:12px;overflow:hidden;border:1px solid var(--er-outline-variant);background:#fff}
+.chip{height:64px}
+.nm{padding:8px 10px;font-family:var(--er-font-mono);font-size:10px;color:var(--er-on-surface-variant);line-height:1.5}
+.nm b{display:block;color:var(--er-on-surface);font-weight:600;margin-bottom:2px}
+.hero{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:44px}
+.demo{border-radius:16px;padding:22px;border:1px solid var(--er-outline-variant)}
+.demo.l{background:var(--er-surface)}
+.demo.d{background:#0b0f16;border-color:#1c2534;color:#e7edf7}
+.demo .t{font-family:var(--er-font-mono);font-size:10px;letter-spacing:.1em;margin-bottom:16px;opacity:.6}
+.btn{height:40px;border-radius:20px;border:none;padding:0 20px;font-size:13.5px;font-weight:600;font-family:var(--er-font-sans);cursor:pointer}
+.btn.p{background:var(--er-primary);color:var(--er-on-primary)}
+.btn.c{background:var(--er-primary-container);color:var(--er-on-primary-container)}
+.btn.g{background:transparent;color:var(--er-primary);box-shadow:inset 0 0 0 1px var(--er-outline)}
+.card{border-radius:14px;padding:14px;margin-bottom:14px;background:var(--er-surface-container-lowest);border:1px solid var(--er-outline-variant)}
+.card .n{font-size:13.5px;font-weight:620}
+.card .p{font-size:11.5px;color:var(--er-on-surface-variant);margin-top:2px}
+.card .c{font-family:var(--er-font-mono);font-size:11px;padding:6px 9px;border-radius:7px;background:var(--er-surface-container);color:var(--er-on-surface-variant);margin-top:9px;display:flex;justify-content:space-between}
+.rowc{display:flex;gap:9px;flex-wrap:wrap;margin-top:14px;align-items:center}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:10px;font-size:11.5px;font-weight:600}
+.pill.ok{background:var(--er-ok-container);color:var(--er-on-ok-container)}
+.pill.w{background:var(--er-warn-container);color:var(--er-on-warn-container)}
+.pill.e{background:var(--er-error-container);color:var(--er-on-error-container)}
+</style></head><body><div class="wrap">
+  <div class="k">EASYREMOTE · BRAND TOKENS · 2026-11-19</div>
+  <h1>品牌主色定稿 #1E4BDB</h1>
+  <p class="lede">本页由 design/tokens.json 生成，不是手抄色值。改 seed 后重跑两个脚本，Flutter 主题、Tailwind 配置与这份色板同步更新——这就是 PRD §6.7.3「设计令牌单一来源」的落地。</p>
+  <div class="sec"><h2>LIGHT · 主色与容器</h2><div class="grid"><div class="sw"><div class="chip" style="background:#1E4BDB"></div><div class="nm"><b>primary</b>#1E4BDB</div></div><div class="sw"><div class="chip" style="background:#FFFFFF"></div><div class="nm"><b>onPrimary</b>#FFFFFF</div></div><div class="sw"><div class="chip" style="background:#d5e3ff"></div><div class="nm"><b>primaryContainer</b>#d5e3ff</div></div><div class="sw"><div class="chip" style="background:#020469"></div><div class="nm"><b>onPrimaryContainer</b>#020469</div></div><div class="sw"><div class="chip" style="background:#495d89"></div><div class="nm"><b>secondary</b>#495d89</div></div><div class="sw"><div class="chip" style="background:#7d477d"></div><div class="nm"><b>tertiary</b>#7d477d</div></div></div></div>
+  <div class="sec"><h2>LIGHT · 表面与描边</h2><div class="grid"><div class="sw"><div class="chip" style="background:#fbfcff"></div><div class="nm"><b>surface</b>#fbfcff</div></div><div class="sw"><div class="chip" style="background:#f4f6fb"></div><div class="nm"><b>surfaceContainerLow</b>#f4f6fb</div></div><div class="sw"><div class="chip" style="background:#eff1f5"></div><div class="nm"><b>surfaceContainer</b>#eff1f5</div></div><div class="sw"><div class="chip" style="background:#e2e8f5"></div><div class="nm"><b>surfaceVariant</b>#e2e8f5</div></div><div class="sw"><div class="chip" style="background:#777c87"></div><div class="nm"><b>outline</b>#777c87</div></div><div class="sw"><div class="chip" style="background:#c6ccd8"></div><div class="nm"><b>outlineVariant</b>#c6ccd8</div></div></div></div>
+  <div class="sec"><h2>DARK · 主色与容器</h2><div class="grid"><div class="sw"><div class="chip" style="background:#adc6fc"></div><div class="nm"><b>primary</b>#adc6fc</div></div><div class="sw"><div class="chip" style="background:#07207f"></div><div class="nm"><b>onPrimary</b>#07207f</div></div><div class="sw"><div class="chip" style="background:#1b3c9b"></div><div class="nm"><b>primaryContainer</b>#1b3c9b</div></div><div class="sw"><div class="chip" style="background:#dee8fe"></div><div class="nm"><b>onPrimaryContainer</b>#dee8fe</div></div><div class="sw"><div class="chip" style="background:#16181a"></div><div class="nm"><b>surface</b>#16181a</div></div><div class="sw"><div class="chip" style="background:#e6e8ec"></div><div class="nm"><b>onSurface</b>#e6e8ec</div></div></div></div>
+  <div class="hero">
+    <div class="demo l"><div class="t" style="color:var(--er-on-surface-variant)">LIGHT THEME 实景</div>
+      <div class="card"><div class="n">公司开发机</div><div class="p">Windows 11 · 在线 · 延迟 12ms</div>
+        <div class="c"><span>842 615 037</span><span>P2P</span></div></div>
+      <div class="rowc"><button class="btn p">连接</button><button class="btn c">诊断</button><button class="btn g">设置</button></div>
+      <div class="rowc"><span class="pill ok">● 在线</span><span class="pill w">中继</span><span class="pill e">失败</span></div>
+    </div>
+    <div class="demo d"><div class="t" style="color:#8ba0c0">DARK THEME 实景</div>
+      <div class="card" style="background:#141a25;border-color:#222c3c"><div class="n" style="color:#e7edf7">公司开发机</div>
+        <div class="p" style="color:#8ba0c0">Windows 11 · 在线 · 延迟 12ms</div>
+        <div class="c" style="background:#1b2331;color:#a8b8d0"><span>842 615 037</span><span>P2P</span></div></div>
+      <div class="rowc"><button class="btn p" style="background:#adc6fc;color:#07207f">连接</button>
+        <button class="btn c" style="background:#1b3c9b;color:#dee8fe">诊断</button></div>
+    </div>
+  </div>
+</div></body></html>

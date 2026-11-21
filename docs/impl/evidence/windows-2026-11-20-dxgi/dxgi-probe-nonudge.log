@@ -1,0 +1,24 @@
+PROBE_START 2026/11/20 ���� 20:10:07.17 nonudge
+=== DXGI 拓扑 ===
+adapter#0 name="NVIDIA GeForce RTX 3060 Laptop GPU" vendor=0x10de luid=00000000:000148ed
+    output#0 attached=true rect=(0,0)-(2880,1620) device="\\\\.\\DISPLAY1"
+adapter#1 name="AMD Radeon(TM) Graphics" vendor=0x1002 luid=00000000:00016425
+    (no DXGI outputs)
+adapter#2 name="NVIDIA GeForce RTX 3060 Laptop GPU" vendor=0x10de luid=00000000:000207e2
+    (no DXGI outputs)
+adapter#3 name="Microsoft Basic Render Driver" vendor=0x1414 luid=00000000:000163af
+    (no DXGI outputs)
+adapter="NVIDIA GeForce RTX 3060 Laptop GPU" size=2880x1620 format=87
+mode = nonudge
+is_locked = false
+wake_display = true
+acquire #0: OK texture=true last_present=0 accum=0 last_mouse=291072873390 ptr_shape_B=0 ptr_pos=(0,0) visible=false
+acquire #1: ERR hresult=0x887a0027 msg=超时值已过，资源还不可用。 (0x887A0027)
+acquire #2: ERR hresult=0x887a0027 msg=超时值已过，资源还不可用。 (0x887A0027)
+acquire #3: ERR hresult=0x887a0027 msg=超时值已过，资源还不可用。 (0x887A0027)
+acquire #4: ERR hresult=0x887a0027 msg=超时值已过，资源还不可用。 (0x887A0027)
+acquire #5: ERR hresult=0x887a0027 msg=超时值已过，资源还不可用。 (0x887A0027)
+grab_gpu_after = None
+is_locked_after = false
+PROBE_DONE
+PROBE_EXIT=0 

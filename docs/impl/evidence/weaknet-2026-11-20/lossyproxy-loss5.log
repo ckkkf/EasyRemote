@@ -1,0 +1,18 @@
+2026/11/20 19:28:32 lossyproxy 127.0.0.1:19100 -> 127.0.0.1:19000 loss=0.050 delay=0s jitter=0s reorder=0.000 seed=22
+2026/11/20 19:28:34 stats down_in=0 down_drop=0 up_in=0 up_drop=0
+2026/11/20 19:28:36 stats down_in=0 down_drop=0 up_in=0 up_drop=0
+2026/11/20 19:28:38 stats down_in=0 down_drop=0 up_in=0 up_drop=0
+2026/11/20 19:28:40 stats down_in=0 down_drop=0 up_in=0 up_drop=0
+2026/11/20 19:28:41 new session 127.0.0.1:53698
+2026/11/20 19:28:42 stats down_in=2 down_drop=0 up_in=0 up_drop=0
+2026/11/20 19:28:44 stats down_in=3 down_drop=0 up_in=23 up_drop=0
+2026/11/20 19:28:46 stats down_in=3 down_drop=0 up_in=77 up_drop=2
+2026/11/20 19:28:48 stats down_in=3 down_drop=0 up_in=132 up_drop=4
+2026/11/20 19:28:50 stats down_in=3 down_drop=0 up_in=186 up_drop=5
+2026/11/20 19:28:52 stats down_in=3 down_drop=0 up_in=237 up_drop=9
+2026/11/20 19:28:54 stats down_in=3 down_drop=0 up_in=291 up_drop=16
+2026/11/20 19:28:56 stats down_in=3 down_drop=0 up_in=303 up_drop=16
+2026/11/20 19:28:58 stats down_in=3 down_drop=0 up_in=303 up_drop=16
+2026/11/20 19:29:00 stats down_in=3 down_drop=0 up_in=303 up_drop=16
+2026/11/20 19:29:02 stats down_in=3 down_drop=0 up_in=303 up_drop=16
+2026/11/20 19:29:04 stats down_in=3 down_drop=0 up_in=303 up_drop=16

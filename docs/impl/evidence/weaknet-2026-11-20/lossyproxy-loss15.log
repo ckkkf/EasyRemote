@@ -1,0 +1,33 @@
+2026/11/20 19:29:06 lossyproxy 127.0.0.1:19100 -> 127.0.0.1:19000 loss=0.150 delay=0s jitter=0s reorder=0.000 seed=33
+2026/11/20 19:29:08 stats down_in=0 down_drop=0 up_in=0 up_drop=0
+2026/11/20 19:29:10 stats down_in=0 down_drop=0 up_in=0 up_drop=0
+2026/11/20 19:29:12 stats down_in=0 down_drop=0 up_in=0 up_drop=0
+2026/11/20 19:29:14 stats down_in=0 down_drop=0 up_in=0 up_drop=0
+2026/11/20 19:29:15 new session 127.0.0.1:58330
+2026/11/20 19:29:16 stats down_in=2 down_drop=0 up_in=0 up_drop=0
+2026/11/20 19:29:18 stats down_in=3 down_drop=0 up_in=19 up_drop=1
+2026/11/20 19:29:20 stats down_in=3 down_drop=0 up_in=73 up_drop=6
+2026/11/20 19:29:22 stats down_in=3 down_drop=0 up_in=129 up_drop=14
+2026/11/20 19:29:24 stats down_in=3 down_drop=0 up_in=183 up_drop=22
+2026/11/20 19:29:26 stats down_in=3 down_drop=0 up_in=235 up_drop=28
+2026/11/20 19:29:28 stats down_in=3 down_drop=0 up_in=288 up_drop=36
+2026/11/20 19:29:30 stats down_in=3 down_drop=0 up_in=303 up_drop=40
+2026/11/20 19:29:32 stats down_in=3 down_drop=0 up_in=303 up_drop=40
+2026/11/20 19:29:34 stats down_in=3 down_drop=0 up_in=303 up_drop=40
+2026/11/20 19:29:36 stats down_in=3 down_drop=0 up_in=303 up_drop=40
+2026/11/20 19:29:38 stats down_in=3 down_drop=0 up_in=303 up_drop=40
+2026/11/20 19:29:40 stats down_in=3 down_drop=0 up_in=303 up_drop=40
+2026/11/20 19:29:42 stats down_in=3 down_drop=0 up_in=303 up_drop=40
+2026/11/20 19:29:44 stats down_in=3 down_drop=0 up_in=303 up_drop=40
+2026/11/20 19:29:46 stats down_in=3 down_drop=0 up_in=303 up_drop=40
+2026/11/20 19:29:48 stats down_in=3 down_drop=0 up_in=303 up_drop=40
+2026/11/20 19:29:50 stats down_in=3 down_drop=0 up_in=303 up_drop=40
+2026/11/20 19:29:52 stats down_in=3 down_drop=0 up_in=303 up_drop=40
+2026/11/20 19:29:54 stats down_in=3 down_drop=0 up_in=303 up_drop=40
+2026/11/20 19:29:56 stats down_in=3 down_drop=0 up_in=303 up_drop=40
+2026/11/20 19:29:58 stats down_in=3 down_drop=0 up_in=303 up_drop=40
+2026/11/20 19:30:00 stats down_in=3 down_drop=0 up_in=303 up_drop=40
+2026/11/20 19:30:02 stats down_in=3 down_drop=0 up_in=303 up_drop=40
+2026/11/20 19:30:04 stats down_in=3 down_drop=0 up_in=303 up_drop=40
+2026/11/20 19:30:06 stats down_in=3 down_drop=0 up_in=303 up_drop=40
+2026/11/20 19:30:08 stats down_in=3 down_drop=0 up_in=303 up_drop=40

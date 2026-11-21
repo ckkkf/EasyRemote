@@ -1,0 +1,17 @@
+[package]
+name = "er-ffi"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "EasyRemote 核心对外的 C ABI（供 Flutter 通过 dart:ffi 调用）"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+er-capture = { path = "../er-capture" }
+er-codec = { path = "../er-codec" }
+er-abr = { path = "../er-abr" }
+er-features = { path = "../er-features" }
+er-client = { path = "../er-client" }
+er-session = { path = "../er-session" }

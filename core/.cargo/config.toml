@@ -1,0 +1,22 @@
+# Windows 侧依赖获取配置（实测于 WIN-VERIFY-PC，2026-11-20）
+#
+# 1) 国内镜像：rsproxy.cn 的 sparse 索引（实测 149ms，index.crates.io 1.5s）。
+# 2) proxy = "" ：强制 libcurl 直连。该机器上 Windows Internet Settings 里残留
+#    ProxyServer=127.0.0.1:9000（ProxyEnable=0，但 cargo 仍会读它），
+#    不置空会报 "Could not connect to rsproxy.cn:443 over proxy 127.0.0.1"。
+#    本仓库的构建不允许走任何代理/VPN。
+# 3) git-fetch-with-cli：GitHub 在该机器上不可达（20s 超时），留着只为兼容 git 依赖。
+[source.crates-io]
+replace-with = "rsproxy-sparse"
+
+[source.rsproxy-sparse]
+registry = "sparse+https://rsproxy.cn/index/"
+
+[registries.rsproxy]
+index = "sparse+https://rsproxy.cn/index/"
+
+[http]
+proxy = ""
+
+[net]
+git-fetch-with-cli = true

@@ -1,0 +1,32 @@
+BENCH_START 2026/11/20 ���� 18:32:35.18 
+=== 环境 ===
+gpu             = Some("NVIDIA GeForce RTX 3060 Laptop GPU")
+driver          = Some("610.88")
+nvenc_api_max   = 0x000000d1
+nvenc_available = true
+probe_detail    = nvEnc session opened, H.264 encode GUID supported
+hardware_available = true
+frame_source=screen size=2880x1620 bytes=18662400
+
+--- 硬件路径: Nvenc ---
+hw encode: 7.824 ms/frame, 127.8 fps, idr=11227 bytes last=1021 bytes
+
+--- 软件路径: Software ---
+[OpenH264] this = 0x000001DFFA1BF550, Warning:ParamValidation(), AdaptiveQuant(1) is not supported yet for screen content, auto turned off
+[OpenH264] this = 0x000001DFFA1BF550, Warning:ParamValidation(), BackgroundDetection(1) is not supported yet for screen content, auto turned off
+[OpenH264] this = 0x000001DFFA1BF550, Warning:bEnableFrameSkip = 0,bitrate can't be controlled for RC_QUALITY_MODE,RC_BITRATE_MODE and RC_TIMESTAMP_MODE without enabling skip frame.
+sw encode: 501.719 ms/frame, 2.0 fps, idr=51283 bytes last=106 bytes
+
+--- 解码校验 ---
+hw decoded: 2880x1620 (rgb bytes 13996800)
+sw decoded: 2880x1620 (rgb bytes 13996800)
+
+=== 对比 ===
+编码器              ms/frame          fps
+Nvenc/SW            7.824        127.8
+OpenH264          501.719          2.0
+speedup = 64.12x
+
+RESULT: hw_kind=Nvenc hw_dims_ok=true sw_dims_ok=true dims_match=true 
+VERDICT: PASS (NVENC 真实启用，同帧硬件编码耗时 7.82ms vs 软件 501.72ms，解码尺寸 2880x1620 一致)
+BENCH_EXIT=0 

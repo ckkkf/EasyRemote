@@ -1,0 +1,28 @@
+Warning: Permanently added '[<frp-host>]:<port>' (ED25519) to the list of known hosts.
+2026/11/21 10:49:08 udptun client udp 127.0.0.1:19000 -> tcp 127.0.0.1:19001
+---------------- hello ----------------
+device_id=dev-183af9b63c1dfed8
+device_code=529048245
+captcha=701301
+--------------------------------------
+'echo.' �����ڲ����ⲿ���Ҳ���ǿ����еĳ���
+���������ļ���
+2026/11/21 10:49:13 new uplink for 127.0.0.1:49665
+CONTROL_EXIT=
+WIN: gateway=http://127.0.0.1:18090 relay=127.0.0.1:19000 pid=36672
+WIN: device_code=529048245 captcha=701301
+WIN: session=ses-eaddbf6f23ffac37
+WIN: relay_registered local=127.0.0.1:49665
+WIN: handshake_verified (ed25519 + x25519)
+WIN: capture_ok 1024x768
+CODEC: init kind=Nvenc 1024x768
+CODEC: prime_frame=false
+WIN: capture_send_failed (capture: capture unavailable); fallback=synthetic_h264
+WIN: frames_sent=5 bytes_total=5701 path=synthetic
+WIN: input_events_sent=3 target=(400,300) sent_before_recv=true
+WIN: frames_from_target=5 resolution=1920x1080 first_h264_bytes=74651
+WIN: MSG_VIDEO=1 (帧头 seq/ts/dim 已随帧传输)
+WIN: RESULT frames_sent_target=5 frames_from_target=5 input_events_sent=3 frames_path=synthetic elapsed_ms=7350
+WIN: DONE session=ses-eaddbf6f23ffac37
+WIN: VERDICT PASS
+STEP4_RESULT: PASS

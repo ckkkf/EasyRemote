@@ -1,0 +1,30 @@
+PROBE_START 2026/11/20 ���� 20:10:32.57 zeromove 
+=== DXGI 拓扑 ===
+adapter#0 name="NVIDIA GeForce RTX 3060 Laptop GPU" vendor=0x10de luid=00000000:000148ed
+    output#0 attached=true rect=(0,0)-(2880,1620) device="\\\\.\\DISPLAY1"
+adapter#1 name="AMD Radeon(TM) Graphics" vendor=0x1002 luid=00000000:00016425
+    (no DXGI outputs)
+adapter#2 name="NVIDIA GeForce RTX 3060 Laptop GPU" vendor=0x10de luid=00000000:000207e2
+    (no DXGI outputs)
+adapter#3 name="Microsoft Basic Render Driver" vendor=0x1414 luid=00000000:000163af
+    (no DXGI outputs)
+adapter="NVIDIA GeForce RTX 3060 Laptop GPU" size=2880x1620 format=87
+mode = zeromove
+is_locked = false
+wake_display = true
+acquire #0: ERR hresult=0x887a0027 msg=超时值已过，资源还不可用。 (0x887A0027)
+zeromove(sendinput, dx=0) #0: ok=true
+acquire #1: OK texture=true last_present=0 accum=0 last_mouse=291339528511 ptr_shape_B=9216 ptr_pos=(1937,809) visible=true
+zeromove(sendinput, dx=0) #1: ok=true
+acquire #2: OK texture=true last_present=291341019177 accum=11 last_mouse=0 ptr_shape_B=0 ptr_pos=(0,0) visible=false
+zeromove(sendinput, dx=0) #2: ok=true
+acquire #3: OK texture=true last_present=291342516851 accum=18 last_mouse=0 ptr_shape_B=0 ptr_pos=(0,0) visible=false
+zeromove(sendinput, dx=0) #3: ok=true
+acquire #4: OK texture=true last_present=291343435984 accum=11 last_mouse=0 ptr_shape_B=0 ptr_pos=(0,0) visible=false
+zeromove(sendinput, dx=0) #4: ok=true
+acquire #5: OK texture=true last_present=291346046045 accum=1 last_mouse=0 ptr_shape_B=0 ptr_pos=(0,0) visible=false
+zeromove(sendinput, dx=0) #5: ok=true
+grab_gpu_after = Some(2880x1620)
+is_locked_after = false
+PROBE_DONE
+PROBE_EXIT=0 

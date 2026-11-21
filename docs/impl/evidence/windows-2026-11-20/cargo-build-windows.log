@@ -1,0 +1,236 @@
+BUILD_START 2026/11/20 ÖÜÎå 18:14:59.42
+   Compiling proc-macro2 v1.0.107
+   Compiling quote v1.0.47
+   Compiling typenum v1.20.1
+   Compiling getrandom v0.4.3
+   Compiling find-msvc-tools v0.1.15
+   Compiling generic-array v0.14.7
+   Compiling windows-sys v0.61.2
+   Compiling litemap v0.8.3
+   Compiling utf_types v1.0.0
+   Compiling crc32fast v1.5.5
+   Compiling once_cell v1.21.4
+   Compiling serde_core v1.0.229
+   Compiling rand_core v0.6.4
+   Compiling writeable v0.6.4
+   Compiling rustc_version v0.4.1
+   Compiling windows-strings v0.3.1
+   Compiling windows-result v0.3.4
+   Compiling utf8_iter v1.1.0
+   Compiling thiserror v2.0.21
+   Compiling windows_x86_64_msvc v0.52.6
+   Compiling autocfg v1.5.1
+   Compiling icu_properties_data v2.4.0
+   Compiling icu_normalizer_data v2.4.0
+   Compiling bytemuck v1.25.2
+   Compiling curve25519-dalek v4.1.3
+   Compiling miniz_oxide v0.9.1
+   Compiling num-traits v0.2.19
+   Compiling zerocopy v0.8.63
+   Compiling serde v1.0.229
+   Compiling rustls v0.23.46
+   Compiling winapi-util v0.1.11
+   Compiling bytes v1.12.2
+   Compiling base64 v0.22.1
+   Compiling jobserver v0.1.35
+   Compiling same-file v1.0.6
+   Compiling nasm-rs v0.3.2
+   Compiling cfg_aliases v0.2.2
+   Compiling smallvec v1.16.6
+   Compiling rand_core v0.10.1
+   Compiling cc v1.11.2
+   Compiling walkdir v2.5.0
+   Compiling flate2 v1.1.11
+   Compiling windows-targets v0.52.6
+   Compiling miniz_oxide v0.8.9
+   Compiling fdeflate v0.3.7
+   Compiling crypto-common v0.1.7
+   Compiling block-buffer v0.10.4
+   Compiling inout v0.1.4
+   Compiling syn v3.0.10
+   Compiling syn v2.0.119
+   Compiling digest v0.10.7
+   Compiling universal-hash v0.5.1
+   Compiling signature v2.2.0
+   Compiling opaque-debug v0.3.1
+   Compiling zmij v1.0.23
+   Compiling bitflags v2.13.2
+   Compiling itoa v1.0.19
+   Compiling pxfm v0.1.30
+   Compiling sha2 v0.10.9
+   Compiling pin-project-lite v0.2.18
+   Compiling png v0.18.1
+   Compiling hmac v0.12.1
+   Compiling ed25519 v2.2.3
+   Compiling poly1305 v0.8.0
+   Compiling aead v0.5.2
+   Compiling windows-sys v0.52.0
+   Compiling safe_arch v0.7.4
+   Compiling tracing-core v0.1.36
+   Compiling byteorder-lite v0.1.0
+   Compiling serde_json v1.0.154
+   Compiling cpufeatures v0.3.1
+   Compiling libc v0.2.191
+   Compiling httparse v1.10.1
+   Compiling percent-encoding v2.3.2
+   Compiling thiserror v1.0.69
+   Compiling tracing v0.1.44
+   Compiling form_urlencoded v1.2.2
+   Compiling wide v0.7.33
+   Compiling chacha20 v0.10.2
+   Compiling socket2 v0.5.10
+   Compiling hkdf v0.12.4
+   Compiling quinn-udp v0.5.16
+   Compiling memchr v2.8.3
+   Compiling scopeguard v1.2.0
+   Compiling deranged v0.5.9
+   Compiling widestring v1.2.1
+   Compiling ring v0.17.14
+   Compiling openh264-sys2 v0.6.6
+   Compiling powerfmt v0.2.1
+   Compiling num-conv v0.2.2
+   Compiling time-core v0.1.9
+   Compiling rand v0.10.4
+   Compiling http v1.5.0
+   Compiling socket2 v0.6.5
+   Compiling moxcms v0.8.1
+   Compiling mio v1.2.5
+   Compiling time v0.3.55
+   Compiling sha1 v0.10.7
+   Compiling rand_pcg v0.10.3
+   Compiling quinn v0.11.12
+   Compiling slab v0.4.12
+   Compiling data-encoding v2.11.1
+   Compiling utf-8 v0.7.6
+   Compiling byteorder v1.5.0
+   Compiling tinyvec v1.13.3
+   Compiling lru-slab v0.1.3
+   Compiling rustc-hash v2.1.3
+   Compiling pem v3.0.6
+   Compiling yasna v0.5.2
+   Compiling synstructure v0.14.0
+   Compiling er-input v0.1.0 (C:\EasyRemote\core\crates\er-input)
+   Compiling er-features v0.1.0 (C:\EasyRemote\core\crates\er-features)
+   Compiling er-abr v0.1.0 (C:\EasyRemote\core\crates\er-abr)
+   Compiling er-channels v0.1.0 (C:\EasyRemote\core\crates\er-channels)
+   Compiling ppv-lite86 v0.2.21
+   Compiling rand_chacha v0.3.1
+   Compiling rand v0.8.8
+   Compiling zeroize_derive v1.5.0
+   Compiling windows-interface v0.59.3
+   Compiling windows-implement v0.59.0
+   Compiling curve25519-dalek-derive v0.1.1
+   Compiling thiserror-impl v1.0.69
+   Compiling zerofrom-derive v0.1.8
+   Compiling yoke-derive v0.8.4
+   Compiling zerovec-derive v0.11.7
+   Compiling displaydoc v0.2.7
+   Compiling thiserror-impl v2.0.21
+   Compiling serde_derive v1.0.229
+   Compiling tokio-macros v2.7.2
+   Compiling zeroize v1.9.2
+   Compiling windows-core v0.60.1
+   Compiling rustls-pki-types v1.16.0
+   Compiling cipher v0.4.4
+   Compiling chacha20 v0.9.1
+   Compiling tokio v1.54.1
+   Compiling zerofrom v0.1.8
+   Compiling webpki-roots v1.0.12
+   Compiling windows-numerics v0.1.1
+   Compiling windows-future v0.1.1
+   Compiling yoke v0.8.4
+   Compiling windows-collections v0.1.1
+   Compiling chacha20poly1305 v0.10.1
+   Compiling image v0.25.10
+   Compiling webpki-roots v0.26.11
+   Compiling windows v0.60.0
+   Compiling tungstenite v0.24.0
+   Compiling zerovec v0.11.9
+   Compiling zerotrie v0.2.5
+   Compiling rustls-webpki v0.103.17
+   Compiling ed25519-dalek v2.2.0
+   Compiling tinystr v0.8.5
+   Compiling potential_utf v0.1.6
+   Compiling icu_locale_core v2.4.0
+   Compiling icu_collections v2.4.0
+   Compiling x25519-dalek v2.0.1
+   Compiling er-session v0.1.0 (C:\EasyRemote\core\crates\er-session)
+   Compiling rcgen v0.13.2
+   Compiling icu_provider v2.4.0
+   Compiling icu_properties v2.4.0
+   Compiling icu_normalizer v2.4.0
+   Compiling er-common v0.1.0 (C:\EasyRemote\core\crates\er-common)
+   Compiling idna_adapter v1.2.2
+   Compiling idna v1.1.0
+   Compiling url v2.5.8
+   Compiling ureq v2.12.1
+   Compiling quinn-proto v0.11.19
+   Compiling er-transport v0.1.0 (C:\EasyRemote\core\crates\er-transport)
+   Compiling openh264 v0.6.6
+   Compiling er-codec v0.1.0 (C:\EasyRemote\core\crates\er-codec)
+warning: field `cfg` is never read
+   --> crates\er-codec\src\lib.rs:218:5
+    |
+217 | pub struct FakeEncoder {
+    |            ----------- field in this struct
+218 |     cfg: EncodeConfig,
+    |     ^^^
+    |
+    = note: `FakeEncoder` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `er-codec` (lib) generated 1 warning
+   Compiling xcap v0.4.1
+   Compiling er-capture v0.1.0 (C:\EasyRemote\core\crates\er-capture)
+   Compiling er-client v0.1.0 (C:\EasyRemote\core\crates\er-client)
+warning: variable does not need to be mutable
+   --> crates\er-client\src\agent.rs:142:13
+    |
+142 |         let mut relay = RelayClient::new(self.relay_addr, session_id, &self.device.device_id)
+    |             ----^^^^^
+    |             |
+    |             help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: variable does not need to be mutable
+   --> crates\er-client\src\agent.rs:328:13
+    |
+328 |         let mut relay = RelayClient::new(self.relay_addr, session_id, &self.device.device_id)
+    |             ----^^^^^
+    |             |
+    |             help: remove this `mut`
+
+warning: field `gateway_base` is never read
+  --> crates\er-client\src\agent.rs:60:5
+   |
+54 | pub struct TargetAgent {
+   |            ----------- field in this struct
+...
+60 |     gateway_base: String,
+   |     ^^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `er-client` (lib) generated 3 warnings (run `cargo fix --lib -p er-client` to apply 2 suggestions)
+   Compiling er-ffi v0.1.0 (C:\EasyRemote\core\crates\er-ffi)
+warning: unused import: `CStr`
+ --> crates\er-ffi\src\lib.rs:9:31
+  |
+9 | use std::ffi::{c_char, c_int, CStr, CString};
+  |                               ^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `er-ffi` (lib) generated 1 warning (run `cargo fix --lib -p er-ffi` to apply 1 suggestion)
+warning: unused dependency `er-features`
+  --> crates\er-ffi\Cargo.toml:15:1
+   |
+15 | er-features = { path = "../er-features" }
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `cargo::unused_dependencies` is set to `warn` by default
+help: consider removing the dependency on `er-features`
+warning: `er-ffi` (manifest) generated 1 warning
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 32.80s
+BUILD_EXIT=0

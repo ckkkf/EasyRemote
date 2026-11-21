@@ -1,0 +1,9 @@
+# 采集自 Mac 终端（weaknet_send 原始 stdout）
+# 场景：loss=0.05（lossyproxy 双向各 5%），300 帧 @16ms
+SEND[loss5]: device_code=862115183 captcha=373010
+SEND[loss5]: session=ses-1b175dad8003cbd2
+SEND[loss5]: handshake_verified
+SEND[loss5]: clock rtt_ms=70 offset_ms=-1900 ok=true
+SEND[loss5]: encoder_kind=Software 320x240
+SEND[loss5]: frames_sent=300 frames_target=300 bytes_total=587935 encode_ms_avg=13.928 elapsed_ms=11204
+SEND[loss5]: DONE session=ses-1b175dad8003cbd2
