@@ -23,7 +23,7 @@ jobs:
         run: |
           tag="${{ github.ref_name }}"
           # 只允许 vX.Y.Z 或 vX.Y.Z-<prerelease>（语义化版本）
-          if ! printf '%s' "$tag" | grep -Eq '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?\$'; then
+          if ! printf '%s' "$tag" | grep -Eq '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?$'; then
             echo "❌ Tag 格式不合法：$tag"
             echo ""
             echo "必须是语义化版本：vX.Y.Z 或 vX.Y.Z-<prerelease>"
