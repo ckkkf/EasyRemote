@@ -18,11 +18,20 @@ class ApiException implements Exception {
 }
 
 class GatewayClient {
-  GatewayClient({required this.baseUrl, http.Client? client})
-    : _client = client ?? http.Client();
+  GatewayClient({
+    required this.baseUrl,
+    http.Client? client,
+    this.requestTimeout = const Duration(seconds: 20),
+  }) : _client = client ?? http.Client();
 
   final String baseUrl;
   final http.Client _client;
+
+  /// 单次请求超时。
+  ///
+  /// http 包默认**没有**超时：网关/反向代理把连接接住却迟迟不回时，Future 会一直挂着，
+  /// 界面就是「按钮转圈转到天荒地老」。所有请求都必须有上限。
+  final Duration requestTimeout;
   String? _token;
   String? _deviceToken;
   // 本机设备身份：刷新后要靠它把 HomeShell 重新拼起来（服务端绑定是幂等的，不必重新 bind）。
@@ -56,23 +65,38 @@ class GatewayClient {
     return h;
   }
 
+  Future<http.Response> _send(Future<http.Response> pending) async {
+    try {
+      return await pending.timeout(requestTimeout);
+    } on TimeoutException {
+      throw ApiException(
+        'NET_TIMEOUT',
+        '服务端 ' + requestTimeout.inSeconds.toString() + ' 秒没有响应：请检查网关/反代是否可达',
+      );
+    }
+  }
+
   Future<Map<String, dynamic>> _post(
     String path,
     Map<String, dynamic> body, {
     bool device = false,
   }) async {
-    final res = await _client.post(
-      Uri.parse('$baseUrl$path'),
-      headers: _headers(device: device),
-      body: jsonEncode(body),
+    final res = await _send(
+      _client.post(
+        Uri.parse('$baseUrl$path'),
+        headers: _headers(device: device),
+        body: jsonEncode(body),
+      ),
     );
     return _decode(res);
   }
 
   Future<Map<String, dynamic>> _get(String path, {bool device = false}) async {
-    final res = await _client.get(
-      Uri.parse('$baseUrl$path'),
-      headers: _headers(device: device),
+    final res = await _send(
+      _client.get(
+        Uri.parse('$baseUrl$path'),
+        headers: _headers(device: device),
+      ),
     );
     return _decode(res);
   }

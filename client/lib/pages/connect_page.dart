@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -47,6 +49,13 @@ class _ConnectPageState extends State<ConnectPage> {
   bool _busy = false;
   String? _error;
 
+  /// 请求期间每秒 +1：把「卡住」变成「看得见的等待」。
+  int _elapsed = 0;
+  Timer? _busyTick;
+
+  /// 每次发起请求自增；取消时也自增，用来丢弃迟到的响应。
+  int _attempt = 0;
+
   @override
   void initState() {
     super.initState();
@@ -70,6 +79,7 @@ class _ConnectPageState extends State<ConnectPage> {
 
   @override
   void dispose() {
+    _busyTick?.cancel();
     _codeCtl.dispose();
     _captcha.dispose();
     _assistCtl.dispose();
@@ -87,11 +97,52 @@ class _ConnectPageState extends State<ConnectPage> {
     setState(() => _error = null);
   }
 
-  Future<void> _connect() async {
+  /// 进入「等待中」：立刻给出进度、已等待秒数和一个可点的取消。
+  void _startBusy() {
+    _busyTick?.cancel();
     setState(() {
       _busy = true;
       _error = null;
+      _elapsed = 0;
     });
+    _busyTick = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted && _busy) setState(() => _elapsed++);
+    });
+  }
+
+  /// 收尾：只有「还是同一次尝试」才改界面，避免取消后又被迟到的响应改回去。
+  void _stopBusy(int attempt) {
+    if (attempt != _attempt) return;
+    _busyTick?.cancel();
+    _busyTick = null;
+    if (mounted) setState(() => _busy = false);
+  }
+
+  /// 取消等待。
+  ///
+  /// 在途 HTTP 无法真正中断，但界面必须立刻回到可操作状态；_attempt 自增让
+  /// 迟到的响应被丢弃（不会突然弹出一个会话页）。
+  void _cancel() {
+    _attempt++;
+    _busyTick?.cancel();
+    _busyTick = null;
+    setState(() {
+      _busy = false;
+      _elapsed = 0;
+      _error = null;
+    });
+  }
+
+  /// 9 位码按 3-3-3 展示（长度不对就原样）。
+  String get _codePretty {
+    final d = _code;
+    if (d.length != 9) return d;
+    return d.substring(0, 3) + ' ' + d.substring(3, 6) + ' ' + d.substring(6, 9);
+  }
+
+  Future<void> _connect() async {
+    final attempt = ++_attempt;
+    _startBusy();
     try {
       final code = _code;
       final sid = await widget.client.requestConnect(
@@ -100,14 +151,19 @@ class _ConnectPageState extends State<ConnectPage> {
         // 只对「同一账号」的目标生效：跨账号服务端仍会要求临时密码。
         direct: appPrefs.value.sameAccountDirect,
       );
+      if (!mounted || attempt != _attempt) return;
       widget.onCodeUsed(code);
       widget.onSessionStarted(sid, code.replaceAll(RegExp(r'[^0-9]'), ''));
     } on ApiException catch (e) {
-      setState(() => _error = _friendlyConnectError(e));
+      if (mounted && attempt == _attempt) {
+        setState(() => _error = _friendlyConnectError(e));
+      }
     } catch (e) {
-      setState(() => _error = e.toString());
+      if (mounted && attempt == _attempt) {
+        setState(() => _error = e.toString());
+      }
     } finally {
-      if (mounted) setState(() => _busy = false);
+      _stopBusy(attempt);
     }
   }
 
@@ -118,20 +174,19 @@ class _ConnectPageState extends State<ConnectPage> {
       setState(() => _error = '协助码是 6 位数字');
       return;
     }
-    setState(() {
-      _busy = true;
-      _error = null;
-    });
+    final attempt = ++_attempt;
+    _startBusy();
     try {
       final sid = await widget.client.redeemAssistCode(code);
+      if (!mounted || attempt != _attempt) return;
       _assistCtl.clear();
       widget.onSessionStarted(sid, '');
     } on ApiException catch (e) {
-      setState(() => _error = e.message);
+      if (mounted && attempt == _attempt) setState(() => _error = e.message);
     } catch (e) {
-      setState(() => _error = e.toString());
+      if (mounted && attempt == _attempt) setState(() => _error = e.toString());
     } finally {
-      if (mounted) setState(() => _busy = false);
+      _stopBusy(attempt);
     }
   }
 
@@ -275,15 +330,24 @@ class _ConnectPageState extends State<ConnectPage> {
                             ),
                           ],
                           const SizedBox(height: 18),
-                          FilledButton(
-                            key: const Key('connect-button'),
-                            onPressed: _busy || (_mode == _ConnectMode.device ? !ready : !assistReady)
-                                ? null
-                                : (_mode == _ConnectMode.device ? _connect : _redeemAssist),
-                            child: _busy
-                                ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                                : Text(_mode == _ConnectMode.device ? '请求连接' : '兑换协助码'),
-                          ),
+                          // 请求中不再是「按钮里塞个小转圈」——那样一卡住就只剩一个
+                          // 转不动的界面。这里给出显式的等待条：进度 + 已等待秒数 + 取消。
+                          if (_busy)
+                            _PendingBar(
+                              label: _mode == _ConnectMode.device
+                                  ? '正在请求连接 ' + _codePretty
+                                  : '正在兑换协助码 ' + _assistCtl.text.trim(),
+                              seconds: _elapsed,
+                              onCancel: _cancel,
+                            )
+                          else
+                            FilledButton(
+                              key: const Key('connect-button'),
+                              onPressed: (_mode == _ConnectMode.device ? !ready : !assistReady)
+                                  ? null
+                                  : (_mode == _ConnectMode.device ? _connect : _redeemAssist),
+                              child: Text(_mode == _ConnectMode.device ? '请求连接' : '兑换协助码'),
+                            ),
                           const SizedBox(height: 10),
                           Text(
                             _mode == _ConnectMode.device
@@ -597,6 +661,71 @@ class _CodeEntryState extends State<_CodeEntry> {
           _group(3),
           const SizedBox(width: 14),
           _group(6),
+        ],
+      ),
+    );
+  }
+}
+
+/// 请求中的等待条：进度 + 已等待秒数 + 取消。
+///
+/// 以前这里只有按钮里一个 18px 的转圈，请求一卡住（网关不回、反代挂住）界面
+/// 就等于「死了」：既没有明确状态，也没有任何退路。取消只让界面回到可操作，
+/// 在途请求由页面丢弃，不会弹出一个迟到的会话页。
+class _PendingBar extends StatelessWidget {
+  const _PendingBar({
+    required this.label,
+    required this.seconds,
+    required this.onCancel,
+  });
+
+  final String label;
+  final int seconds;
+  final VoidCallback onCancel;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final text = Theme.of(context).textTheme;
+    return Container(
+      key: const Key('connect-pending'),
+      padding: const EdgeInsets.fromLTRB(14, 8, 8, 8),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerHigh,
+        borderRadius: BorderRadius.circular(ErTokens.radiusMd),
+      ),
+      child: Row(
+        children: [
+          const SizedBox(
+            width: 18,
+            height: 18,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  label,
+                  style: text.bodySmall,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                Text(
+                  '已等待 ' + seconds.toString() + ' 秒',
+                  style: text.labelSmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          TextButton(
+            key: const Key('connect-cancel'),
+            onPressed: onCancel,
+            child: const Text('取消'),
+          ),
         ],
       ),
     );
