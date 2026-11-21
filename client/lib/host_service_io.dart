@@ -157,7 +157,12 @@ class HostService {
   }
 
   /// 开流（后台线程：等主控 → 授权 → 握手 → 推流 + 注入）。
-  void start({required String signalBase, int fps = 30, int idleTimeoutSecs = 1800}) {
+  /// idleTimeoutSecs 是「多久没收到输入就认为主控走了」。
+  ///
+  /// 不能设太大：UDP 中继收不到对端离线通知，主控断开后被控端会一直空推；
+  /// 之前是 1800s，导致上一个会话结束后半小时内谁都连不进来（表现就是
+  /// 「已通知对方」但被控端毫无反应）。90s 是可用性与误判的折中。
+  void start({required String signalBase, int fps = 30, int idleTimeoutSecs = 90}) {
     final id = _hostId;
     if (id == null) throw StateError('host not prepared');
     final lib = _load();
