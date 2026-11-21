@@ -223,7 +223,7 @@ jobs:
   # ---------------------------------------------------------------- 发布
   publish:
     name: 发布 GitHub Release
-    needs: [verify, client-web, client-macos, server]
+    needs: [verify, client-web, client-macos, client-windows, server]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
