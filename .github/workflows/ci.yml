@@ -1,0 +1,165 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GO_VERSION: "1.26"
+  NODE_VERSION: "20"
+
+jobs:
+  # ---------------------------------------------------------------- 契约闸门
+  gate:
+    name: 契约与规范闸门
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: server/go.sum
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: 生成物一致性（错误码 / 契约）
+        run: |
+          node scripts/gen-errors.mjs --check
+          node scripts/gen-contract.mjs --check
+
+      - name: 路由清单 vs 契约
+        run: node scripts/check-routes.mjs --strict
+
+      - name: gofmt
+        run: |
+          out=$(gofmt -l server)
+          if [ -n "$out" ]; then echo "$out"; exit 1; fi
+
+      - name: go vet
+        run: cd server && go vet ./...
+
+      - name: 禁止模式（响应必须走 httpx）
+        run: |
+          bad=$(grep -rnF --include=*.go -e 'json.NewEncoder' -e 'http.Error(' -e 'w.Write([]byte' \
+                server/internal server/cmd 2>/dev/null \
+                | grep -v '_test.go' | grep -v 'server/internal/httpx/httpx.go' || true)
+          if [ -n "$bad" ]; then echo "以下位置绕过 httpx 写响应："; echo "$bad"; exit 1; fi
+
+  # ---------------------------------------------------------------- 服务端
+  go:
+    name: Go 服务端
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: server/go.sum
+      - name: 构建全部入口
+        run: |
+          cd server
+          for cmd in admin gateway lossyproxy relay rendezvous stack udptun; do
+            echo "build ./cmd/$cmd"
+            go build -o /dev/null ./cmd/$cmd
+          done
+      - name: 单元测试
+        run: cd server && go test -race -coverprofile=cover.out ./...
+      - name: 覆盖率摘要
+        run: |
+          cd server
+          go tool cover -func=cover.out | tail -1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: go-coverage
+          path: server/cover.out
+          if-no-files-found: ignore
+
+  # ---------------------------------------------------------------- Rust 核心
+  rust:
+    name: Rust 核心
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: core
+      - name: 格式
+        run: cargo fmt --all --manifest-path core/Cargo.toml -- --check
+      - name: Clippy
+        run: cargo clippy --manifest-path core/Cargo.toml --workspace --all-targets -- -D warnings
+      - name: 测试
+        run: cargo test --manifest-path core/Cargo.toml --workspace
+
+  # ---------------------------------------------------------------- 运营后台
+  web-admin:
+    name: React 运营后台
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web-admin
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: web-admin/package-lock.json
+      - run: npm ci
+      - name: 类型检查
+        run: npx tsc --noEmit
+      - name: 构建
+        run: npm run build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: web-admin-dist
+          path: web-admin/dist
+          if-no-files-found: error
+
+  # ---------------------------------------------------------------- Flutter 客户端
+  flutter:
+    name: Flutter 客户端
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: 安装依赖
+        working-directory: client
+        run: flutter pub get
+      - name: 静态分析
+        working-directory: client
+        run: flutter analyze --no-fatal-infos
+      - name: 单元测试
+        working-directory: client
+        run: flutter test
+
+  # ---------------------------------------------------------------- 汇总
+  ci-status:
+    name: CI 结果汇总
+    if: always()
+    needs: [gate, go, rust, web-admin, flutter]
+    runs-on: ubuntu-latest
+    steps:
+      - name: 判定
+        run: |
+          echo "gate=${{ needs.gate.result }} go=${{ needs.go.result }} rust=${{ needs.rust.result }} web-admin=${{ needs['web-admin'].result }} flutter=${{ needs.flutter.result }}"
+          for r in "${{ needs.gate.result }}" "${{ needs.go.result }}" "${{ needs.rust.result }}" "${{ needs['web-admin'].result }}" "${{ needs.flutter.result }}"; do
+            if [ "$r" != "success" ]; then echo "存在未通过的 job"; exit 1; fi
+          done

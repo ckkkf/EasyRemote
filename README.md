@@ -2,7 +2,10 @@
 
 **低延迟、可自托管的跨平台远程桌面。** 服务端 Go，核心引擎 Rust，客户端 Flutter，运营后台 React。
 
+[![CI](https://github.com/ckkkf/EasyRemote/actions/workflows/ci.yml/badge.svg)](https://github.com/ckkkf/EasyRemote/actions/workflows/ci.yml)
+[![Release](https://github.com/ckkkf/EasyRemote/actions/workflows/release.yml/badge.svg)](https://github.com/ckkkf/EasyRemote/actions/workflows/release.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-1E4BDB.svg)](LICENSE)
+
 [![Go](https://img.shields.io/badge/Go-1.26-00ADD8?logo=go&logoColor=white)](server/)
 [![Rust](https://img.shields.io/badge/Rust-2021-000000?logo=rust&logoColor=white)](core/)
 [![Flutter](https://img.shields.io/badge/Flutter-Material_3-02569B?logo=flutter&logoColor=white)](client/)
@@ -143,17 +146,30 @@ npm run dev
 - 字段一律 `snake_case`；`code` 这个键全站只归信封所有
 - 每条路由必须有契约测试覆盖
 
-提交前跑闸门：
+提交前跑闸门（本地与 CI 同一套标准）：
 
 ```bash
-bash scripts/gate.sh
+bash scripts/gate.sh     # 9 步：gofmt / vet+test / tsc / 生成物 / 路由 / 禁止模式 / 版本 / 信封
 ```
+
+### 贡献流程
+
+```bash
+git switch -c feat/server-xxx
+# ... 改动 ...
+bash scripts/gate.sh                    # 必须 PASS
+git commit -m "feat(server): 说明"      # 标题遵循 <type>(<scope>): <subject>
+git push -u origin feat/server-xxx      # 开 PR，CI 自动跑
+```
+
+PR 标题须为 `<type>(<scope>): <subject>`，自查清单需勾选；发布走 `node scripts/check-version.mjs --set` + `git tag vX.Y.Z`。详见 [工作流说明](docs/github-workflows.md)。
 
 ## 文档
 
 - [产品需求 PRD v0.8](docs/prd/easyremote-prd-v0.8.md)
 - [接口契约](docs/spec/contract.yaml) ｜ [错误码](docs/spec/error-codes.md) ｜ [协议](docs/spec/protocol.md) ｜ [页面清单](docs/spec/pages.md)
 - [竞品技术拆解](docs/research/uu-remote-analysis.md)
+- [GitHub 工作流与发布规范](docs/github-workflows.md)
 - [文档索引](docs/README.md)
 
 ## 路线图

@@ -1,0 +1,47 @@
+name: Tag 规范
+
+on:
+  push:
+    tags: ['*']
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Tag 命名规范
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: 校验 Tag 格式
+        run: |
+          tag="${{ github.ref_name }}"
+          # 只允许 vX.Y.Z 或 vX.Y.Z-<prerelease>（语义化版本）
+          if ! printf '%s' "$tag" | grep -Eq '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?\$'; then
+            echo "❌ Tag 格式不合法：$tag"
+            echo ""
+            echo "必须是语义化版本：vX.Y.Z 或 vX.Y.Z-<prerelease>"
+            echo "  正确：v1.0.0  v0.2.1  v1.0.0-rc.1"
+            echo "  错误：1.0.0  v1.0  release-1.0.0  v1.0.0.0"
+            exit 1
+          fi
+          echo "✅ Tag 格式合法：$tag"
+
+      - name: 校验版本一致性
+        run: node scripts/check-version.mjs --tag "${{ github.ref_name }}"
+
+      - name: 校验 Tag 指向 main 分支历史
+        run: |
+          git fetch origin main --depth=200 || true
+          if ! git merge-base --is-ancestor "${{ github.sha }}" origin/main; then
+            echo "❌ Tag 提交不在 main 分支历史上"
+            echo "请从 main 打 Tag：git checkout main && git tag vX.Y.Z && git push origin vX.Y.Z"
+            exit 1
+          fi
+          echo "✅ Tag 提交在 main 历史上"

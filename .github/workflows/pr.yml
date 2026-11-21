@@ -1,0 +1,114 @@
+name: PR 规范
+
+on:
+  pull_request_target:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  title:
+    name: PR 标题与描述
+    runs-on: ubuntu-latest
+    steps:
+      - uses: amannn/action-semantic-pull-request@v5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          types: |
+            feat
+            fix
+            docs
+            style
+            refactor
+            perf
+            test
+            build
+            ci
+            chore
+            revert
+          scopes: |
+            server
+            core
+            client
+            web-admin
+            docs
+            spec
+            scripts
+            ci
+            deps
+          requireScope: false
+          subjectPattern: ^(?![A-Z]).+$
+          subjectPatternError: |
+            标题描述部分不能以大写字母开头，也不要以句号结尾。
+            正确示例：feat(server): 新增设备绑定接口
+            你的标题：{title}
+
+  size:
+    name: 改动规模
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner, repo: context.repo.repo,
+              pull_number: context.issue.number,
+            });
+            const changed = pr.changed_files;
+            // 生成物、证据文件不计入规模
+            const { data: files } = await github.rest.pulls.listFiles({
+              owner: context.repo.owner, repo: context.repo.repo,
+              pull_number: context.issue.number, per_page: 100,
+            });
+            const generated = files.filter(f =>
+              /_gen\.go$|_gen\.rs$|contract\.ts$|contract\.dart$|tokens\.(css|dart|cjs)$|docs\/impl\/evidence\//.test(f.filename)
+            ).length;
+            const effective = changed - generated;
+            core.info(`变更文件 ${changed}（生成物/证据 ${generated}，有效 ${effective}）`);
+            if (effective > 60) {
+              core.warning(`本 PR 有效改动 ${effective} 个文件，建议拆分以便评审。`);
+            }
+            const lines = pr.additions + pr.deletions;
+            core.info(`净变更 ${lines} 行`);
+            if (lines > 3000) {
+              core.warning(`本 PR 净变更 ${lines} 行，评审负担较重。`);
+            }
+
+  checklist:
+    name: 自查清单
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const body = context.payload.pull_request.body || '';
+            const required = [
+              ['- [x]', '已跑 bash scripts/gate.sh（或说明为何不适用）'],
+              ['- [x]', '改接口时先改了 docs/spec/contract.yaml 并重新生成'],
+              ['- [x]', '新增/修改的路由有契约测试覆盖'],
+              ['- [x]', '没有提交密钥、服务器地址等敏感信息'],
+            ];
+            const missing = required.filter(([checked]) => !body.includes(checked));
+            if (missing.length) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner, repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: '### PR 自查清单未完成\n\n请在描述中勾选以下项：\n' +
+                  missing.map(([, label]) => `- [ ] ${label}`).join('\n'),
+              });
+              core.setFailed(`自查清单缺 ${missing.length} 项`);
+            }
+
+  labels:
+    name: 自动标签
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/labeler@v5
+        with:
+          sync-labels: false
