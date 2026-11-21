@@ -72,6 +72,10 @@ fn real_main() {
     let out_frames: usize = arg(7, "5").parse().expect("out_frames");
     let hello_file = arg(8, "mac_hello.txt");
     let want_input: usize = arg(9, "3").parse().expect("input_events");
+    // 演示/长会话用：注入阶段的总预算（默认 120s 适合 3 个事件，长演示要放大）
+    let input_timeout: u64 = arg(10, "120").parse().unwrap_or(120);
+    // 演示用：1 = 先注入再发帧（让主控画圆结束后才录屏，画面里能看到光标停点）
+    let send_after_input: bool = arg(11, "0") == "1";
 
     let t_start = Instant::now();
     let disp = MacDisplay::main();
@@ -183,17 +187,22 @@ fn real_main() {
     }
 
     // ---------- ④ 采集本机真实屏幕并发给主控 ----------
-    let t0 = Instant::now();
-    let sizes = target
-        .send_frames(&mut relay, &mut crypto, out_frames)
-        .expect("send frames");
-    let encode_ms = t0.elapsed().as_millis();
-    println!(
-        "MAC: frames_sent={} bytes_total={} ms={}",
-        sizes.len(),
-        sizes.iter().sum::<usize>(),
-        encode_ms
-    );
+    // 演示模式（send_after_input）把这一步推迟到注入之后：
+    // 主控的输入演示先跑，用户能现场看到 X 光标在动；随后才编码回传，
+    // 这样录下来的画面里光标停在演示的终点，可核对。
+    let mut sizes: Vec<usize> = Vec::new();
+    if !send_after_input {
+        let t0 = Instant::now();
+        sizes = target
+            .send_frames(&mut relay, &mut crypto, out_frames)
+            .expect("send frames");
+        println!(
+            "MAC: frames_sent={} bytes_total={} ms={}",
+            sizes.len(),
+            sizes.iter().sum::<usize>(),
+            t0.elapsed().as_millis()
+        );
+    }
 
     // ---------- ⑤ 注入前光标基线（两次读数一致才算稳定） ----------
     std::thread::sleep(Duration::from_millis(400));
@@ -208,15 +217,19 @@ fn real_main() {
 
     // ---------- ⑥ 收主控输入并真注入 ----------
     let mut injector = MacInjector::new(true);
+    // 收不满不算失败（UDP 会丢个别事件）：超时后返回已收到的，moved_to_target 仍可断言
     let injected: Vec<InputEvent> = target
         .recv_input(
             &mut relay,
             &mut crypto,
             &mut injector,
             want_input,
-            Duration::from_secs(120),
+            Duration::from_secs(input_timeout),
         )
-        .expect("recv input");
+        .unwrap_or_default();
+    if injected.is_empty() {
+        println!("MAC: input_events_received=0 (主控没有发出可注入的输入)");
+    }
     std::thread::sleep(Duration::from_millis(250));
     let after = MacInjector::cursor_pixel();
 
@@ -255,6 +268,20 @@ fn real_main() {
         "MAC: cursor_stable_before_inject={}",
         baseline.is_some() && baseline == baseline2
     );
+
+    // ---------- ⑦ 演示模式：注入之后才编码回传（主控正在录像） ----------
+    if send_after_input {
+        let t0 = Instant::now();
+        sizes = target
+            .send_frames(&mut relay, &mut crypto, out_frames)
+            .unwrap_or_default();
+        println!(
+            "MAC: frames_sent={} bytes_total={} ms={} (after_input=true)",
+            sizes.len(),
+            sizes.iter().sum::<usize>(),
+            t0.elapsed().as_millis()
+        );
+    }
 
     println!(
         "MAC: RESULT screen_permission={} frames_received={} frames_sent={} input_events={} moved_to_target={} elapsed_ms={}",

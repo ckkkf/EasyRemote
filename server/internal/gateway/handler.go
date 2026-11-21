@@ -222,6 +222,38 @@ func (a *App) Routes() http.Handler {
 		httpx.OK(w, r, map[string]any{"code": code, "expires_at": exp})
 	})
 
+	// 被控端设置「临时密码」：长期有效、校验不消费、可反复使用。
+	// 明文只留在被控端本地（可查看/复制），服务端只存 HMAC。
+	mux.HandleFunc("/v1/devices/password", func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		acc, err := a.account(ctx, r)
+		if err != nil {
+			WriteErr(w, err)
+			return
+		}
+		var req struct {
+			DeviceID string `json:"device_id"`
+			Password string `json:"password"`
+		}
+		if err := httpx.Decode(w, r, &req); err != nil {
+			WriteErr(w, errcode.New(errcode.SrvInternal, "bad body"))
+			return
+		}
+		d, err := a.Store.GetDevice(ctx, req.DeviceID)
+		if err != nil || d.AccountID != acc.ID {
+			WriteErr(w, errcode.New(errcode.ConnDeviceNotFound, "device not found"))
+			return
+		}
+		if err := a.Device.SetPassword(ctx, d.ID, req.Password); err != nil {
+			WriteErr(w, err)
+			return
+		}
+		// 新路由用具体类型，不再往存量的无类型响应体里加（gate 禁止模式）
+		httpx.OK(w, r, struct {
+			OK bool `json:"ok"`
+		}{OK: true})
+	})
+
 	mux.HandleFunc("/v1/connect/request", func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		acc, err := a.account(ctx, r)
@@ -267,9 +299,13 @@ func (a *App) Routes() http.Handler {
 				WriteErr(w, errcode.New(errcode.ConnCaptchaExpired, "captcha required"))
 				return
 			}
-			if err := a.Device.VerifyCode(ctx, target.DeviceCode, req.Captcha); err != nil {
-				WriteErr(w, err)
-				return
+			// 先按「临时密码」校验：长期有效、校验不消费（被控端可查看/复制同一串密码反复用）。
+			// 不匹配再回退到一次性验证码，保证旧客户端与旧流程不受影响。
+			if !a.Device.CheckPassword(ctx, target.DeviceCode, req.Captcha) {
+				if err := a.Device.VerifyCode(ctx, target.DeviceCode, req.Captcha); err != nil {
+					WriteErr(w, err)
+					return
+				}
 			}
 		}
 		sess, err := a.Session.Request(ctx, controllerID, target.ID)

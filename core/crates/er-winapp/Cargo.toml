@@ -1,0 +1,18 @@
+[package]
+name = "er-winapp"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Windows 主控端 GUI：用 Windows 远控 macOS（显示画面 + 转发鼠标键盘）"
+
+[dependencies]
+# GUI：纯 Rust，不依赖 Flutter/CMake。glow 后端走系统 OpenGL（Win11 + 显卡驱动自带）
+eframe = { version = "0.29", default-features = false, features = ["glow", "default_fonts"] }
+egui = "0.29"
+er-client = { path = "../er-client" }
+er-codec = { path = "../er-codec" }
+er-session = { path = "../er-session" }
+er-input = { path = "../er-input" }
+
+# 仅用于窗口环境自检（src/bin/winit_probe.rs）
+winit = "0.30"

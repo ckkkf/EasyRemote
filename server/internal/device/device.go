@@ -131,6 +131,36 @@ func (s *Service) RotateToken(ctx context.Context, deviceID string) (string, err
 	return token, nil
 }
 
+// hashPassword 与设备凭证同一套 HMAC：泄露库也拿不到明文密码。
+func (s *Service) hashPassword(deviceID, password string) string {
+	m := hmac.New(sha256.New, s.secret)
+	m.Write([]byte("dp:" + deviceID + ":" + password))
+	return base64.RawURLEncoding.EncodeToString(m.Sum(nil))
+}
+
+// SetPassword 设置/覆盖设备临时密码。明文由被控端本地保存（可查看、可复制），
+// 服务端只存哈希，且**不做轮换、不做消费**——这是与一次性验证码最大的区别。
+func (s *Service) SetPassword(ctx context.Context, deviceID, password string) error {
+	if len(password) < 6 || len(password) > 16 {
+		return errcode.New(errcode.ConnCaptchaInvalid, "password length must be 6..16")
+	}
+	for _, r := range password {
+		if !(r >= '0' && r <= '9') && !(r >= 'a' && r <= 'z') && !(r >= 'A' && r <= 'Z') {
+			return errcode.New(errcode.ConnCaptchaInvalid, "password must be alphanumeric")
+		}
+	}
+	return s.store.UpdateDevicePassword(ctx, deviceID, s.hashPassword(deviceID, password))
+}
+
+// CheckPassword 校验临时密码（恒定时间比较，不消费）。
+func (s *Service) CheckPassword(ctx context.Context, deviceCode, password string) bool {
+	d, err := s.store.GetDeviceByCode(ctx, normalize(deviceCode))
+	if err != nil || d.PasswordHash == "" || password == "" {
+		return false
+	}
+	return hmac.Equal([]byte(d.PasswordHash), []byte(s.hashPassword(d.ID, password)))
+}
+
 func (s *Service) hashCode(deviceCode, code string) string {
 	m := hmac.New(sha256.New, s.secret)
 	m.Write([]byte("vc:" + deviceCode + ":" + code))

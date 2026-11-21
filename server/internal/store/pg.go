@@ -252,6 +252,17 @@ func (p *PG) UpdateDeviceToken(ctx context.Context, id, tokenHash string) error 
 	return nil
 }
 
+func (p *PG) UpdateDevicePassword(ctx context.Context, id, passwordHash string) error {
+	tag, err := p.pool.Exec(ctx, `UPDATE devices SET password_hash=$2 WHERE id=$1`, id, passwordHash)
+	if err != nil {
+		return mapErr(err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 func (p *PG) UpdateDeviceIdentity(ctx context.Context, id, pubkey string) error {
 	tag, err := p.pool.Exec(ctx, `UPDATE devices SET identity_pubkey=$2 WHERE id=$1`, id, pubkey)
 	if err != nil {

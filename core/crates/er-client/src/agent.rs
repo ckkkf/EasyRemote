@@ -75,6 +75,9 @@ macro_rules! fail {
 }
 
 /// 被控端。
+///
+/// Clone 是给流式被控用的：prepare_host 把实例存进注册表，服务线程需要一份自己的句柄。
+#[derive(Clone)]
 pub struct TargetAgent {
     gw: Gateway,
     device: BoundDevice,
@@ -85,6 +88,41 @@ pub struct TargetAgent {
 }
 
 impl TargetAgent {
+    /// 用**已登录会话**构造被控端：不重新登录、不重新绑设备，设备码就是这台机器
+    /// 在「我的设备」页里显示的那个。
+    ///
+    /// 为什么需要它：客户端已经是登录态，被控开关不该再走一遍短信登录（也没地方填码），
+    /// 更不该每次启动都 bind 一台新设备（设备码会一直变）。
+    pub fn from_session(
+        gateway_base: &str,
+        token: &str,
+        device_id: &str,
+        device_code: &str,
+        device_token: &str,
+        relay_addr: SocketAddr,
+    ) -> Result<Self, AgentError> {
+        if token.is_empty() || device_id.is_empty() {
+            return Err(AgentError("missing session (token/device_id)".into()));
+        }
+        let device = BoundDevice {
+            device_id: device_id.to_string(),
+            device_token: device_token.to_string(),
+            raw_code: device_code.to_string(),
+        };
+        let gw = Gateway::new(gateway_base, token, device_token);
+        let identity = DeviceIdentity::random();
+        gw.register_identity(device_id, &encode_pubkey(identity.public().as_bytes()))
+            .map_err(|e| AgentError(e.to_string()))?;
+        Ok(Self {
+            gw,
+            device,
+            identity,
+            relay_addr,
+            token: token.to_string(),
+            gateway_base: gateway_base.to_string(),
+        })
+    }
+
     /// 登录 + 绑设备 + 登记身份公钥。
     pub fn start(
         gateway_base: &str,
@@ -152,6 +190,13 @@ impl TargetAgent {
     pub fn rotate_captcha(&self) -> Result<String, AgentError> {
         self.gw
             .rotate_code(&self.device_code())
+            .map_err(|e| AgentError(e.to_string()))
+    }
+
+    /// 设置本设备的「临时密码」（被控端本地生成，服务端只存哈希）。
+    pub fn set_password(&self, password: &str) -> Result<(), AgentError> {
+        self.gw
+            .set_password(&self.device.device_id, password)
             .map_err(|e| AgentError(e.to_string()))
     }
 
@@ -380,6 +425,45 @@ fn recv_video_frames(
     }
     if out.is_empty() {
         fail!("no frames decoded");
+    }
+    Ok(out)
+}
+
+/// 接收若干帧，返回每帧的 H.264 裸码流（Annex-B）。
+fn recv_video_raw(
+    relay: &mut RelayClient,
+    crypto: &mut CryptoSession,
+    count: usize,
+    timeout: Duration,
+) -> Result<Vec<Vec<u8>>, AgentError> {
+    let mut out: Vec<Vec<u8>> = Vec::with_capacity(count);
+    let deadline = Instant::now() + timeout;
+    while out.len() < count && Instant::now() < deadline {
+        let Some(sealed) = relay
+            .recv_timeout(Duration::from_secs(3))
+            .map_err(|e| AgentError(e.to_string()))?
+        else {
+            continue;
+        };
+        let plain = match crypto.open(&sealed) {
+            Ok(p) => p,
+            Err(_) if sealed.starts_with(TAG) => continue,
+            Err(e) => fail!("decrypt: {e}"),
+        };
+        if plain.is_empty() || plain[0] != MSG_VIDEO {
+            continue;
+        }
+        let Some(_hdr) = crate::link::VideoHeader::decode(&plain[1..]) else {
+            continue;
+        };
+        let payload = &plain[1 + crate::link::VIDEO_HEADER_LEN..];
+        if payload.is_empty() {
+            continue;
+        }
+        out.push(payload.to_vec());
+    }
+    if out.is_empty() {
+        fail!("no frames received");
     }
     Ok(out)
 }
@@ -663,6 +747,20 @@ impl ControllerAgent {
         count: usize,
     ) -> Result<Vec<usize>, AgentError> {
         send_screen_frames(relay, crypto, count)
+    }
+
+    /// 接收若干帧并返回 **H.264 原始字节**（不解码）。用于录制/离线分析。
+    ///
+    /// 为什么不解码：软件解码 1080p 约 90ms/帧，边收边解会把 UDP 接收缓冲撑爆；
+    /// 而录制只关心码流完整，落盘后交给 ffmpeg 处理才是正确分工。
+    pub fn recv_video_raw(
+        &self,
+        relay: &mut RelayClient,
+        crypto: &mut CryptoSession,
+        count: usize,
+        timeout: Duration,
+    ) -> Result<Vec<Vec<u8>>, AgentError> {
+        recv_video_raw(relay, crypto, count, timeout)
     }
 
     /// 接收并解码被控端发来的帧（主控侧显示画面）。

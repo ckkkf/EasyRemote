@@ -104,11 +104,24 @@ class ErNative {
   final _BackendDart _backend;
 
   /// 加载动态库：环境变量 ER_CORE_LIB 优先，其次仓库相对路径。
+  ///
+  /// Windows 的产物名是 er_ffi.dll（MSVC cdylib），macOS 是 liber_ffi.dylib；
+  /// 打包分发时 dll 与 exe 同目录，所以 Windows 也要试裸文件名（走系统 DLL 搜索路径）。
   static ErNative load() {
+    final isWindows = Platform.isWindows;
+    // 打包成 .app 后没有"仓库相对路径"这回事：dylib 由 CI 放进
+    // Contents/Frameworks/（或 Contents/MacOS/），必须按可执行文件位置定位。
+    final bundleLib = _bundleDylibPath();
     final candidates = <String>[
       if (Platform.environment['ER_CORE_LIB'] != null) Platform.environment['ER_CORE_LIB']!,
-      '../core/target/debug/liber_ffi.dylib',
-      '../core/target/release/liber_ffi.dylib',
+      if (bundleLib != null) bundleLib,
+      if (isWindows) ...<String>[
+        'er_ffi.dll',
+        '../core/target/release/er_ffi.dll',
+        '../core/target/debug/er_ffi.dll',
+      ],
+      if (!isWindows) '../core/target/debug/liber_ffi.dylib',
+      if (!isWindows) '../core/target/release/liber_ffi.dylib',
     ];
     for (final path in candidates) {
       if (File(path).existsSync()) {
@@ -448,4 +461,24 @@ class ErHostLink {
     _freeString(p);
     return raw;
   }
+}
+
+/// macOS .app 包内的 Rust 核心库位置（CI 打包时拷进去）。
+///
+/// 可执行文件在 Contents/MacOS/Runner，库放在 Contents/Frameworks/liber_ffi.dylib；
+/// 也兼容直接和可执行文件同级（Contents/MacOS/）。
+String? _bundleDylibPath() {
+  if (!Platform.isMacOS) return null;
+  try {
+    final exe = Platform.resolvedExecutable;
+    final contents = Directory(exe).parent.parent.path;
+    for (final p in <String>[
+      "$contents/Frameworks/liber_ffi.dylib",
+      "$contents/MacOS/liber_ffi.dylib",
+      "$contents/Resources/liber_ffi.dylib",
+    ]) {
+      if (File(p).existsSync()) return p;
+    }
+  } catch (_) {}
+  return null;
 }

@@ -256,3 +256,11 @@ endpoints:
     auth: none
     response: any
     errors: SRV_INTERNAL
+  GW-20:
+    # 被控端设置「临时密码」：长期有效、校验不消费（对比 GW-07 的一次性验证码）。
+    # 明文只存在被控端本地，服务端只存 HMAC。
+    method: POST
+    path: /v1/devices/password
+    auth: bearer
+    response: any
+    errors: CONN_DEVICE_NOT_FOUND, CONN_CAPTCHA_INVALID, AUTH_TOKEN_EXPIRED

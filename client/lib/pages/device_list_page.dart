@@ -1,7 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../api.dart';
+import '../host_service.dart';
+import '../main.dart' show erGatewayBaseUrl;
 import '../models.dart';
 import '../shell.dart';
 import '../theme.dart';
@@ -30,14 +34,78 @@ class _DeviceListPageState extends State<DeviceListPage> {
   final _search = TextEditingController();
   _Filter _filter = _Filter.all;
 
+  // 被控（「允许被控」开关）：值全来自 HostService，UI 只做展示。
+  bool _hostOn = false;
+  bool _hostBusy = false;
+  String? _hostPassword;
+  bool _showPw = false;
+  String _hostError = "";
+  HostStatus _hostStatus = HostStatus.idle;
+  Timer? _hostTimer;
+
   @override
   void initState() {
     super.initState();
     _future = widget.client.listDevices();
+    // 被控状态每 2 秒轮询一次（主控连进来后 frames/injected 会变）
+    _hostTimer = Timer.periodic(const Duration(seconds: 2), (_) {
+      if (!mounted || !_hostOn) return;
+      final st = HostService.instance.status();
+      if (st.running != _hostStatus.running || st.sessionId != _hostStatus.sessionId) {
+        setState(() => _hostStatus = st);
+      }
+    });
+  }
+
+
+  /// 「允许被控」开关：prepare（复用本机设备身份）→ 生成/同步密码 → 开流。
+  Future<void> _toggleHost(bool on) async {
+    if (_hostBusy) return;
+    setState(() {
+      _hostBusy = true;
+      _hostError = "";
+    });
+    try {
+      if (on) {
+        final code = HostService.instance.prepare(
+          gateway: erGatewayBaseUrl.isEmpty ? "http://127.0.0.1:18090" : erGatewayBaseUrl,
+          relay: "127.0.0.1:19000",
+          token: widget.client.token ?? "",
+          deviceId: widget.ownDevice.id,
+          deviceCode: widget.ownDevice.code,
+          deviceToken: widget.client.deviceToken ?? "",
+        );
+        final pw = HostService.instance.ensurePassword();
+        HostService.instance.start(
+          signalBase: erGatewayBaseUrl.isEmpty ? "http://127.0.0.1:18090" : erGatewayBaseUrl,
+        );
+        setState(() {
+          _hostOn = true;
+          _hostPassword = pw;
+          _hostStatus = HostStatus.idle;
+        });
+        debugPrint("[host] 允许被控已开启 device_code=$code password=$pw");
+      } else {
+        HostService.instance.stop();
+        setState(() {
+          _hostOn = false;
+          _hostStatus = HostStatus.idle;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _hostOn = false;
+        _hostError = e.toString();
+      });
+    } finally {
+      if (mounted) setState(() => _hostBusy = false);
+    }
   }
 
   @override
   void dispose() {
+    _hostTimer?.cancel();
+    if (_hostOn) HostService.instance.stop();
     _search.dispose();
     super.dispose();
   }
@@ -116,6 +184,85 @@ class _DeviceListPageState extends State<DeviceListPage> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('生成失败：' + e.toString())));
     }
+  }
+
+
+  /// 「被控服务」卡片：开关 + 设备码 + 临时密码（可查看/复制）+ 状态。
+  Widget _hostCard(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final text = Theme.of(context).textTheme;
+    final st = _hostStatus;
+    final tail = st.sessionId.length > 8
+        ? st.sessionId.substring(st.sessionId.length - 8)
+        : st.sessionId;
+    final statusText = !_hostOn
+        ? "未开启：打开开关后，这台设备才能被远程控制"
+        : st.hasSession
+            ? "正在被控 · $tail · 已传 ${st.frames} 帧 / 注入 ${st.injected} 次"
+            : "已就绪，等待对方连接";
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.fromLTRB(18, 14, 18, 14),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(ErTokens.radiusLg),
+        border: Border.all(color: scheme.outlineVariant.withValues(alpha: 0.6)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.computer_rounded, size: 18, color: scheme.primary),
+              const SizedBox(width: 8),
+              Expanded(child: Text("允许被控（本机共享）", style: text.titleSmall)),
+              Switch(value: _hostOn, onChanged: _hostBusy ? null : _toggleHost),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(statusText, style: text.bodySmall?.copyWith(color: scheme.onSurfaceVariant)),
+          if (_hostError.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(_hostError, style: text.bodySmall?.copyWith(color: scheme.error)),
+          ],
+          if (_hostOn) ...[
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Text("临时密码",
+                    style: text.labelMedium?.copyWith(color: scheme.onSurfaceVariant)),
+                const SizedBox(width: 10),
+                Text(
+                  _showPw ? (_hostPassword ?? "") : "●" * 8,
+                  style: text.titleMedium?.copyWith(letterSpacing: 2),
+                ),
+                const Spacer(),
+                TextButton(
+                  onPressed: () => setState(() => _showPw = !_showPw),
+                  child: Text(_showPw ? "隐藏" : "显示"),
+                ),
+                TextButton(
+                  onPressed: _hostPassword == null
+                      ? null
+                      : () async {
+                          await Clipboard.setData(ClipboardData(text: _hostPassword!));
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text("临时密码已复制")),
+                            );
+                          }
+                        },
+                  child: const Text("复制"),
+                ),
+              ],
+            ),
+            Text("对方在「连接设备」里输入设备码 + 这串密码即可；密码长期有效，可反复使用。",
+                style: text.labelSmall?.copyWith(color: scheme.onSurfaceVariant)),
+          ],
+        ],
+      ),
+    );
   }
 
   @override
@@ -246,7 +393,9 @@ class _DeviceListPageState extends State<DeviceListPage> {
                         );
                       },
                     ),
-                  const SizedBox(height: 28),
+                  const SizedBox(height: 20),
+                  _hostCard(context),
+                  const SizedBox(height: 8),
                   Text('其他连接方式', style: text.titleMedium),
                   const SizedBox(height: 4),
                   Text('无需在列表里找到设备，直接用设备码连接',
@@ -455,17 +604,25 @@ class _DeviceCard extends StatelessWidget {
               const SizedBox(width: 4),
               Text(online ? '在线' : '离线', style: text.labelSmall?.copyWith(color: scheme.onSurfaceVariant)),
               const Spacer(),
-              online
-                  ? FilledButton.tonal(
-                      onPressed: () => onConnect(device.code),
-                      style: FilledButton.styleFrom(minimumSize: const Size(0, 36), padding: const EdgeInsets.symmetric(horizontal: 16)),
-                      child: const Text('连接'),
-                    )
-                  : FilledButton.tonal(
-                      onPressed: null,
-                      style: FilledButton.styleFrom(minimumSize: const Size(0, 36), padding: const EdgeInsets.symmetric(horizontal: 16)),
-                      child: const Text('离线'),
-                    ),
+              // 本机设备不能"连接自己"：那只会开一个指向本机的会话，纯噪音。
+              // 要给别人连自己，看上面的本机设备码。
+              if (isOwn)
+                Text(
+                  '当前设备',
+                  style: text.labelSmall?.copyWith(color: scheme.onSurfaceVariant),
+                )
+              else if (online)
+                FilledButton.tonal(
+                  onPressed: () => onConnect(device.code),
+                  style: FilledButton.styleFrom(minimumSize: const Size(0, 36), padding: const EdgeInsets.symmetric(horizontal: 16)),
+                  child: const Text('连接'),
+                )
+              else
+                FilledButton.tonal(
+                  onPressed: null,
+                  style: FilledButton.styleFrom(minimumSize: const Size(0, 36), padding: const EdgeInsets.symmetric(horizontal: 16)),
+                  child: const Text('离线'),
+                ),
             ],
           ),
         ],

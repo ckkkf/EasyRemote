@@ -133,5 +133,6 @@ export const ENDPOINTS: readonly EndpointSpec[] = [
   { id: 'GW-17', method: 'POST', path: '/v1/assist/redeem', auth: 'bearer', response: 'any', errors: ['CONN_ASSIST_CODE_INVALID', 'CONN_ASSIST_CODE_USED', 'CONN_ASSIST_CODE_EXPIRED', 'CONN_SELF_CONNECT'] },
   { id: 'GW-18', method: 'GET', path: '/v1/config', auth: 'none', response: 'any', errors: ['SRV_INTERNAL'] },
   { id: 'GW-19', method: 'POST', path: '/v1/net/reflect', auth: 'none', response: 'any', errors: ['SRV_INTERNAL'] },
+  { id: 'GW-20', method: 'POST', path: '/v1/devices/password', auth: 'bearer', response: 'any', errors: ['CONN_DEVICE_NOT_FOUND', 'CONN_CAPTCHA_INVALID', 'AUTH_TOKEN_EXPIRED'] },
   { id: 'SYS-01', method: 'GET', path: '/healthz', auth: 'none', response: 'OkResult', errors: ['[]'] },
 ];

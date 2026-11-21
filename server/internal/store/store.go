@@ -37,6 +37,9 @@ type Device struct {
 	LastSeenAt time.Time `json:"last_seen_at"`
 	Online     bool      `json:"online"`
 	TokenHash  string    `json:"-"`
+	// PasswordHash 是「临时密码」的哈希：长期有效、校验不消费、被控端可查看明文后复制。
+	// 与一次性验证码（VerifyCode）并存：老客户端仍能走验证码，新客户端用密码。
+	PasswordHash string `json:"-"`
 	// IdentityPubKey 是设备长期身份公钥（Ed25519 hex），端到端握手验签用。
 	IdentityPubKey string `json:"identity_pubkey,omitempty"`
 }
@@ -166,6 +169,7 @@ type Store interface {
 	UpdateDeviceSeen(ctx context.Context, id string, at time.Time, online bool) error
 	UpdateDeviceToken(ctx context.Context, id, tokenHash string) error
 	UpdateDeviceIdentity(ctx context.Context, id, pubkey string) error
+	UpdateDevicePassword(ctx context.Context, id, passwordHash string) error
 	GetDeviceIdentity(ctx context.Context, id string) (string, error)
 
 	// verify codes

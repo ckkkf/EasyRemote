@@ -32,7 +32,7 @@ class ConnectPage extends StatefulWidget {
   State<ConnectPage> createState() => _ConnectPageState();
 }
 
-/// 连接方式：设备码（首次连接要验证码）/ 协助码（被控端临时授权，免验证码）。
+/// 连接方式：设备码 + 临时密码（被控端窗口显示，长期有效）/ 协助码（被控端临时授权）。
 enum _ConnectMode { device, assist }
 
 class _ConnectPageState extends State<ConnectPage> {
@@ -76,6 +76,16 @@ class _ConnectPageState extends State<ConnectPage> {
     super.dispose();
   }
 
+  /// 从剪贴板取 9 位设备码填进格子（剪贴板里混着空格/横线也能用）。
+  Future<void> _pasteCodeFromClipboard() async {
+    final data = await Clipboard.getData(Clipboard.kTextPlain);
+    final digits = (data?.text ?? "").replaceAll(RegExp(r"[^0-9]"), "");
+    if (digits.isEmpty) return;
+    _codeCtl.text = digits.length > 9 ? digits.substring(0, 9) : digits;
+    _codeFocus.requestFocus();
+    setState(() => _error = null);
+  }
+
   Future<void> _connect() async {
     setState(() {
       _busy = true;
@@ -87,7 +97,7 @@ class _ConnectPageState extends State<ConnectPage> {
       widget.onCodeUsed(code);
       widget.onSessionStarted(sid, code.replaceAll(RegExp(r'[^0-9]'), ''));
     } on ApiException catch (e) {
-      setState(() => _error = e.message);
+      setState(() => _error = _friendlyConnectError(e));
     } catch (e) {
       setState(() => _error = e.toString());
     } finally {
@@ -192,14 +202,24 @@ class _ConnectPageState extends State<ConnectPage> {
                             focusNode: _codeFocus,
                             onChanged: () => setState(() {}),
                           ),
-                          const SizedBox(height: 14),
+                          // 粘贴入口：透明输入层的光标与格子对不上，
+                          // 与其纠结光标位置，不如给一个显式的「粘贴设备码」。
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: TextButton.icon(
+                              onPressed: _pasteCodeFromClipboard,
+                              icon: const Icon(Icons.content_paste_rounded, size: 16),
+                              label: const Text("粘贴设备码"),
+                            ),
+                          ),
+                          const SizedBox(height: 6),
                           TextField(
                             key: const Key('captcha-field'),
                             controller: _captcha,
                             keyboardType: TextInputType.number,
                             decoration: const InputDecoration(
-                              labelText: '验证码（首次连接必填）',
-                              hintText: '对方屏幕上显示的数字',
+                              labelText: '临时密码',
+                              hintText: '被控端窗口里显示的 8 位数字（可长期复用）',
                               prefixIcon: Icon(Icons.verified_user_outlined, size: 18),
                             ),
                           ),
@@ -421,14 +441,21 @@ class _CodeEntry extends StatelessWidget {
             controller: controller,
             focusNode: focusNode,
             autofocus: false,
+            // 之前 showCursor/enableInteractiveSelection 都是 false，输入层既看不到光标、
+            // 也不能选中，用户自然认为"没法粘贴"。文字仍然透明（视觉由上面 9 个格子表达），
+            // 但光标与选区必须可见，否则交互完全不可发现。
+            // 光标必须隐藏：透明输入层的字宽/起点与上方 9 个格子不是同一套布局，
+            // 显示出来一定是"光标和数字对不上"（实测）。但交互要保留——
+            // 这样点一下能聚焦、Ctrl+V 能粘贴；要肉眼可见的粘贴入口看下面那个按钮。
             showCursor: false,
-            enableInteractiveSelection: false,
+            cursorColor: Colors.transparent,
+            enableInteractiveSelection: true,
             keyboardType: TextInputType.number,
             maxLength: 9,
             onChanged: (_) => onChanged(),
             inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(9)],
-            style: const TextStyle(color: Colors.transparent, fontSize: 1),
-            cursorColor: Colors.transparent,
+            // 文字透明且不可见光标，字号只影响内部布局，取一个稳定的中等值
+            style: const TextStyle(color: Colors.transparent, fontSize: 20),
             decoration: const InputDecoration(
               counterText: '',
               border: InputBorder.none,
@@ -443,4 +470,23 @@ class _CodeEntry extends StatelessWidget {
       ],
     );
   }
+}
+
+/// 连接阶段的服务端错误 → 用户能照做的提示。
+///
+/// 连接错误 → 用户能照做的提示。
+///
+/// 现在的主流程是「设备码 + 临时密码」：密码长期有效、可重复使用，被控端窗口里
+/// 点「显示」就能看到明文、点「复制」可直接粘。仍保留对旧「一次性验证码」错误的兼容文案。
+String _friendlyConnectError(ApiException e) {
+  if (e.code.contains("CAPTCHA_EXPIRED") || e.message.contains("验证码已过期")) {
+    return "密码/验证码已失效：请让对方在被控端窗口重新查看密码后再试（9 位设备码不用换）";
+  }
+  if (e.code.contains("CAPTCHA") || e.message.contains("验证码不正确")) {
+    return "密码不正确：请核对被控端窗口显示的 8 位数字（可点「显示」查看明文）";
+  }
+  if (e.code.contains("DEVICE")) {
+    return "设备码不存在或对方未开启被控：请确认 9 位设备码，并让对方在该设备上允许被控";
+  }
+  return e.message;
 }

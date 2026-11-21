@@ -11,6 +11,7 @@ members = [
   "crates/er-ffi",
   "crates/er-session",
   "crates/er-client",
+  "crates/er-winapp",
 ]
 resolver = "2"
 

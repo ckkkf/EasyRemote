@@ -1,0 +1,28 @@
+MAC: gateway=http://127.0.0.1:18090 relay=127.0.0.1:19000 signal=http://127.0.0.1:18090 pid=7859
+MAC: display pixels=1920x1080 points=1920x1080 origin=(0,0) scale=1
+MAC: permission_screen=ok (info=1920x1080 frame=1920x1080 nonzero_samples=8316)
+MAC: cursor_baseline_pixel=Some((1305, 1079)) (读不到 = 没有输入监控/辅助功能会话)
+MAC: device_id=dev-e982718ccb8273a1 device_code=163892730 captcha=147498 (404ms)
+MAC: waiting_for_signalling ...
+MAC: session=ses-026e38756a41d3e1
+MAC: consent=authorized
+MAC: relay_registered local=127.0.0.1:57438
+MAC: handshake_verified (ed25519 + x25519)
+MAC: frames_received=5 resolution=320x240 first_h264_bytes=762
+MAC: cursor_baseline=Some((1305, 1079)) recheck=Some((1305, 1079)) stable=true
+MAC: input_events_received=60 kinds=[MouseMove { x: 1180, y: 540 }, MouseMove { x: 1179, y: 558 }, MouseMove { x: 1177, y: 577 }, MouseMove { x: 1173, y: 595 }, MouseMove { x: 1168, y: 612 }, MouseMove { x: 1161, y: 629 }, MouseMove { x: 1153, y: 646 }, MouseMove { x: 1143, y: 662 }, MouseMove { x: 1132, y: 677 }, MouseMove { x: 1120, y: 691 }, MouseMove { x: 1107, y: 703 }, MouseMove { x: 1093, y: 715 }, MouseMove { x: 1078, y: 726 }, MouseMove { x: 1062, y: 735 }, MouseMove { x: 1045, y: 743 }, MouseMove { x: 1028, y: 749 }, MouseMove { x: 1010, y: 754 }, MouseMove { x: 992, y: 758 }, MouseMove { x: 974, y: 760 }, MouseMove { x: 955, y: 760 }, MouseMove { x: 937, y: 759 }, MouseMove { x: 919, y: 756 }, MouseMove { x: 901, y: 752 }, MouseMove { x: 883, y: 746 }, MouseMove { x: 866, y: 739 }, MouseMove { x: 850, y: 731 }, MouseMove { x: 834, y: 721 }, MouseMove { x: 820, y: 710 }, MouseMove { x: 806, y: 697 }, MouseMove { x: 793, y: 684 }, MouseMove { x: 782, y: 669 }, MouseMove { x: 772, y: 654 }, MouseMove { x: 763, y: 638 }, MouseMove { x: 755, y: 621 }, MouseMove { x: 749, y: 604 }, MouseMove { x: 745, y: 586 }, MouseMove { x: 742, y: 568 }, MouseMove { x: 740, y: 549 }, MouseMove { x: 740, y: 531 }, MouseMove { x: 742, y: 512 }, MouseMove { x: 745, y: 494 }, MouseMove { x: 749, y: 476 }, MouseMove { x: 755, y: 459 }, MouseMove { x: 763, y: 442 }, MouseMove { x: 772, y: 426 }, MouseMove { x: 782, y: 411 }, MouseMove { x: 793, y: 396 }, MouseMove { x: 806, y: 383 }, MouseMove { x: 820, y: 370 }, MouseMove { x: 834, y: 359 }, MouseMove { x: 850, y: 349 }, MouseMove { x: 866, y: 341 }, MouseMove { x: 883, y: 334 }, MouseMove { x: 901, y: 328 }, MouseMove { x: 919, y: 324 }, MouseMove { x: 937, y: 321 }, MouseMove { x: 955, y: 320 }, MouseMove { x: 974, y: 320 }, MouseMove { x: 992, y: 322 }, MouseMove { x: 1010, y: 326 }]
+MAC: injected_moves=[(1180, 540), (1179, 558), (1177, 577), (1173, 595), (1168, 612), (1161, 629), (1153, 646), (1143, 662), (1132, 677), (1120, 691), (1107, 703), (1093, 715), (1078, 726), (1062, 735), (1045, 743), (1028, 749), (1010, 754), (992, 758), (974, 760), (955, 760), (937, 759), (919, 756), (901, 752), (883, 746), (866, 739), (850, 731), (834, 721), (820, 710), (806, 697), (793, 684), (782, 669), (772, 654), (763, 638), (755, 621), (749, 604), (745, 586), (742, 568), (740, 549), (740, 531), (742, 512), (745, 494), (749, 476), (755, 459), (763, 442), (772, 426), (782, 411), (793, 396), (806, 383), (820, 370), (834, 359), (850, 349), (866, 341), (883, 334), (901, 328), (919, 324), (937, 321), (955, 320), (974, 320), (992, 322), (1010, 326)]
+MAC: injected_mapped=60
+MAC: cursor_after=Some((1010, 326))
+MAC: moved_to_target=true (target=Some((1010, 326)) actual=Some((1010, 326)) delta=(0, 0))
+MAC: cursor_stable_before_inject=true
+CODEC: init kind=Software 1920x1080
+CODEC: prime_frame=false
+[OpenH264] this = 0x0x735468630, Warning:ParamValidation(), AdaptiveQuant(1) is not supported yet for screen content, auto turned off
+[OpenH264] this = 0x0x735468630, Warning:ParamValidation(), BackgroundDetection(1) is not supported yet for screen content, auto turned off
+[OpenH264] this = 0x0x735468630, Warning:bEnableFrameSkip = 0,bitrate can't be controlled for RC_QUALITY_MODE,RC_BITRATE_MODE and RC_TIMESTAMP_MODE without enabling skip frame.
+CODEC: backend_final=cpu
+MAC: frames_sent=30 bytes_total=113560 ms=12281 (after_input=true)
+MAC: RESULT screen_permission=true frames_received=5 frames_sent=30 input_events=60 moved_to_target=true elapsed_ms=30061
+MAC: DONE session=ses-026e38756a41d3e1
+MAC: VERDICT PASS

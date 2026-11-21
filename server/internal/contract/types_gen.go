@@ -133,5 +133,6 @@ var Endpoints = []Endpoint{
 	{ID: "GW-17", Method: "POST", Path: "/v1/assist/redeem", Auth: "bearer", Response: "any", Errors: []string{"CONN_ASSIST_CODE_INVALID", "CONN_ASSIST_CODE_USED", "CONN_ASSIST_CODE_EXPIRED", "CONN_SELF_CONNECT"}},
 	{ID: "GW-18", Method: "GET", Path: "/v1/config", Auth: "none", Response: "any", Errors: []string{"SRV_INTERNAL"}},
 	{ID: "GW-19", Method: "POST", Path: "/v1/net/reflect", Auth: "none", Response: "any", Errors: []string{"SRV_INTERNAL"}},
+	{ID: "GW-20", Method: "POST", Path: "/v1/devices/password", Auth: "bearer", Response: "any", Errors: []string{"CONN_DEVICE_NOT_FOUND", "CONN_CAPTCHA_INVALID", "AUTH_TOKEN_EXPIRED"}},
 	{ID: "SYS-01", Method: "GET", Path: "/healthz", Auth: "none", Response: "OkResult", Errors: []string{"[]"}},
 }

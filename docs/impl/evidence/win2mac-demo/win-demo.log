@@ -1,0 +1,22 @@
+Warning: Permanently added '[47.95.247.209]:39100' (ED25519) to the list of known hosts.
+2026/11/21 13:10:20 udptun client udp 127.0.0.1:19000 -> tcp 127.0.0.1:19001
+2026/11/21 13:10:24 new uplink for 127.0.0.1:55892
+DEMO_EXIT=
+WIN: gateway=http://127.0.0.1:18090 relay=127.0.0.1:19000 pid=42924
+WIN: device_code=163892730 captcha=147498
+WIN: session=ses-026e38756a41d3e1
+WIN: relay_registered local=127.0.0.1:55892
+WIN: handshake_verified (ed25519 + x25519)
+WIN: capture_ok 1024x768
+CODEC: init kind=Nvenc 1024x768
+CODEC: prime_frame=false
+WIN: capture_send_failed (capture: capture unavailable); fallback=synthetic_h264
+WIN: frames_sent=5 bytes_total=5701 path=synthetic
+WIN: demo_moves_sent=75 circle_center=(960,540) r=220 secs=3
+WIN: recorded_frames=30 bytes=113560 path=C:\EasyRemote\demo_mac.h264
+WIN: frames_from_target=30 (录像模式，码流已落盘)
+WIN: MSG_VIDEO=1 (帧头 seq/ts/dim 已随帧传输)
+WIN: RESULT frames_sent_target=5 frames_from_target=30 input_events_sent=75 frames_path=synthetic elapsed_ms=23482
+WIN: DONE session=ses-026e38756a41d3e1
+WIN: VERDICT PASS
+DEMO_RESULT: PASS

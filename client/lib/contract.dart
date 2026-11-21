@@ -285,5 +285,6 @@ const List<EndpointSpec> endpoints = <EndpointSpec>[
   EndpointSpec(id: 'GW-17', method: 'POST', path: '/v1/assist/redeem', auth: 'bearer', response: 'any', errors: <String>['CONN_ASSIST_CODE_INVALID', 'CONN_ASSIST_CODE_USED', 'CONN_ASSIST_CODE_EXPIRED', 'CONN_SELF_CONNECT']),
   EndpointSpec(id: 'GW-18', method: 'GET', path: '/v1/config', auth: 'none', response: 'any', errors: <String>['SRV_INTERNAL']),
   EndpointSpec(id: 'GW-19', method: 'POST', path: '/v1/net/reflect', auth: 'none', response: 'any', errors: <String>['SRV_INTERNAL']),
+  EndpointSpec(id: 'GW-20', method: 'POST', path: '/v1/devices/password', auth: 'bearer', response: 'any', errors: <String>['CONN_DEVICE_NOT_FOUND', 'CONN_CAPTCHA_INVALID', 'AUTH_TOKEN_EXPIRED']),
   EndpointSpec(id: 'SYS-01', method: 'GET', path: '/healthz', auth: 'none', response: 'OkResult', errors: <String>['[]']),
 ];

@@ -1,0 +1,16 @@
+MAC: host gateway=http://127.0.0.1:18090 relay=127.0.0.1:19000 display=1920x1080 scale=1 fps=30 duration=25
+MAC: capture_ok 1920x1080 backend=xcap
+MAC: cursor_baseline_pixel=Some((1263, 1079))
+MAC: device_id=dev-9c579b71734b3ade device_code=682491968 captcha=586048
+MAC: waiting_for_signalling ...
+MAC: session=ses-eff96fa76b3554c2
+MAC: consent=authorized
+MAC: relay_registered local=127.0.0.1:49976
+MAC: handshake_verified (ed25519 + x25519)
+MAC: streaming ...
+[OpenH264] this = 0x0xa7a8599b0, Warning:ParamValidation(), AdaptiveQuant(1) is not supported yet for screen content, auto turned off
+[OpenH264] this = 0x0xa7a8599b0, Warning:ParamValidation(), BackgroundDetection(1) is not supported yet for screen content, auto turned off
+[OpenH264] this = 0x0xa7a8599b0, Warning:bEnableFrameSkip = 0,bitrate can't be controlled for RC_QUALITY_MODE,RC_BITRATE_MODE and RC_TIMESTAMP_MODE without enabling skip frame.
+MAC: stats sent=8 injected=192 backend=cpu elapsed=19s
+MAC: stats sent=17 injected=480 backend=cpu elapsed=24s
+MAC: HOST_DONE sent=19 injected=544 elapsed=25s

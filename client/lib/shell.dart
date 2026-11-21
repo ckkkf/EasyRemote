@@ -454,11 +454,23 @@ class PageHeader extends StatelessWidget {
       if (!wide) const ThemeModeButton(),
     ];
 
+    final canPop = Navigator.of(context).canPop();
+
     return Padding(
       padding: EdgeInsets.fromLTRB(wide ? 32 : 16, wide ? 28 : 12, wide ? 32 : 16, wide ? 12 : 8),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // 二级页面（诊断等）必须能退回上一层：之前只画标题，用户走到这里就没有回头路。
+          if (canPop)
+            Padding(
+              padding: const EdgeInsets.only(right: 8, top: 2),
+              child: IconButton(
+                tooltip: "返回",
+                onPressed: () => Navigator.of(context).maybePop(),
+                icon: const Icon(Icons.arrow_back_rounded, size: 20),
+              ),
+            ),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,

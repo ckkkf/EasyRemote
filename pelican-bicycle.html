@@ -1,0 +1,1007 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="color-scheme" content="light" />
+<title>Coastline Cruise — A Pelican on a Bicycle</title>
+<style>
+  :root {
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --sans: "Avenir Next", Avenir, "Helvetica Neue", Helvetica, Arial, sans-serif;
+    --ink: #183f3b;
+    --coral: #c45f48;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body { margin: 0; min-height: 100%; }
+
+  body {
+    display: grid;
+    place-items: center;
+    min-height: 100svh;
+    padding: 22px;
+    background:
+      radial-gradient(1100px 720px at 12% -12%, rgba(235, 175, 115, 0.14), transparent 62%),
+      radial-gradient(950px 720px at 90% 112%, rgba(91, 156, 143, 0.26), transparent 62%),
+      #0d2a28;
+    font-family: var(--sans);
+    color: var(--ink);
+  }
+
+  .poster {
+    position: relative;
+    width: min(1280px, calc(100vw - 44px));
+    width: min(1280px, calc(100vw - 44px), calc((100svh - 44px) * 1.578947));
+    aspect-ratio: 1200 / 760;
+    max-height: calc(100svh - 44px);
+    overflow: hidden;
+    border-radius: 18px;
+    background: #f2e6d1;
+    box-shadow:
+      0 34px 90px rgba(0, 0, 0, 0.42),
+      0 3px 0 rgba(255, 255, 255, 0.1) inset;
+    isolation: isolate;
+    container-type: inline-size;
+    -webkit-user-select: none;
+    user-select: none;
+    animation: poster-in 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+
+  .poster::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    border-radius: inherit;
+    pointer-events: none;
+    box-shadow:
+      inset 0 0 0 1px rgba(24, 63, 59, 0.2),
+      inset 0 0 80px rgba(35, 60, 47, 0.14);
+    mix-blend-mode: multiply;
+  }
+
+  #scene {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  #scene .kicker {
+    font-family: var(--sans);
+    font-size: 12.5px;
+    font-weight: 600;
+    letter-spacing: 0.245em;
+    fill: #17433e;
+  }
+
+  #scene .display {
+    font-family: var(--serif);
+    font-size: 84px;
+    font-weight: 500;
+    letter-spacing: -0.035em;
+    fill: #173f3b;
+  }
+
+  #scene .display-italic {
+    font-family: var(--serif);
+    font-size: 82px;
+    font-style: italic;
+    font-weight: 500;
+    letter-spacing: -0.045em;
+    fill: #c45f48;
+  }
+
+  #scene .caption {
+    font-family: var(--sans);
+    font-size: 13px;
+    letter-spacing: 0.035em;
+    fill: rgba(23, 63, 59, 0.73);
+  }
+
+  #scene .stamp {
+    font-family: var(--sans);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.22em;
+    text-anchor: middle;
+    fill: #1c4843;
+  }
+
+  #scene .stamp-small {
+    font-size: 8.5px;
+    letter-spacing: 0.16em;
+    opacity: 0.82;
+  }
+
+  .control {
+    position: absolute;
+    right: 26px;
+    bottom: 24px;
+    z-index: 6;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 42px;
+    padding: 11px 17px;
+    border: 1px solid rgba(24, 63, 59, 0.24);
+    border-radius: 999px;
+    background: rgba(255, 248, 233, 0.76);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.19em;
+    line-height: 1;
+    text-transform: uppercase;
+    cursor: pointer;
+    touch-action: manipulation;
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+    box-shadow: 0 5px 18px rgba(35, 55, 43, 0.14);
+    transition: background-color 0.22s ease, transform 0.22s ease, border-color 0.22s ease;
+  }
+
+  .control:hover {
+    background: rgba(255, 250, 239, 0.96);
+    border-color: rgba(24, 63, 59, 0.38);
+    transform: translateY(-1px);
+  }
+
+  .control:active { transform: translateY(0); }
+
+  .control:focus-visible {
+    outline: 2px solid var(--ink);
+    outline-offset: 3px;
+  }
+
+  .ctl-icon {
+    position: relative;
+    display: inline-block;
+    flex: 0 0 auto;
+    width: 11px;
+    height: 12px;
+  }
+
+  .control.is-playing .ctl-icon::before,
+  .control.is-playing .ctl-icon::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    width: 3px;
+    height: 12px;
+    border-radius: 1px;
+    background: currentColor;
+  }
+
+  .control.is-playing .ctl-icon::before { left: 1px; }
+  .control.is-playing .ctl-icon::after { right: 1px; }
+
+  .control.is-paused .ctl-icon {
+    width: 0;
+    height: 0;
+    border-top: 6px solid transparent;
+    border-bottom: 6px solid transparent;
+    border-left: 10px solid currentColor;
+    margin-right: 2px;
+  }
+
+  .control.is-paused .ctl-icon::before,
+  .control.is-paused .ctl-icon::after { content: none; }
+
+  @keyframes poster-in {
+    from { opacity: 0; transform: translateY(14px) scale(0.995); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+
+  @media (max-width: 720px) {
+    body { padding: 10px; }
+    .poster {
+      width: min(1280px, calc(100vw - 20px), calc((100svh - 20px) * 1.578947));
+      max-height: calc(100svh - 20px);
+      border-radius: 13px;
+    }
+    .control {
+      right: 14px;
+      bottom: 14px;
+      min-height: 38px;
+      padding: 9px 13px;
+      font-size: 9.5px;
+      gap: 8px;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .poster { animation: none; }
+  }
+</style>
+</head>
+<body>
+<main class="poster" id="poster" aria-label="Animated illustration of a pelican riding a bicycle down a coastal road">
+  <svg id="scene" viewBox="0 0 1200 760" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="sceneTitle sceneDesc">
+    <title id="sceneTitle">Coastline Cruise</title>
+    <desc id="sceneDesc">A cream-colored pelican wearing a red cycling cap and a coral scarf pedals a teal bicycle along a seaside road at golden hour. The wheels turn, its legs pedal, the scarf ripples, a fish tail wiggles in the basket, and the coastal landscape drifts past.</desc>
+
+    <defs>
+      <linearGradient id="skyGrad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#9dc9c4" />
+        <stop offset="0.48" stop-color="#cadfc9" />
+        <stop offset="0.78" stop-color="#efd8b2" />
+        <stop offset="1" stop-color="#f6d1a2" />
+      </linearGradient>
+
+      <radialGradient id="sunHalo" cx="50%" cy="50%" r="50%">
+        <stop offset="0" stop-color="#ffd39a" stop-opacity="0.7" />
+        <stop offset="0.55" stop-color="#ffd39a" stop-opacity="0.2" />
+        <stop offset="1" stop-color="#ffd39a" stop-opacity="0" />
+      </radialGradient>
+
+      <linearGradient id="seaGrad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#7aada4" />
+        <stop offset="0.55" stop-color="#5e9189" />
+        <stop offset="1" stop-color="#3f726d" />
+      </linearGradient>
+
+      <linearGradient id="roadGrad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#d5bf99" />
+        <stop offset="0.55" stop-color="#c6ab80" />
+        <stop offset="1" stop-color="#b5966d" />
+      </linearGradient>
+
+      <linearGradient id="bodyGrad" x1="0.18" y1="0.05" x2="0.72" y2="1">
+        <stop offset="0" stop-color="#fffaf0" />
+        <stop offset="0.55" stop-color="#f6ebd7" />
+        <stop offset="1" stop-color="#e2cfb2" />
+      </linearGradient>
+
+      <linearGradient id="wingGrad" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#fff8ea" />
+        <stop offset="1" stop-color="#e7d5b9" />
+      </linearGradient>
+
+      <linearGradient id="beakGrad" x1="0" y1="0" x2="1" y2="0.6">
+        <stop offset="0" stop-color="#f7ad5b" />
+        <stop offset="0.55" stop-color="#ef9141" />
+        <stop offset="1" stop-color="#e27934" />
+      </linearGradient>
+
+      <linearGradient id="pouchGrad" x1="0" y1="0" x2="0.35" y2="1">
+        <stop offset="0" stop-color="#f9bd77" />
+        <stop offset="1" stop-color="#e98b4c" />
+      </linearGradient>
+
+      <pattern id="scarfPattern" width="16" height="16" patternUnits="userSpaceOnUse" patternTransform="rotate(24)">
+        <rect width="16" height="16" fill="#d8694f" />
+        <rect width="4" height="16" fill="#f2cfa8" opacity="0.52" />
+      </pattern>
+
+      <radialGradient id="vignette" cx="50%" cy="44%" r="72%">
+        <stop offset="0.55" stop-color="#1b3f37" stop-opacity="0" />
+        <stop offset="1" stop-color="#1b3f37" stop-opacity="0.2" />
+      </radialGradient>
+
+      <filter id="softBlur" x="-50%" y="-80%" width="200%" height="260%">
+        <feGaussianBlur stdDeviation="10" />
+      </filter>
+
+      <clipPath id="basketClip">
+        <path d="M 855 366 L 928 379 L 912 433 L 861 430 Z" />
+      </clipPath>
+
+      <line id="spoke" x1="0" y1="0" x2="0" y2="-96" />
+
+      <g id="wheelGraphic">
+        <circle r="106" fill="none" stroke="#223a36" stroke-width="13" />
+        <circle r="98.5" fill="none" stroke="#d9b36b" stroke-width="2.2" />
+        <circle r="104" fill="none" stroke="#fff3d9" stroke-width="1.3" opacity="0.28" />
+        <g stroke="#f3e6cf" stroke-width="1.3" opacity="0.72">
+          <use href="#spoke" />
+          <use href="#spoke" transform="rotate(30)" />
+          <use href="#spoke" transform="rotate(60)" />
+          <use href="#spoke" transform="rotate(90)" />
+          <use href="#spoke" transform="rotate(120)" />
+          <use href="#spoke" transform="rotate(150)" />
+          <use href="#spoke" transform="rotate(180)" />
+          <use href="#spoke" transform="rotate(210)" />
+          <use href="#spoke" transform="rotate(240)" />
+          <use href="#spoke" transform="rotate(270)" />
+          <use href="#spoke" transform="rotate(300)" />
+          <use href="#spoke" transform="rotate(330)" />
+        </g>
+        <circle r="14" fill="#d9b36b" />
+        <circle r="5.5" fill="#223a36" />
+        <circle cx="0" cy="100" r="3.5" fill="#c46145" />
+      </g>
+
+      <g id="cloudTile">
+        <g transform="translate(116 142)" opacity="0.68">
+          <ellipse cx="0" cy="0" rx="72" ry="18" fill="#fff7e6" />
+          <circle cx="-38" cy="-8" r="24" fill="#fff7e6" />
+          <circle cx="4" cy="-25" r="35" fill="#fff7e6" />
+          <circle cx="42" cy="-7" r="20" fill="#fff7e6" />
+        </g>
+        <g transform="translate(424 92) scale(0.78)" opacity="0.55">
+          <ellipse cx="0" cy="0" rx="62" ry="16" fill="#fff7e6" />
+          <circle cx="-30" cy="-8" r="21" fill="#fff7e6" />
+          <circle cx="6" cy="-23" r="30" fill="#fff7e6" />
+          <circle cx="38" cy="-5" r="17" fill="#fff7e6" />
+        </g>
+        <g transform="translate(746 76) scale(0.58)" opacity="0.48">
+          <ellipse cx="0" cy="0" rx="64" ry="16" fill="#fff7e6" />
+          <circle cx="-28" cy="-7" r="19" fill="#fff7e6" />
+          <circle cx="5" cy="-22" r="29" fill="#fff7e6" />
+          <circle cx="38" cy="-6" r="17" fill="#fff7e6" />
+        </g>
+        <g transform="translate(1034 138) scale(0.9)" opacity="0.62">
+          <ellipse cx="0" cy="0" rx="60" ry="15" fill="#fff7e6" />
+          <circle cx="-30" cy="-8" r="22" fill="#fff7e6" />
+          <circle cx="4" cy="-24" r="32" fill="#fff7e6" />
+          <circle cx="38" cy="-7" r="18" fill="#fff7e6" />
+        </g>
+        <g transform="translate(296 322) scale(0.42)" opacity="0.33">
+          <ellipse cx="0" cy="0" rx="64" ry="14" fill="#fff7e6" />
+          <circle cx="0" cy="-18" r="28" fill="#fff7e6" />
+        </g>
+      </g>
+
+      <g id="tuftA" fill="none" stroke="#5d765f" stroke-width="2.5" stroke-linecap="round">
+        <path d="M 0 0 C -4 -14 -11 -26 -18 -34" />
+        <path d="M 0 0 C 0 -18 3 -31 9 -42" />
+        <path d="M 0 0 C 8 -13 15 -22 22 -28" />
+      </g>
+
+      <g id="tuftB" fill="none" stroke="#7a8b6d" stroke-width="2" stroke-linecap="round">
+        <path d="M 0 0 C -3 -11 -6 -20 -12 -26" />
+        <path d="M 0 0 C 3 -14 5 -23 12 -31" />
+      </g>
+
+      <g id="budA">
+        <path d="M 0 0 C 2 -10 3 -18 3 -26" fill="none" stroke="#5d765f" stroke-width="2" stroke-linecap="round" />
+        <circle cx="3" cy="-28" r="4" fill="#d87a58" />
+      </g>
+
+      <g id="vergeTile">
+        <use href="#tuftA" x="44" y="605" />
+        <use href="#tuftB" x="156" y="602" />
+        <use href="#tuftA" x="286" y="607" />
+        <use href="#budA" x="372" y="603" />
+        <use href="#tuftB" x="462" y="601" />
+        <use href="#tuftA" x="592" y="606" />
+        <use href="#tuftB" x="716" y="602" />
+        <use href="#budA" x="812" y="604" />
+        <use href="#tuftA" x="922" y="606" />
+        <use href="#tuftB" x="1032" y="602" />
+        <use href="#tuftA" x="1138" y="605" />
+      </g>
+
+      <g id="framePaths" fill="none" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M 382 519 L 604 527" />
+        <path d="M 382 519 L 556 382" />
+        <path d="M 604 527 L 556 382" />
+        <path d="M 556 382 C 626 377 704 379 772 390" />
+        <path d="M 604 527 L 789 421" />
+        <path d="M 789 421 L 836 519" />
+        <path d="M 771 386 L 791 423" />
+      </g>
+    </defs>
+
+    <!-- SKY AND WEATHER -->
+    <rect width="1200" height="760" fill="#f2e6d1" />
+    <rect width="1200" height="470" fill="url(#skyGrad)" />
+
+    <circle cx="1012" cy="316" r="185" fill="url(#sunHalo)" />
+    <circle cx="1012" cy="316" r="66" fill="#f9c98f" />
+    <circle cx="1012" cy="316" r="49" fill="#ffdda9" opacity="0.78" />
+
+    <g id="cloudTrack">
+      <use href="#cloudTile" />
+      <use href="#cloudTile" x="1200" />
+    </g>
+
+    <g fill="none" stroke="#315c55" stroke-width="2.2" stroke-linecap="round" opacity="0.4">
+      <path d="M 290 244 q 9 -9 18 0 q 9 -9 18 0" />
+      <path d="M 348 220 q 6 -6 12 0 q 6 -6 12 0" />
+      <path d="M 1054 286 q 8 -8 16 0 q 8 -8 16 0" />
+      <path d="M 1118 310 q 6 -6 12 0 q 6 -6 12 0" opacity="0.6" />
+    </g>
+
+    <!-- DISTANT COAST -->
+    <path d="M 0 432 C 90 398 170 404 250 390 C 330 376 390 408 480 404 C 540 401 560 420 600 432 Z" fill="#b1b99c" opacity="0.74" />
+    <path d="M 780 432 C 860 400 940 404 1020 388 C 1090 374 1150 392 1200 382 L 1200 432 Z" fill="#9fae94" opacity="0.58" />
+
+    <rect x="0" y="432" width="1200" height="160" fill="url(#seaGrad)" />
+    <rect x="0" y="432" width="1200" height="2" fill="#edf3df" opacity="0.42" />
+
+    <path d="M 0 453 C 55 424 118 410 172 426 C 202 435 220 450 232 465 L 0 465 Z" fill="#6f8b75" />
+    <path d="M 0 460 C 58 440 118 436 189 454 L 193 470 L 0 470 Z" fill="#56735f" opacity="0.82" />
+    <path d="M 1200 438 C 1150 428 1112 436 1082 452 C 1120 460 1160 456 1200 450 Z" fill="#7b947e" />
+    <path d="M 0 467 C 54 456 108 452 164 460" fill="none" stroke="#89a086" stroke-width="2" opacity="0.6" />
+
+    <g transform="translate(116 402)" opacity="0.95">
+      <path d="M -7 34 L 7 34 L 5 0 L -5 0 Z" fill="#f3e7cf" stroke="#5f7663" stroke-width="1.4" stroke-linejoin="round" />
+      <rect x="-7" y="9" width="14" height="4" fill="#c75a43" />
+      <path d="M -8 0 L 8 0 L 5 -8 L -5 -8 Z" fill="#c75a43" stroke="#8e4437" stroke-width="1" stroke-linejoin="round" />
+      <rect x="-3.4" y="-6.5" width="6.8" height="5" rx="0.8" fill="#ffe6a8" />
+      <path d="M 0 -8 L 0 -15" fill="none" stroke="#4f6b56" stroke-width="1.4" stroke-linecap="round" />
+      <path d="M -2 34 L 2 34" fill="none" stroke="#8d9f86" stroke-width="1.5" />
+    </g>
+
+    <g id="waveLines" stroke="#e4f0e4" stroke-width="2" fill="none" stroke-linecap="round">
+      <path class="wave" d="M -40 470 H 1240" stroke-dasharray="22 38 6 22" opacity="0.4" />
+      <path class="wave" d="M -40 495 H 1240" stroke-dasharray="12 42 30 26" opacity="0.32" />
+      <path class="wave" d="M -40 521 H 1240" stroke-dasharray="36 48 10 30" opacity="0.28" />
+      <path class="wave" d="M -40 548 H 1240" stroke-dasharray="8 30 22 36" opacity="0.24" />
+      <path class="wave" d="M -40 573 H 1240" stroke-dasharray="30 40 8 24" opacity="0.2" />
+    </g>
+
+    <g fill="none" stroke="#dfece1" stroke-width="2" stroke-linecap="round" opacity="0.48">
+      <path d="M 112 482 q 24 -8 48 0 t 48 0" />
+      <path d="M 228 510 q 20 -7 40 0 t 40 0" />
+      <path d="M 86 540 q 18 -6 36 0 t 36 0" />
+      <path d="M 390 524 q 22 -7 44 0 t 44 0" />
+      <path d="M 660 486 q 24 -8 48 0 t 48 0" />
+      <path d="M 764 558 q 18 -6 36 0 t 36 0" />
+    </g>
+
+    <g fill="#ffe4b5" opacity="0.62">
+      <rect x="946" y="474" width="58" height="3" rx="1.5" />
+      <rect x="978" y="492" width="43" height="3" rx="1.5" />
+      <rect x="952" y="512" width="76" height="3" rx="1.5" />
+      <rect x="986" y="535" width="49" height="3" rx="1.5" />
+      <rect x="958" y="556" width="34" height="3" rx="1.5" />
+    </g>
+
+    <g transform="translate(1032 474)" opacity="0.82">
+      <path d="M -23 15 L 22 15 L 14 25 L -15 25 Z" fill="#2c5b55" />
+      <path d="M 0 11 L 0 -19 L 18 11 Z" fill="#f6ead1" />
+      <path d="M -4 11 L -4 -13 L -19 11 Z" fill="#e9d3b1" />
+      <path d="M -27 29 q 10 -4 20 0 t 20 0" fill="none" stroke="#e8f0df" stroke-width="1.5" opacity="0.45" />
+    </g>
+
+    <!-- SHORE AND ROAD -->
+    <path d="M 0 574 C 180 562 340 582 520 574 C 730 565 950 586 1200 570 L 1200 616 L 0 616 Z" fill="#b8c09d" />
+    <path d="M 0 596 C 220 588 380 604 590 596 C 810 588 1010 604 1200 594 L 1200 760 L 0 760 Z" fill="url(#roadGrad)" />
+    <path d="M 0 596 C 220 588 380 604 590 596 C 810 588 1010 604 1200 594" fill="none" stroke="#f1e2c6" stroke-width="4.5" opacity="0.76" />
+
+    <path id="roadDash" d="M -80 682 H 1280" fill="none" stroke="#f5e8cb" stroke-width="5" stroke-dasharray="52 96" stroke-linecap="round" opacity="0.54" />
+
+    <path d="M 0 728 C 220 716 440 738 680 730 C 900 722 1040 744 1200 732 L 1200 760 L 0 760 Z" fill="#7c8b66" opacity="0.75" />
+
+    <g id="vergeTrack">
+      <use href="#vergeTile" />
+      <use href="#vergeTile" x="1200" />
+    </g>
+
+    <!-- SPEED LINES -->
+    <g id="windLines" fill="none" stroke="#355b53" stroke-width="2" stroke-linecap="round" opacity="0.28">
+      <path d="M 210 340 C 258 330 300 332 344 340" />
+      <path d="M 250 370 C 300 362 340 364 388 372" />
+      <path d="M 312 308 C 350 302 386 303 420 309" />
+    </g>
+
+    <!-- BICYCLE -->
+    <ellipse cx="610" cy="631" rx="300" ry="18" fill="#5e4a32" opacity="0.24" filter="url(#softBlur)" />
+
+    <g id="wheelRear" transform="translate(382 519)">
+      <use href="#wheelGraphic" />
+    </g>
+    <g id="wheelFront" transform="translate(836 519)">
+      <use href="#wheelGraphic" />
+    </g>
+
+    <g fill="none" stroke-linecap="round">
+      <path class="chain" d="M 382 505 L 604 496" stroke="#5b4c3b" stroke-width="3.4" stroke-dasharray="7 5" />
+      <path class="chain" d="M 382 535 L 604 558" stroke="#5b4c3b" stroke-width="3.4" stroke-dasharray="7 5" />
+    </g>
+    <circle cx="382" cy="519" r="16" fill="#223a36" stroke="#d9b36b" stroke-width="2" />
+
+    <use href="#framePaths" stroke="#143f3a" stroke-width="12" />
+    <use href="#framePaths" stroke="#2d6f65" stroke-width="7.5" />
+
+    <circle cx="556" cy="382" r="8" fill="#2d6f65" stroke="#143f3a" stroke-width="3" />
+    <circle cx="604" cy="527" r="8" fill="#2d6f65" stroke="#143f3a" stroke-width="3" />
+    <circle cx="771" cy="386" r="6.5" fill="#2d6f65" stroke="#143f3a" stroke-width="2.5" />
+    <path d="M 774 391 L 789 403" fill="none" stroke="#d9b36b" stroke-width="2" opacity="0.6" />
+
+    <path id="legFar" d="M 579 372.3 L 665.6 411.3 L 594.1 488.3" fill="none" stroke="#a8622f" stroke-width="10.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.72" />
+    <g id="pedalFar" transform="translate(594.1 488.3)" opacity="0.72">
+      <rect x="-17" y="-4" width="34" height="8" rx="3" fill="#1b3431" />
+    </g>
+    <g id="footFar" transform="translate(594.1 486.3) rotate(-2)" opacity="0.72">
+      <path d="M -11 -5 C -3 -12 10 -11 19 -4 C 12 -1 16 2 20 5 C 8 10 -3 7 -11 2 Z" fill="#b87339" stroke="#965326" stroke-width="1.3" />
+    </g>
+
+    <g id="crankGroup" transform="rotate(75.6 604 527)">
+      <line x1="604" y1="527" x2="644" y2="527" stroke="#b68e53" stroke-width="7" stroke-linecap="round" />
+      <line x1="604" y1="527" x2="564" y2="527" stroke="#6e583d" stroke-width="7" stroke-linecap="round" />
+      <circle cx="604" cy="527" r="31" fill="#f6e7ca" fill-opacity="0.12" stroke="#d9b36b" stroke-width="4" />
+      <circle cx="604" cy="527" r="35" fill="none" stroke="#d9b36b" stroke-width="1.8" stroke-dasharray="2 4" opacity="0.8" />
+      <circle cx="604" cy="527" r="7" fill="#203a36" stroke="#d9b36b" stroke-width="2" />
+      <circle cx="644" cy="527" r="4" fill="#d9b36b" />
+      <circle cx="564" cy="527" r="4" fill="#8a6e47" />
+    </g>
+
+    <path id="legNear" d="M 594 376.3 L 633.7 462.3 L 613.9 565.7" fill="none" stroke="#e29444" stroke-width="12.5" stroke-linecap="round" stroke-linejoin="round" />
+    <g id="pedalNear" transform="translate(613.9 565.7)">
+      <rect x="-18" y="-4" width="36" height="8" rx="4" fill="#1b3431" />
+      <rect x="-13" y="-1" width="26" height="2" rx="1" fill="#d9b36b" opacity="0.5" />
+    </g>
+    <g id="footNear" transform="translate(613.9 563.7) rotate(2)">
+      <path d="M -11 -5 C -3 -12 10 -11 19 -4 C 12 -1 16 2 20 5 C 8 10 -3 7 -11 2 Z" fill="#e29444" stroke="#b56c2e" stroke-width="1.3" />
+      <path d="M 6 -7 C 4 -2 5 2 9 5 M 12 -6 C 10 -1 11 3 15 6" fill="none" stroke="#c87b39" stroke-width="1.2" opacity="0.8" />
+    </g>
+
+    <path d="M 500 370 C 520 359 554 357 572 365 C 579 368 578 375 568 378 C 544 385 514 382 502 376 C 496 373 496 372 500 370 Z" fill="#8a5a3c" stroke="#63402b" stroke-width="2" />
+    <path d="M 556 382 L 549 371" stroke="#d9b36b" stroke-width="4" stroke-linecap="round" />
+
+    <g transform="translate(520 397)">
+      <path d="M -20 0 C -16 -16 18 -18 25 -2 C 28 12 10 24 -8 20 C -18 17 -23 8 -20 0 Z" fill="#96613f" stroke="#70462d" stroke-width="2" />
+      <path d="M -16 -3 C -4 -12 12 -10 20 -1" fill="none" stroke="#d6a76e" stroke-width="2" />
+      <circle cx="2" cy="10" r="2.2" fill="#e3c28f" />
+    </g>
+
+    <g id="handlebar">
+      <path d="M 772 389 L 801 355" fill="none" stroke="#1b4a44" stroke-width="9" stroke-linecap="round" />
+      <path d="M 801 355 C 810 342 828 337 843 344" fill="none" stroke="#1b4a44" stroke-width="9" stroke-linecap="round" />
+      <path d="M 832 342 L 856 349" fill="none" stroke="#7c5639" stroke-width="13" stroke-linecap="round" />
+      <path d="M 833 343 L 854 349" fill="none" stroke="#b98252" stroke-width="3" stroke-linecap="round" opacity="0.55" />
+
+      <g transform="translate(815 333)">
+        <path d="M -7 5 C -7 0 0 -4 7 0 C 8 3 5 7 1 8 C -3 9 -6 8 -7 5 Z" fill="#d9b36b" stroke="#8a6a3b" stroke-width="1.5" />
+        <path d="M 0 -4 L 0 -8" stroke="#8a6a3b" stroke-width="2" stroke-linecap="round" />
+        <circle cx="0" cy="-8" r="2" fill="#d9b36b" />
+      </g>
+    </g>
+
+    <g id="bellPing1" transform="translate(815 333) scale(0.7)" opacity="0">
+      <circle r="10" fill="none" stroke="#244b44" stroke-width="1.4" />
+    </g>
+    <g id="bellPing2" transform="translate(815 333) scale(0.7)" opacity="0">
+      <circle r="10" fill="none" stroke="#244b44" stroke-width="1.2" />
+    </g>
+
+    <g transform="translate(884 368)">
+      <g id="fishTail">
+        <path d="M 0 0 C -8 -14 -9 -31 -2 -44 C 8 -34 10 -15 4 0 Z" fill="#8fb5ae" stroke="#5d8a83" stroke-width="1.5" />
+        <path d="M -1 -10 C 1 -20 2 -30 1 -38" fill="none" stroke="#d9ebe4" stroke-width="1.5" opacity="0.7" />
+      </g>
+    </g>
+    <g transform="translate(903 373) scale(0.72)" opacity="0.85">
+      <path d="M 0 0 C -7 -11 -7 -25 -1 -36 C 7 -27 8 -12 3 0 Z" fill="#b7ccc3" stroke="#6f978c" stroke-width="1.5" />
+    </g>
+
+    <g id="basket">
+      <path d="M 856 365 L 864 348 L 871 349 L 867 367" fill="none" stroke="#7a5432" stroke-width="4" stroke-linecap="round" />
+      <path d="M 916 376 L 909 356 L 916 354 L 924 377" fill="none" stroke="#7a5432" stroke-width="4" stroke-linecap="round" />
+      <path d="M 855 366 L 928 379 L 912 433 L 861 430 Z" fill="#d2a05f" stroke="#8d5b31" stroke-width="3" stroke-linejoin="round" />
+      <g clip-path="url(#basketClip)" stroke="#a46e3d" stroke-width="2" opacity="0.65">
+        <path d="M 848 382 L 934 394" />
+        <path d="M 851 400 L 930 410" />
+        <path d="M 855 418 L 922 426" />
+        <path d="M 869 362 L 878 436" />
+        <path d="M 885 366 L 893 438" />
+        <path d="M 901 370 L 908 437" />
+        <path d="M 916 375 L 921 435" />
+      </g>
+      <path d="M 853 366 L 930 379 L 927 387 L 854 374 Z" fill="#b88249" stroke="#8d5b31" stroke-width="2" />
+      <path d="M 855 366 Q 890 360 928 379" fill="none" stroke="#e5bd80" stroke-width="2.5" opacity="0.75" />
+      <path d="M 912 382 L 924 429" fill="none" stroke="#7a5432" stroke-width="2.5" opacity="0.4" />
+    </g>
+
+    <!-- PELICAN -->
+    <g id="pelican" transform="translate(0 2.3)">
+      <g id="tailFeathers" transform="rotate(0 490 320)">
+        <path d="M 486 304 C 448 292 412 286 396 292 C 414 306 442 323 476 330 Z" fill="#f1e3cb" stroke="#ddcab0" stroke-width="1.5" />
+        <path d="M 486 318 C 442 317 414 323 402 336 C 430 342 462 342 492 334 Z" fill="#e7d7bd" />
+        <path d="M 486 328 C 456 340 438 354 434 362 C 456 358 480 350 496 338 Z" fill="#dcc9ac" />
+      </g>
+
+      <path d="M 622 280 C 674 278 724 296 774 326 C 760 335 742 331 718 321 C 688 307 656 299 618 306 Z" fill="#e7d7bd" opacity="0.62" />
+
+      <path d="M 486 300 C 504 252 552 226 611 228 C 673 230 708 262 708 310 C 708 350 672 381 616 387 C 566 393 520 372 494 340 C 479 322 477 311 486 300 Z" fill="url(#bodyGrad)" stroke="#d8c4a6" stroke-width="2.2" />
+      <path d="M 522 360 C 558 387 624 390 674 352 C 651 385 603 398 558 383 C 542 377 531 369 522 360 Z" fill="#d8c4a7" opacity="0.55" />
+      <path d="M 535 260 C 568 238 614 234 650 247" fill="none" stroke="#fffaf0" stroke-width="8" stroke-linecap="round" opacity="0.6" />
+      <path d="M 552 335 C 578 346 604 348 628 343" fill="none" stroke="#e5d4b9" stroke-width="2" stroke-linecap="round" opacity="0.65" />
+
+      <g id="headGroup" transform="rotate(0 700 246)">
+        <path d="M 650 292 C 660 252 674 218 708 200" fill="none" stroke="#d8c4a6" stroke-width="56" stroke-linecap="round" />
+        <path d="M 650 292 C 660 252 674 218 708 200" fill="none" stroke="#f8efdd" stroke-width="49" stroke-linecap="round" />
+        <path d="M 642 289 C 650 253 663 222 693 202 C 680 226 672 260 665 295 Z" fill="#e6d4b8" opacity="0.66" />
+
+        <ellipse cx="722" cy="180" rx="49" ry="44" fill="#f9f0de" stroke="#d8c4a6" stroke-width="2" />
+        <path d="M 692 210 C 705 228 729 237 752 232 C 738 245 711 243 695 228 C 687 220 686 215 692 210 Z" fill="#e5d3b7" opacity="0.55" />
+
+        <ellipse cx="742" cy="176" rx="13" ry="14" fill="#fffdf6" stroke="#c9b393" stroke-width="1.5" />
+        <circle cx="747" cy="178" r="6" fill="#203633" />
+        <circle cx="745" cy="175" r="2" fill="#ffffff" opacity="0.92" />
+        <path d="M 731 156 Q 744 150 756 159" fill="none" stroke="#b2946d" stroke-width="2.4" stroke-linecap="round" opacity="0.7" />
+        <path d="M 732 187 Q 743 191 753 186" fill="none" stroke="#d3bd9b" stroke-width="1.4" stroke-linecap="round" opacity="0.8" />
+
+        <g id="pouchGroup" transform="rotate(0 758 196)">
+          <path d="M 758 191 C 796 211 866 225 934 211 C 928 234 904 253 869 264 C 828 276 784 251 760 214 C 756 206 755 198 758 191 Z" fill="url(#pouchGrad)" stroke="#c86f36" stroke-width="2" stroke-linejoin="round" />
+          <path d="M 780 211 C 810 233 858 245 904 240" fill="none" stroke="#f9ca8d" stroke-width="3" stroke-linecap="round" opacity="0.38" />
+          <path d="M 806 228 C 826 244 850 253 876 256" fill="none" stroke="#d9783c" stroke-width="1.6" stroke-linecap="round" opacity="0.32" />
+        </g>
+
+        <path d="M 756 165 C 800 165 874 179 932 194 C 943 197 947 203 943 208 C 939 214 928 215 917 214 C 860 210 806 201 761 191 C 752 188 750 175 756 165 Z" fill="url(#beakGrad)" stroke="#b85f2c" stroke-width="2" stroke-linejoin="round" />
+        <path d="M 767 177 C 823 183 880 195 932 203" fill="none" stroke="#f9c888" stroke-width="3" stroke-linecap="round" opacity="0.46" />
+        <path d="M 772 188 C 824 199 884 207 930 209" fill="none" stroke="#c15f2c" stroke-width="1.5" stroke-linecap="round" opacity="0.62" />
+        <ellipse cx="786" cy="178" rx="3.6" ry="2.3" fill="#b95b2b" opacity="0.55" transform="rotate(-8 786 178)" />
+        <path d="M 932 204 C 944 205 947 212 938 216" fill="none" stroke="#a84f25" stroke-width="2" stroke-linecap="round" />
+
+        <g id="cap">
+          <path d="M 690 157 C 696 128 727 118 749 130 C 760 137 766 147 765 157 C 741 148 714 150 692 168 Z" fill="#cd6047" stroke="#9d4533" stroke-width="2" stroke-linejoin="round" />
+          <path d="M 692 160 C 717 149 743 149 763 157" fill="none" stroke="#f4e7d1" stroke-width="6" stroke-linecap="round" />
+          <path d="M 753 155 C 770 149 789 151 798 159 C 786 167 765 167 751 162 Z" fill="#b04f39" stroke="#8e3e2d" stroke-width="1.5" stroke-linejoin="round" />
+          <circle cx="728" cy="126" r="3.5" fill="#f4e7d1" />
+        </g>
+      </g>
+
+      <g id="wingNear" transform="rotate(0 650 275)">
+        <path d="M 638 262 C 688 256 738 280 772 306 C 754 318 734 322 714 317 C 686 309 656 310 634 316 C 622 303 622 276 638 262 Z" fill="url(#wingGrad)" stroke="#c9b28e" stroke-width="2" stroke-linejoin="round" />
+        <path d="M 756 300 C 782 314 810 331 834 343 C 845 348 848 356 840 361 C 832 366 817 358 803 349 C 782 335 760 326 740 320 C 742 311 748 304 756 300 Z" fill="url(#wingGrad)" stroke="#c9b28e" stroke-width="2" stroke-linejoin="round" />
+        <path d="M 824 338 C 838 340 850 347 849 355 C 844 362 832 360 822 353 Z" fill="#fbf1dd" stroke="#c9b28e" stroke-width="1.5" stroke-linejoin="round" />
+        <path d="M 764 304 C 780 316 798 329 814 342 M 786 316 C 800 327 812 336 822 346" fill="none" stroke="#c6ad88" stroke-width="2" stroke-linecap="round" opacity="0.75" />
+        <path d="M 660 303 C 684 305 708 311 728 319" fill="none" stroke="#e0cfb3" stroke-width="2" stroke-linecap="round" opacity="0.9" />
+      </g>
+
+      <path id="scarfBack" d="M 680 240 C 640 234 598 230 560 242 C 600 250 646 256 674 251 C 678 248 681 244 680 240 Z" fill="#b6503c" stroke="#8b3c2c" stroke-width="1.5" />
+      <path id="scarfFront" d="M 684 228 C 652 198 606 190 548 206 L 566 219 L 536 228 L 562 237 L 544 250 C 598 257 648 249 682 243 Z" fill="url(#scarfPattern)" stroke="#a94835" stroke-width="1.6" stroke-linejoin="round" />
+      <path d="M 673 226 C 691 216 714 222 724 238 C 717 249 697 252 681 245 Z" fill="#c75a43" stroke="#9a4231" stroke-width="1.5" />
+      <circle cx="684" cy="239" r="6" fill="#a84632" />
+    </g>
+
+    <!-- FOREGROUND -->
+    <g id="fgLeft">
+      <path d="M -10 762 C 24 718 22 674 2 630 C 44 682 58 724 40 762 Z" fill="#466351" />
+      <path d="M 18 762 C 42 728 48 694 34 656 C 66 700 72 734 60 762 Z" fill="#5e795e" />
+      <path d="M 46 762 C 64 736 76 714 78 692 C 92 716 90 744 84 762 Z" fill="#395846" />
+      <path d="M 8 762 C -8 726 -2 690 -22 662 C 4 684 20 718 34 762 Z" fill="#6f8665" />
+      <path d="M 74 762 C 94 738 104 710 104 686 C 120 714 116 742 110 762 Z" fill="#476352" />
+      <path d="M 62 720 C 70 696 72 678 68 662" fill="none" stroke="#4b6853" stroke-width="3" stroke-linecap="round" />
+      <circle cx="66" cy="658" r="8" fill="#d46e52" />
+      <circle cx="66" cy="658" r="3" fill="#e7b06b" />
+      <path d="M 28 724 C 34 708 36 696 33 684" fill="none" stroke="#5b765f" stroke-width="2.2" stroke-linecap="round" />
+      <circle cx="32" cy="680" r="5" fill="#db8762" />
+    </g>
+
+    <g id="fgRight">
+      <path d="M 1210 762 C 1176 716 1180 680 1200 638 C 1164 684 1150 726 1170 762 Z" fill="#3f5e4c" />
+      <path d="M 1178 762 C 1152 728 1144 696 1158 664 C 1128 704 1122 738 1134 762 Z" fill="#5d785d" />
+      <path d="M 1152 762 C 1134 736 1122 714 1120 692 C 1106 716 1108 744 1114 762 Z" fill="#476654" />
+      <path d="M 1206 762 C 1188 724 1196 690 1216 662 C 1190 684 1174 720 1160 762 Z" fill="#6d8463" />
+      <path d="M 1138 720 C 1130 696 1128 680 1132 664" fill="none" stroke="#4b6853" stroke-width="3" stroke-linecap="round" />
+      <circle cx="1134" cy="660" r="7.5" fill="#d46e52" />
+      <circle cx="1134" cy="660" r="3" fill="#e7b06b" />
+    </g>
+
+    <rect width="1200" height="760" fill="url(#vignette)" pointer-events="none" />
+
+    <!-- MASTHEAD -->
+    <g id="titleBlock">
+      <text x="70" y="78" class="kicker">PELICAN EXPRESS · COASTAL LINE</text>
+      <line x1="70" y1="92" x2="250" y2="92" stroke="#1b4540" stroke-opacity="0.34" />
+      <text x="66" y="170" class="display">Coastline</text>
+      <text x="66" y="246" class="display display-italic">cruise.</text>
+      <text x="72" y="286" class="caption">A small bird. A big beak.</text>
+      <text x="72" y="306" class="caption">One very good day.</text>
+    </g>
+
+    <g transform="translate(1080 108) rotate(7)" opacity="0.9">
+      <circle r="60" fill="none" stroke="#1b4540" stroke-width="1.1" />
+      <circle r="53" fill="none" stroke="#1b4540" stroke-width="1.1" stroke-dasharray="2 4" />
+      <path d="M -24 30 q 12 -8 24 0 q 12 -8 24 0" fill="none" stroke="#1b4540" stroke-width="1.3" opacity="0.7" />
+      <text y="-6" class="stamp">PELICAN</text>
+      <text y="10" class="stamp">EXPRESS</text>
+      <text y="26" class="stamp stamp-small">NO. 07</text>
+    </g>
+  </svg>
+
+  <button class="control is-playing" id="toggle" type="button" aria-label="Pause animation" title="Pause animation (Space)">
+    <span class="ctl-icon" aria-hidden="true"></span>
+    <span id="toggleLabel">Pause</span>
+  </button>
+</main>
+
+<script>
+(function () {
+  'use strict';
+
+  var get = function (id) { return document.getElementById(id); };
+  var poster = get('poster');
+  var toggle = get('toggle');
+  var toggleLabel = get('toggleLabel');
+
+  var els = {
+    wheelRear: get('wheelRear'),
+    wheelFront: get('wheelFront'),
+    crank: get('crankGroup'),
+    pedalNear: get('pedalNear'),
+    pedalFar: get('pedalFar'),
+    legNear: get('legNear'),
+    legFar: get('legFar'),
+    footNear: get('footNear'),
+    footFar: get('footFar'),
+    pelican: get('pelican'),
+    head: get('headGroup'),
+    pouch: get('pouchGroup'),
+    tail: get('tailFeathers'),
+    wing: get('wingNear'),
+    scarfFront: get('scarfFront'),
+    scarfBack: get('scarfBack'),
+    cloudTrack: get('cloudTrack'),
+    vergeTrack: get('vergeTrack'),
+    roadDash: get('roadDash'),
+    fishTail: get('fishTail'),
+    bell1: get('bellPing1'),
+    bell2: get('bellPing2'),
+    wind: get('windLines'),
+    fgLeft: get('fgLeft'),
+    fgRight: get('fgRight')
+  };
+
+  var waves = Array.prototype.slice.call(document.querySelectorAll('#scene .wave'));
+  var chains = Array.prototype.slice.call(document.querySelectorAll('#scene .chain'));
+
+  var motionQuery = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : { matches: false };
+  var running = !motionQuery.matches;
+  var clock = 2.2;
+  var lastTime = 0;
+  var rafId = 0;
+  var wheelDegPerSec = 118;
+  var crankDegPerSec = 198;
+  var roadSpeed = 214;
+
+  var bb = { x: 604, y: 527 };
+  var crankRadius = 40;
+  var thigh = 95;
+  var shin = 105;
+
+  function clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value));
+  }
+
+  function legGeometry(hip, foot) {
+    var dx = foot.x - hip.x;
+    var dy = foot.y - hip.y;
+    var distance = Math.sqrt(dx * dx + dy * dy);
+    distance = clamp(distance, Math.abs(thigh - shin) + 0.2, thigh + shin - 0.2);
+    var base = Math.atan2(dy, dx);
+    var cosine = (distance * distance + thigh * thigh - shin * shin) / (2 * distance * thigh);
+    var alpha = Math.acos(clamp(cosine, -1, 1));
+    var kneeAngle = base - alpha;
+    return {
+      kneeX: hip.x + thigh * Math.cos(kneeAngle),
+      kneeY: hip.y + thigh * Math.sin(kneeAngle)
+    };
+  }
+
+  function placeLeg(node, hip, foot, knee) {
+    if (!node) return;
+    node.setAttribute('d',
+      'M ' + hip.x.toFixed(2) + ' ' + hip.y.toFixed(2) +
+      ' L ' + knee.kneeX.toFixed(2) + ' ' + knee.kneeY.toFixed(2) +
+      ' L ' + foot.x.toFixed(2) + ' ' + (foot.y - 2).toFixed(2));
+  }
+
+  function placeFoot(node, pedal, angle) {
+    if (!node) return;
+    node.setAttribute('transform',
+      'translate(' + pedal.x.toFixed(2) + ' ' + (pedal.y - 2).toFixed(2) + ') rotate(' + angle.toFixed(2) + ')');
+  }
+
+  function render(t) {
+    var wheelAngle = (t * wheelDegPerSec) % 360;
+    if (els.wheelRear) {
+      els.wheelRear.setAttribute('transform', 'translate(382 519) rotate(' + wheelAngle.toFixed(2) + ')');
+    }
+    if (els.wheelFront) {
+      els.wheelFront.setAttribute('transform', 'translate(836 519) rotate(' + wheelAngle.toFixed(2) + ')');
+    }
+
+    var crankDeg = (t * crankDegPerSec) % 360;
+    var crankRad = crankDeg * Math.PI / 180;
+    var nearPedal = {
+      x: bb.x + crankRadius * Math.cos(crankRad),
+      y: bb.y + crankRadius * Math.sin(crankRad)
+    };
+    var farPedal = {
+      x: bb.x - crankRadius * Math.cos(crankRad),
+      y: bb.y - crankRadius * Math.sin(crankRad)
+    };
+
+    if (els.crank) {
+      els.crank.setAttribute('transform', 'rotate(' + crankDeg.toFixed(2) + ' ' + bb.x + ' ' + bb.y + ')');
+    }
+    if (els.pedalNear) {
+      els.pedalNear.setAttribute('transform', 'translate(' + nearPedal.x.toFixed(2) + ' ' + nearPedal.y.toFixed(2) + ')');
+    }
+    if (els.pedalFar) {
+      els.pedalFar.setAttribute('transform', 'translate(' + farPedal.x.toFixed(2) + ' ' + farPedal.y.toFixed(2) + ')');
+    }
+
+    var bob = Math.sin(t * 3.42) * 2.4;
+    if (els.pelican) {
+      els.pelican.setAttribute('transform', 'translate(0 ' + bob.toFixed(2) + ')');
+    }
+    if (els.head) {
+      els.head.setAttribute('transform', 'rotate(' + (Math.sin(t * 3.42 - 0.8) * 1.15).toFixed(2) + ' 700 246)');
+    }
+    if (els.pouch) {
+      els.pouch.setAttribute('transform', 'rotate(' + (Math.sin(t * 5.0) * 1.35).toFixed(2) + ' 758 196)');
+    }
+    if (els.wing) {
+      els.wing.setAttribute('transform', 'rotate(' + (Math.sin(t * 3.42 + 0.55) * 0.8).toFixed(2) + ' 650 275)');
+    }
+    if (els.tail) {
+      els.tail.setAttribute('transform', 'rotate(' + (Math.sin(t * 2.3) * 2.8).toFixed(2) + ' 490 320)');
+    }
+
+    var hipNear = { x: 594, y: 374 + bob };
+    var hipFar = { x: 579, y: 370 + bob };
+    var kneeNear = legGeometry(hipNear, nearPedal);
+    var kneeFar = legGeometry(hipFar, farPedal);
+
+    placeLeg(els.legNear, hipNear, nearPedal, kneeNear);
+    placeLeg(els.legFar, hipFar, farPedal, kneeFar);
+    placeFoot(els.footNear, nearPedal, Math.sin(crankRad) * 4.5);
+    placeFoot(els.footFar, farPedal, Math.sin(crankRad + Math.PI) * 4.5);
+
+    var s1 = Math.sin(t * 4.4);
+    var s2 = Math.sin(t * 4.4 + 1.15);
+
+    if (els.scarfFront) {
+      els.scarfFront.setAttribute('d',
+        'M 684 228 C 652 ' + (198 + s1 * 10).toFixed(1) +
+        ' 606 ' + (190 - s1 * 4).toFixed(1) +
+        ' 548 ' + (206 + s2 * 13).toFixed(1) +
+        ' L 566 ' + (219 + s2 * 4).toFixed(1) +
+        ' L 536 ' + (228 + s2 * 12).toFixed(1) +
+        ' L 562 ' + (237 + s2 * 7).toFixed(1) +
+        ' L 544 ' + (250 + s2 * 10).toFixed(1) +
+        ' C 598 ' + (257 + s1 * 5).toFixed(1) +
+        ' 648 ' + (249 - s2 * 2).toFixed(1) +
+        ' 682 243 Z');
+    }
+
+    if (els.scarfBack) {
+      els.scarfBack.setAttribute('d',
+        'M 680 240 C 640 ' + (234 + s2 * 7).toFixed(1) +
+        ' 598 ' + (230 - s1 * 5).toFixed(1) +
+        ' 560 ' + (242 + s1 * 8).toFixed(1) +
+        ' C 600 ' + (250 + s2 * 4).toFixed(1) +
+        ' 646 ' + (256 - s1 * 2).toFixed(1) +
+        ' 674 251 C 678 248 681 244 680 240 Z');
+    }
+
+    if (els.cloudTrack) {
+      els.cloudTrack.setAttribute('transform', 'translate(' + (-((t * 11) % 1200)).toFixed(2) + ' 0)');
+    }
+    if (els.vergeTrack) {
+      els.vergeTrack.setAttribute('transform', 'translate(' + (-((t * 168) % 1200)).toFixed(2) + ' 0)');
+    }
+    if (els.roadDash) {
+      els.roadDash.style.strokeDashoffset = String(((t * roadSpeed) % 148).toFixed(2));
+    }
+
+    var i;
+    for (i = 0; i < waves.length; i++) {
+      waves[i].style.strokeDashoffset = String(((t * (11 + i * 2.4)) % 96 + i * 9).toFixed(2));
+    }
+    for (i = 0; i < chains.length; i++) {
+      chains[i].style.strokeDashoffset = String(((t * 90) % 12).toFixed(2));
+    }
+
+    if (els.fishTail) {
+      els.fishTail.setAttribute('transform', 'rotate(' + (Math.sin(t * 6.2) * 8).toFixed(2) + ')');
+    }
+    if (els.wind) {
+      els.wind.setAttribute('opacity', (0.24 + 0.1 * Math.sin(t * 2.2)).toFixed(3));
+      els.wind.setAttribute('transform', 'translate(' + (Math.sin(t * 1.4) * 4).toFixed(1) + ' 0)');
+    }
+    if (els.fgLeft) {
+      els.fgLeft.setAttribute('transform', 'rotate(' + (Math.sin(t * 1.25) * 0.7).toFixed(2) + ' 0 760)');
+    }
+    if (els.fgRight) {
+      els.fgRight.setAttribute('transform', 'rotate(' + (Math.sin(t * 1.25 + 1.7) * 0.55).toFixed(2) + ' 1200 760)');
+    }
+
+    var bellPhase = t % 8;
+    var pings = [
+      { node: els.bell1, delay: 0.05 },
+      { node: els.bell2, delay: 0.22 }
+    ];
+
+    for (i = 0; i < pings.length; i++) {
+      var node = pings[i].node;
+      if (!node) continue;
+      var age = bellPhase - pings[i].delay;
+      if (age >= 0 && age < 0.95) {
+        var scale = 0.7 + age * 2.4;
+        node.setAttribute('transform', 'translate(815 333) scale(' + scale.toFixed(2) + ')');
+        node.setAttribute('opacity', ((1 - age / 0.95) * 0.55).toFixed(2));
+      } else {
+        node.setAttribute('opacity', '0');
+      }
+    }
+  }
+
+  function syncToggle() {
+    if (!toggle || !toggleLabel) return;
+    toggle.classList.toggle('is-playing', running);
+    toggle.classList.toggle('is-paused', !running);
+    toggleLabel.textContent = running ? 'Pause' : 'Play';
+    toggle.setAttribute('aria-label', running ? 'Pause animation' : 'Play animation');
+    toggle.setAttribute('title', running ? 'Pause animation (Space)' : 'Play animation (Space)');
+    if (poster) poster.classList.toggle('is-paused', !running);
+  }
+
+  function frame(now) {
+    if (!running) return;
+    if (!lastTime) lastTime = now;
+    var dt = (now - lastTime) / 1000;
+    lastTime = now;
+    if (dt > 0.08) dt = 0.08;
+    clock += dt;
+    render(clock);
+    rafId = window.requestAnimationFrame(frame);
+  }
+
+  function start() {
+    if (running) return;
+    running = true;
+    lastTime = 0;
+    syncToggle();
+    rafId = window.requestAnimationFrame(frame);
+  }
+
+  function stop() {
+    if (!running) return;
+    running = false;
+    if (rafId) window.cancelAnimationFrame(rafId);
+    rafId = 0;
+    syncToggle();
+  }
+
+  if (toggle) {
+    toggle.addEventListener('click', function () {
+      if (running) {
+        stop();
+      } else {
+        start();
+      }
+    });
+  }
+
+  document.addEventListener('keydown', function (event) {
+    if (event.code !== 'Space' || event.repeat) return;
+    var tag = event.target && event.target.tagName ? event.target.tagName : '';
+    if (tag === 'BUTTON' || tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || tag === 'A') return;
+    event.preventDefault();
+    if (running) {
+      stop();
+    } else {
+      start();
+    }
+  });
+
+  if (motionQuery.addEventListener) {
+    motionQuery.addEventListener('change', function (event) {
+      if (event.matches) {
+        stop();
+      } else {
+        syncToggle();
+      }
+    });
+  }
+
+  render(clock);
+  syncToggle();
+  if (running) {
+    rafId = window.requestAnimationFrame(frame);
+  }
+})();
+</script>
+</body>
+</html>
