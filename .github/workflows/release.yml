@@ -127,7 +127,10 @@ jobs:
           printf "version: %s\nbuilt_at: %s\ngateway: %s\narch: arm64\n" \
             "$V" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "${ER_GATEWAY:-http://127.0.0.1:8080}" \
             > "$out/BUILD_INFO.txt"
-          ( cd dist && ditto -c -k --sequesterRsrc --keepParent "$out" "${out}.zip" )
+          # 注意：cd dist 之后 $out 已经是相对 dist 的路径，再用完整 $out 会变成 dist/dist/...
+          # （上一版就是这么炸的：ditto: Cannot get the real path for source）。用 basename。
+          base="$(basename "$out")"
+          ( cd dist && ditto -c -k --sequesterRsrc --keepParent "$base" "${base}.zip" )
           ls -lh dist
       - uses: actions/upload-artifact@v4
         with:
