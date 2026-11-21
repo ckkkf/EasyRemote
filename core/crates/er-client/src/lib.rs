@@ -3,6 +3,7 @@
 pub mod agent;
 pub mod conductor;
 pub mod encoder;
+pub mod ctrl_session;
 pub mod host_stream;
 pub mod gpu_policy;
 pub mod link;

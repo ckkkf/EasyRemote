@@ -606,6 +606,32 @@ pub struct ControllerAgent {
 }
 
 impl ControllerAgent {
+    /// 用已登录会话构造主控端（不重新登录、不重新请求会话）。
+    ///
+    /// 客户端已经在 GatewayClient 里建过会话，FFI 只需要"接管"它跑收发；
+    /// 再 request 一次会撞上「设备正在被控制」。
+    pub fn from_session(
+        gateway_base: &str,
+        token: &str,
+        device_id: &str,
+        device_token: &str,
+        relay_addr: SocketAddr,
+    ) -> Result<Self, AgentError> {
+        if token.is_empty() || device_id.is_empty() {
+            return Err(AgentError("missing session (token/device_id)".into()));
+        }
+        let device = BoundDevice {
+            device_id: device_id.to_string(),
+            device_token: device_token.to_string(),
+            raw_code: String::new(),
+        };
+        let gw = Gateway::new(gateway_base, token, device_token);
+        let identity = DeviceIdentity::random();
+        gw.register_identity(device_id, &encode_pubkey(identity.public().as_bytes()))
+            .map_err(|e| AgentError(e.to_string()))?;
+        Ok(Self { gw, device, identity, relay_addr })
+    }
+
     pub fn start(
         gateway_base: &str,
         phone: &str,

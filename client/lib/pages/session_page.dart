@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -6,7 +7,9 @@ import 'package:flutter/services.dart';
 import '../api.dart';
 import '../models.dart';
 import '../net_probe.dart';
+import '../main.dart' show erGatewayBaseUrl;
 import '../net_probe_cache.dart';
+import '../session_video.dart';
 import '../theme.dart';
 import 'diagnostics_page.dart';
 
@@ -83,10 +86,39 @@ class _SessionPageState extends State<SessionPage> {
     _tick = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) setState(() {});
     });
+    _startVideo();
+  }
+
+
+  Timer? _videoTimer;
+
+  /// 接管会话并开始拉帧：FFI 里已经建好双缓冲，这里只是定时把最新帧解码成 ui.Image。
+  void _startVideo() {
+    final token = widget.client.token ?? "";
+    final deviceId = widget.client.deviceId ?? "";
+    final deviceToken = widget.client.deviceToken ?? "";
+    if (token.isEmpty || deviceId.isEmpty) {
+      debugPrint("[video] 缺少登录态，跳过画面接管");
+      return;
+    }
+    SessionVideo.instance.attach(
+      gateway: erGatewayBaseUrl.isEmpty ? "http://127.0.0.1:18090" : erGatewayBaseUrl,
+      relay: "127.0.0.1:19000",
+      token: token,
+      deviceId: deviceId,
+      deviceToken: deviceToken,
+      sessionId: widget.sessionId,
+    );
+    _videoTimer = Timer.periodic(const Duration(milliseconds: 60), (_) async {
+      await SessionVideo.instance.poll();
+      if (mounted && SessionVideo.instance.image != null) setState(() {});
+    });
   }
 
   @override
   void dispose() {
+    _videoTimer?.cancel();
+    SessionVideo.instance.close();
     _poll?.cancel();
     _tick?.cancel();
     super.dispose();
@@ -486,7 +518,7 @@ class _SessionPageState extends State<SessionPage> {
 
     return Stack(
       children: [
-        Positioned.fill(child: _remotePlaceholder(context)),
+        Positioned.fill(child: _remoteView(context)),
         if (!_immersive)
           Positioned(
             top: 0,
@@ -517,6 +549,47 @@ class _SessionPageState extends State<SessionPage> {
           ),
       ],
     );
+  }
+
+  /// 远端画面：有帧就画，没帧才显示占位说明。
+  Widget _remoteView(BuildContext context) {
+    final img = SessionVideo.instance.image;
+    if (img == null) {
+      return _remotePlaceholder(context);
+    }
+    return Container(
+      key: const Key("remote-canvas"),
+      color: Colors.black,
+      child: LayoutBuilder(
+        builder: (context, c) {
+          final iw = img.width.toDouble();
+          final ih = img.height.toDouble();
+          final scale = (c.maxWidth / iw).clamp(0.0, c.maxHeight / ih);
+          return Center(
+            child: Listener(
+              onPointerMove: (e) => _sendPointer(e.localPosition, scale, img),
+              onPointerDown: (e) {
+                _sendPointer(e.localPosition, scale, img);
+                SessionVideo.instance.send(1, 0, 1);
+              },
+              onPointerUp: (e) => SessionVideo.instance.send(1, 0, 0),
+              child: SizedBox(
+                width: iw * scale,
+                height: ih * scale,
+                child: RawImage(image: img, fit: BoxFit.fill),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  /// 把窗口坐标换算成被控端像素坐标再发过去。
+  void _sendPointer(Offset local, double scale, ui.Image img) {
+    final x = (local.dx / scale).clamp(0.0, img.width.toDouble()).round();
+    final y = (local.dy / scale).clamp(0.0, img.height.toDouble()).round();
+    SessionVideo.instance.send(0, x, y);
   }
 
   Widget _remotePlaceholder(BuildContext context) {
