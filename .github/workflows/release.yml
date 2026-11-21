@@ -72,7 +72,7 @@ jobs:
             > "$out/BUILD_INFO.txt"
           tar -czf "dist/easyremote-client-web-${V}.tar.gz" -C dist "easyremote-client-web-${V}"
           ls -lh dist
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: client-web
           path: dist/easyremote-client-web-*.tar.gz
@@ -132,7 +132,7 @@ jobs:
           base="$(basename "$out")"
           ( cd dist && ditto -c -k --sequesterRsrc --keepParent "$base" "${base}.zip" )
           ls -lh dist
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: client-macos
           path: dist/easyremote-client-macos-*.zip
@@ -173,7 +173,7 @@ jobs:
               go build -trimpath -ldflags "-s -w" -o "../$out/$cmd$ext" "./cmd/$cmd"
           done
           tar -czf "../$out.tar.gz" -C ../dist "$(basename "$out")"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: server-${{ matrix.goos }}-${{ matrix.goarch }}
           path: dist/easyremote-server-*.tar.gz
