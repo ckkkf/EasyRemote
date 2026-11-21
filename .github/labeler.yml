@@ -1,0 +1,24 @@
+server:
+  - changed-files:
+      - any-glob-to-any-file: ['server/**']
+core:
+  - changed-files:
+      - any-glob-to-any-file: ['core/**']
+client:
+  - changed-files:
+      - any-glob-to-any-file: ['client/**']
+web-admin:
+  - changed-files:
+      - any-glob-to-any-file: ['web-admin/**']
+spec:
+  - changed-files:
+      - any-glob-to-any-file: ['docs/spec/**']
+docs:
+  - changed-files:
+      - any-glob-to-any-file: ['docs/**', '*.md']
+ci:
+  - changed-files:
+      - any-glob-to-any-file: ['.github/**', 'scripts/**']
+dependencies:
+  - changed-files:
+      - any-glob-to-any-file: ['**/package-lock.json', '**/go.sum', '**/Cargo.lock', '**/pubspec.lock']

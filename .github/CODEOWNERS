@@ -1,0 +1,4 @@
+# 默认所有者。多人协作时可按目录细分，例如：
+# /core/    @someone
+# /server/  @someone-else
+*  @ckkkf

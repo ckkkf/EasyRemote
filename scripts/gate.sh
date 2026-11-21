@@ -14,32 +14,32 @@ BASELINE="scripts/gate-baseline.txt"
 fail=0
 say() { echo; echo "== $1 =="; }
 
-say "1/8 gofmt"
+say "1/9 gofmt"
 out=$(gofmt -l server 2>/dev/null || true)
 if [ -n "$out" ]; then echo "$out"; fail=1; fi
 
-say "2/8 go vet + go test"
+say "2/9 go vet + go test"
 if ! (cd server && go vet ./... && go test ./...); then fail=1; fi
 
-say "3/8 web-admin tsc"
+say "3/9 web-admin tsc"
 if [ -d web-admin/node_modules ]; then
   if ! (cd web-admin && npx tsc --noEmit); then fail=1; fi
 else
   echo "跳过：web-admin/node_modules 不存在（先装依赖）"
 fi
 
-say "4/8 契约与错误码生成物"
+say "4/9 契约与错误码生成物"
 node scripts/gen-errors.mjs --check || fail=1
 node scripts/gen-contract.mjs --check || fail=1
 
-say "5/8 路由清单 vs 契约"
+say "5/9 路由清单 vs 契约"
 if [ "$MODE" = "--report" ]; then
   node scripts/check-routes.mjs || true
 else
   node scripts/check-routes.mjs --strict || fail=1
 fi
 
-say "6/8 禁止模式"
+say "6/9 禁止模式"
 current="$(mktemp)"
 trap 'rm -f "$current"' EXIT
 {
@@ -64,7 +64,10 @@ else
   fi
 fi
 
-say "7/8 响应信封契约"
+say "7/9 版本一致性"
+node scripts/check-version.mjs || fail=1
+
+say "8/9 响应信封契约"
 if [ "$MODE" = "--report" ]; then
   (cd server && go test ./internal/adminhttp/ -run TestAdminEnvelopeContract -v 2>&1) | grep -E '违规|报告模式|全部' || true
 else
