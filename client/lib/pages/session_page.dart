@@ -555,7 +555,8 @@ class _SessionPageState extends State<SessionPage> {
   Widget _remoteView(BuildContext context) {
     final img = SessionVideo.instance.image;
     if (img == null) {
-      return _remotePlaceholder(context);
+      // 把 FFI 侧的错误直接显示出来：黑屏时这是唯一能自证的线索
+      return _remotePlaceholder(context, SessionVideo.instance.error);
     }
     return Container(
       key: const Key("remote-canvas"),
@@ -592,7 +593,7 @@ class _SessionPageState extends State<SessionPage> {
     SessionVideo.instance.send(0, x, y);
   }
 
-  Widget _remotePlaceholder(BuildContext context) {
+  Widget _remotePlaceholder(BuildContext context, [String error = '']) {
     return Container(
       key: const Key('remote-canvas'),
       decoration: const BoxDecoration(
@@ -620,8 +621,16 @@ class _SessionPageState extends State<SessionPage> {
           const Text('桌面端渲染远端画面',
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white70)),
           const SizedBox(height: 6),
-          const Text('Web 预览不解码视频流：画面与控制通道由桌面端 Rust 核心（硬件解码）输出',
-              style: TextStyle(fontSize: 12, color: Colors.white38)),
+          Text(
+            error.isEmpty
+                ? '等待被控端画面…（若长时间无画面，请确认对方已开启「允许被控」）'
+                : '画面接管失败：' + error,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 12,
+              color: error.isEmpty ? Colors.white38 : Colors.orangeAccent,
+            ),
+          ),
         ],
       ),
     );

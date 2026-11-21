@@ -57,7 +57,15 @@ void main() {
     expect(
       tester.getTopLeft(settings).dy,
       greaterThan(tester.getBottomLeft(files).dy),
-      reason: '设置必须排在文件传输下方（最下方）',
+      reason: '设置必须排在文件传输下方',
+    );
+    // 但它是「导航组」的最后一项，不是整栏最下方：外观/本机面板永远在导航组下面。
+    final appearance = find.text('外观');
+    expect(appearance, findsOneWidget);
+    expect(
+      tester.getTopLeft(settings).dy,
+      lessThan(tester.getTopLeft(appearance).dy),
+      reason: '设置要留在导航组内（外观面板之上），不能掉到整栏最底部',
     );
 
     // 在设备页搜索框输入，切到设置再回来，文字必须还在（IndexedStack 保活）。
@@ -74,5 +82,39 @@ void main() {
     final searchAgain = tester.widget<TextField>(find.byType(TextField).first);
     expect(searchAgain.controller?.text, '111',
         reason: '换页不能 dispose 设备页，否则输入与滚动位置都会丢');
+  });
+
+  // 回归：导航项的底色过渡目标必须是不透明色。
+  // Material 的 color 过渡按 RGBA 分量线性插值，插到 Colors.transparent（透明黑）
+  // 会在中途变暗——鼠标移出时就会闪一下灰黑。悬停高亮交给 InkWell 原生处理：
+  // 它做的是实色的透明度动画，不经过半透明中间色，也不会和底色叠成两层。
+  testWidgets('导航项底色不透明、悬停交回 InkWell，移出时不再闪', (tester) async {
+    tester.view.devicePixelRatio = 1.0;
+    tester.view.physicalSize = const Size(1400, 900);
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildTheme(Brightness.light),
+        home: HomeShell(client: _client(), device: _device),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final settings = find.text('设置');
+    final material = tester.widget<Material>(
+      find.ancestor(of: settings, matching: find.byType(Material)).first,
+    );
+    expect(
+      material.color?.a,
+      1.0,
+      reason: '未选中项的底色不能是透明色，否则过渡中途会变暗闪一下',
+    );
+
+    final ink = tester.widget<InkWell>(
+      find.ancestor(of: settings, matching: find.byType(InkWell)).first,
+    );
+    expect(ink.hoverColor, isNotNull, reason: '悬停反馈要保留（原生 InkWell）');
+    expect(ink.onTap, isNotNull);
   });
 }

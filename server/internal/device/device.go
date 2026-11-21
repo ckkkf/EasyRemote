@@ -93,6 +93,47 @@ func (s *Service) Bind(ctx context.Context, accountID, platform string) (*store.
 	return d, deviceToken, nil
 }
 
+// BindOrReuse 绑定设备，带「幂等复用」语义（GW-04）。
+//
+// 调用方若出示本机已有身份（deviceID + deviceToken 且校验通过、属于同一账号），
+// 复用那一行：只刷新 platform / last_seen 并轮换设备凭证，不再 allocateCode 新建。
+// 没身份、或凭证对不上 → 走 Bind 新建（老客户端行为不变）。
+//
+// 为什么必须幂等：客户端每次登录都会 bind 一次。非幂等时同一个账号越攒越多设备行，
+// 列表又按设备码升序返回，客户端「取第一台」就会认领别人的设备——这正是
+// 「macOS 机器显示成 Windows 设备」的来源。
+func (s *Service) BindOrReuse(ctx context.Context, accountID, platform, deviceID, deviceToken string) (*store.Device, string, error) {
+	if accountID == "" {
+		return nil, "", errcode.New(errcode.AuthTokenExpired, "no account")
+	}
+	if platform == "" {
+		platform = "unknown"
+	}
+	if deviceID != "" && deviceToken != "" && s.VerifyDeviceToken(ctx, deviceID, deviceToken) {
+		d, err := s.store.GetDevice(ctx, deviceID)
+		if err == nil && d.AccountID == accountID {
+			if err := s.store.UpdateDevicePlatform(ctx, d.ID, platform); err != nil {
+				return nil, "", errcode.New(errcode.SrvInternal, err.Error())
+			}
+			if err := s.store.UpdateDeviceSeen(ctx, d.ID, s.now(), true); err != nil {
+				return nil, "", errcode.New(errcode.SrvInternal, err.Error())
+			}
+			token, err := randomToken()
+			if err != nil {
+				return nil, "", errcode.New(errcode.SrvInternal, err.Error())
+			}
+			if err := s.store.UpdateDeviceToken(ctx, d.ID, s.hashToken(token)); err != nil {
+				return nil, "", errcode.New(errcode.SrvInternal, err.Error())
+			}
+			d.Platform = platform
+			d.Online = true
+			d.LastSeenAt = s.now()
+			return d, token, nil
+		}
+	}
+	return s.Bind(ctx, accountID, platform)
+}
+
 func randomToken() (string, error) {
 	var buf [32]byte
 	if _, err := rand.Read(buf[:]); err != nil {

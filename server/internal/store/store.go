@@ -167,6 +167,8 @@ type Store interface {
 	ListDevicesByAccount(ctx context.Context, accountID string, p Page) ([]*Device, error)
 	ListDevices(ctx context.Context, p Page) ([]*Device, error)
 	UpdateDeviceSeen(ctx context.Context, id string, at time.Time, online bool) error
+	// UpdateDevicePlatform 刷新设备平台名（幂等绑定复用同一行时用）。
+	UpdateDevicePlatform(ctx context.Context, id, platform string) error
 	UpdateDeviceToken(ctx context.Context, id, tokenHash string) error
 	UpdateDeviceIdentity(ctx context.Context, id, pubkey string) error
 	UpdateDevicePassword(ctx context.Context, id, passwordHash string) error

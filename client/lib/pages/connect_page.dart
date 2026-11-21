@@ -38,7 +38,8 @@ enum _ConnectMode { device, assist }
 
 class _ConnectPageState extends State<ConnectPage> {
   final _codeCtl = TextEditingController();
-  final _codeFocus = FocusNode();
+  /// 9 格输入的句柄：粘贴后把焦点放到第一个空格。
+  final _codeEntryKey = GlobalKey<_CodeEntryState>();
   final _captcha = TextEditingController();
   final _assistCtl = TextEditingController();
   final _assistFocus = FocusNode();
@@ -70,7 +71,6 @@ class _ConnectPageState extends State<ConnectPage> {
   @override
   void dispose() {
     _codeCtl.dispose();
-    _codeFocus.dispose();
     _captcha.dispose();
     _assistCtl.dispose();
     _assistFocus.dispose();
@@ -83,7 +83,7 @@ class _ConnectPageState extends State<ConnectPage> {
     final digits = (data?.text ?? "").replaceAll(RegExp(r"[^0-9]"), "");
     if (digits.isEmpty) return;
     _codeCtl.text = digits.length > 9 ? digits.substring(0, 9) : digits;
-    _codeFocus.requestFocus();
+    _codeEntryKey.currentState?.focusNextEmpty();
     setState(() => _error = null);
   }
 
@@ -204,8 +204,8 @@ class _ConnectPageState extends State<ConnectPage> {
                           const SizedBox(height: 18),
                           if (_mode == _ConnectMode.device) ...[
                           _CodeEntry(
+                            key: _codeEntryKey,
                             controller: _codeCtl,
-                            focusNode: _codeFocus,
                             onChanged: () => setState(() {}),
                           ),
                           // 粘贴入口：透明输入层的光标与格子对不上，
@@ -386,96 +386,219 @@ class _ModeSwitch extends StatelessWidget {
   }
 }
 
-class _CodeEntry extends StatelessWidget {
-  const _CodeEntry({required this.controller, required this.focusNode, required this.onChanged});
+/// 9 格设备码输入：每一格都是一个**真的** TextField。
+///
+/// 旧实现是「一个透明 TextField 盖在 9 个画出来的格子上」——文字和光标都透明，
+/// 光标位置永远和格子对不上，选区也看不见，结果就是「没光标、选不中数字」。
+/// 这里换成 9 个真输入框：光标、选区、输入法、退格全部走系统原生行为。
+class _CodeEntry extends StatefulWidget {
+  const _CodeEntry({super.key, required this.controller, required this.onChanged});
 
+  /// 聚合值：恒为 0–9 位纯数字。页面其它入口（粘贴按钮、最近连接）只改这里。
   final TextEditingController controller;
-  final FocusNode focusNode;
   final VoidCallback onChanged;
 
   @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final text = Theme.of(context).textTheme;
-    final value = controller.text;
+  State<_CodeEntry> createState() => _CodeEntryState();
+}
 
-    Widget box(int i) {
-      final filled = i < value.length;
-      final active = focusNode.hasFocus && i == value.length.clamp(0, 8);
-      return AnimatedContainer(
-        duration: const Duration(milliseconds: 120),
-        width: 46,
-        height: 56,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: scheme.surfaceContainerLowest,
-          borderRadius: BorderRadius.circular(ErTokens.radiusMd),
-          border: Border.all(
-            color: active ? scheme.primary : scheme.outlineVariant,
-            width: active ? 1.8 : 1.2,
-          ),
-        ),
-        child: Text(
-          filled ? value[i] : '',
-          style: text.headlineSmall?.copyWith(fontFeatures: const [FontFeature.tabularFigures()]),
-        ),
-      );
+class _CodeEntryState extends State<_CodeEntry> {
+  static const _len = 9;
+
+  final List<String> _chars = List<String>.filled(_len, '');
+  late final List<TextEditingController> _ctls = List.generate(
+    _len,
+    (_) => TextEditingController(),
+  );
+  late final List<FocusNode> _focus = List.generate(_len, (_) => FocusNode());
+
+  /// 防回环：我们自己写 widget.controller.text 时不要再触发一次分发。
+  bool _publishing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    for (var i = 0; i < _len; i++) {
+      _focus[i].addListener(_onFocusChanged);
     }
+    _distribute(widget.controller.text);
+    widget.controller.addListener(_onExternalChange);
+  }
 
-    Widget group(int start) => Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            for (var i = start; i < start + 3; i++) ...[
-              box(i),
-              if (i != start + 2) const SizedBox(width: 6),
-            ],
-          ],
-        );
+  @override
+  void dispose() {
+    widget.controller.removeListener(_onExternalChange);
+    for (final c in _ctls) {
+      c.dispose();
+    }
+    for (final f in _focus) {
+      f.removeListener(_onFocusChanged);
+      f.dispose();
+    }
+    super.dispose();
+  }
 
-    return Stack(
-      alignment: Alignment.center,
-      children: [
-        FittedBox(
-          fit: BoxFit.scaleDown,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [group(0), const SizedBox(width: 14), group(3), const SizedBox(width: 14), group(6)],
+  void _onFocusChanged() {
+    if (mounted) setState(() {});
+  }
+
+  void _onExternalChange() {
+    if (_publishing) return;
+    if (widget.controller.text == _chars.join()) return;
+    setState(() => _distribute(widget.controller.text));
+  }
+
+  /// 把一串数字铺进 9 格（外部粘贴 / 从「最近连接」带入）。
+  void _distribute(String raw) {
+    final digits = raw.replaceAll(RegExp(r'[^0-9]'), '');
+    for (var i = 0; i < _len; i++) {
+      _chars[i] = i < digits.length ? digits[i] : '';
+      if (_ctls[i].text != _chars[i]) _ctls[i].text = _chars[i];
+    }
+  }
+
+  /// 把格子内容写回聚合控制器（页面的 _code 取的就是这里）。
+  void _publish() {
+    _publishing = true;
+    widget.controller.text = _chars.join();
+    _publishing = false;
+    widget.onChanged();
+  }
+
+  void _onCellChanged(int i, String value) {
+    final digits = value.replaceAll(RegExp(r'[^0-9]'), '');
+    if (digits.length > 1) {
+      // 粘贴 / 自动填充：从当前格开始往后铺，焦点落到下一个空格。
+      var j = i;
+      for (final d in digits.split('')) {
+        if (j >= _len) break;
+        _chars[j] = d;
+        _ctls[j].text = d;
+        j++;
+      }
+      _focus[j < _len ? j : _len - 1].requestFocus();
+    } else {
+      _chars[i] = digits;
+      if (_ctls[i].text != digits) _ctls[i].text = digits;
+      if (digits.isNotEmpty && i < _len - 1) _focus[i + 1].requestFocus();
+    }
+    setState(() {});
+    _publish();
+  }
+
+  /// 空格子上的退格：回到上一格并删掉它；左右方向键在格子间移动。
+  KeyEventResult _onKey(int i, KeyEvent event) {
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
+      return KeyEventResult.ignored;
+    }
+    final key = event.logicalKey;
+    if (key == LogicalKeyboardKey.backspace && _chars[i].isEmpty && i > 0) {
+      setState(() {
+        _chars[i - 1] = '';
+        _ctls[i - 1].text = '';
+      });
+      _focus[i - 1].requestFocus();
+      _publish();
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.arrowLeft && i > 0) {
+      _focus[i - 1].requestFocus();
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.arrowRight && i < _len - 1) {
+      _focus[i + 1].requestFocus();
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
+  }
+
+  /// 给页面「粘贴设备码」用：把焦点放到第一个空格。
+  void focusNextEmpty() {
+    final i = _chars.indexWhere((c) => c.isEmpty);
+    _focus[i < 0 ? _len - 1 : i].requestFocus();
+  }
+
+  Widget _cell(int i) {
+    final scheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final active = _focus[i].hasFocus;
+
+    return Focus(
+      skipTraversal: true,
+      onKeyEvent: (_, event) => _onKey(i, event),
+      child: GestureDetector(
+        onTap: () => _focus[i].requestFocus(),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 120),
+          width: 46,
+          height: 56,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: scheme.surfaceContainerLowest,
+            borderRadius: BorderRadius.circular(ErTokens.radiusMd),
+            border: Border.all(
+              color: active ? scheme.primary : scheme.outlineVariant,
+              width: active ? 1.8 : 1.2,
+            ),
           ),
-        ),
-        // 透明输入层：承接键盘、粘贴与退格，视觉完全由上面的格子表达。
-        Positioned.fill(
           child: TextField(
-            key: const Key('device-code-field'),
-            controller: controller,
-            focusNode: focusNode,
-            autofocus: false,
-            // 之前 showCursor/enableInteractiveSelection 都是 false，输入层既看不到光标、
-            // 也不能选中，用户自然认为"没法粘贴"。文字仍然透明（视觉由上面 9 个格子表达），
-            // 但光标与选区必须可见，否则交互完全不可发现。
-            // 光标必须隐藏：透明输入层的字宽/起点与上方 9 个格子不是同一套布局，
-            // 显示出来一定是"光标和数字对不上"（实测）。但交互要保留——
-            // 这样点一下能聚焦、Ctrl+V 能粘贴；要肉眼可见的粘贴入口看下面那个按钮。
-            showCursor: false,
-            cursorColor: Colors.transparent,
-            enableInteractiveSelection: true,
+            key: Key('device-code-digit-$i'),
+            controller: _ctls[i],
+            focusNode: _focus[i],
+            textAlign: TextAlign.center,
             keyboardType: TextInputType.number,
-            maxLength: 9,
-            onChanged: (_) => onChanged(),
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(9)],
-            // 文字透明且不可见光标，字号只影响内部布局，取一个稳定的中等值
-            style: const TextStyle(color: Colors.transparent, fontSize: 20),
+            textInputAction: TextInputAction.next,
+            cursorColor: scheme.primary,
+            cursorWidth: 1.6,
+            style: textTheme.headlineSmall?.copyWith(
+              fontFeatures: const [FontFeature.tabularFigures()],
+            ),
+            strutStyle: const StrutStyle(forceStrutHeight: true, height: 1.1),
+            // 不做长度截断：粘贴 9 位时先让它进来，再分发到后面几格。
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            onChanged: (v) => _onCellChanged(i, v),
             decoration: const InputDecoration(
+              isDense: true,
               counterText: '',
               border: InputBorder.none,
               enabledBorder: InputBorder.none,
               focusedBorder: InputBorder.none,
-              filled: false,
-              isDense: true,
               contentPadding: EdgeInsets.zero,
+              // Material 3 的 InputDecorator 会在悬停时自己画一块灰色高亮，
+              // 而格子的底色/边框是外层 AnimatedContainer 画的——两层叠在一起就是
+              // 鼠标划过时格子中间多出来的那个灰色小方块。这里关掉它。
+              hoverColor: Colors.transparent,
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _group(int start) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      for (var i = start; i < start + 3; i++) ...[
+        _cell(i),
+        if (i != start + 2) const SizedBox(width: 6),
       ],
+    ],
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _group(0),
+          const SizedBox(width: 14),
+          _group(3),
+          const SizedBox(width: 14),
+          _group(6),
+        ],
+      ),
     );
   }
 }

@@ -149,13 +149,28 @@ class GatewayClient {
     await _persist();
   }
 
-  Future<DeviceInfo> bindDevice(String platform) async {
-    final body = await _post('/v1/devices/bind', {'platform': platform});
+  /// 绑定本机设备。
+  ///
+  /// [deviceId] + [deviceToken] 是本机已有身份：带上它们服务端会复用那一行
+  /// （幂等绑定，只刷新平台并轮换凭证），不再凭空多出一台幽灵设备。
+  Future<DeviceInfo> bindDevice(
+    String platform, {
+    String? deviceId,
+    String? deviceToken,
+  }) async {
+    final body = await _post('/v1/devices/bind', {
+      'platform': platform,
+      if (deviceId != null && deviceId.isNotEmpty) 'device_id': deviceId,
+      if (deviceToken != null && deviceToken.isNotEmpty)
+        'device_token': deviceToken,
+    });
     _deviceToken = body['device_token'] as String?;
     final device = DeviceInfo(
       id: body['device_id'] as String? ?? '',
       code: (body['raw_code'] as String? ?? '').replaceAll(' ', ''),
-      platform: platform,
+      // 平台以服务端落库的真值为准（GW-04 会回显 platform）；
+      // 老服务端不回显时才退回本机上报值。
+      platform: (body['platform'] as String?) ?? platform,
       online: true,
     );
     _deviceId = device.id;
@@ -195,13 +210,35 @@ class GatewayClient {
       final devices = await listDevices();
       DeviceInfo? self;
       for (final d in devices) {
-        if (d.id == stored.deviceId) {
+        // id 优先；老快照可能只有设备码，用码兜一次。
+        if (d.id == stored.deviceId ||
+            (stored.deviceCode.isNotEmpty && d.code == stored.deviceCode)) {
           self = d;
           break;
         }
       }
-      if (self == null && devices.isNotEmpty) self = devices.first;
-      if (self == null) return _localDevice(stored);
+      if (self == null) {
+        // 本地身份在服务端不存在（内存库重启、设备被清、换账号残留快照）：
+        // 重新绑一台本机设备，**绝不**拿 devices.first 凑数。
+        // 列表按设备码升序返回，第一台很可能是同账号下的另一台机器（比如 Windows），
+        // 认领它会让本机顶着别人的设备码和平台名，被控也会因 device_token 对不上而失败。
+        try {
+          // 带上快照里的身份：服务端命中就复用同一行（幂等），只是刷新平台与凭证。
+          return await bindDevice(
+            currentPlatformName(),
+            deviceId: stored.deviceId,
+            deviceToken: stored.deviceToken,
+          );
+        } on ApiException catch (e) {
+          if (_isAuthError(e.code)) {
+            await logout();
+            return null;
+          }
+          return _localDevice(stored);
+        } catch (_) {
+          return _localDevice(stored);
+        }
+      }
       _deviceId = self.id;
       _deviceCode = self.code;
       _devicePlatform = self.platform;
@@ -328,7 +365,12 @@ class GatewayClient {
         online: true,
       );
     }
-    return bindDevice(platform);
+    // 缺 code/token 时补一次绑定；把现有身份一起带上，能复用就复用。
+    return bindDevice(
+      platform,
+      deviceId: id,
+      deviceToken: deviceToken,
+    );
   }
 
   // ---------- 运行时配置（P1-1 / P1-4） ----------

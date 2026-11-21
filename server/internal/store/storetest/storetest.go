@@ -95,9 +95,20 @@ func testDeviceLifecycle(t *testing.T, s store.Store) {
 	if got.Online {
 		t.Fatal("online should be false")
 	}
+	if err := s.UpdateDevicePlatform(bg(), d.ID, "macos"); err != nil {
+		t.Fatalf("platform: %v", err)
+	}
+	got, _ = s.GetDevice(bg(), d.ID)
+	if got.Platform != "macos" {
+		t.Fatalf("platform not stored: %q", got.Platform)
+	}
 	list, err := s.ListDevicesByAccount(bg(), a.ID, store.Page{Limit: 10})
 	if err != nil || len(list) != 1 {
 		t.Fatalf("list: %v %v", list, err)
+	}
+	// 未知 id 必须报 ErrNotFound，不能静默成功。
+	if err := s.UpdateDevicePlatform(bg(), "dev-does-not-exist", "linux"); err != store.ErrNotFound {
+		t.Fatalf("unknown device should be ErrNotFound, got %v", err)
 	}
 }
 

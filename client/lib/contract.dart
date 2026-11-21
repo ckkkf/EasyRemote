@@ -96,6 +96,48 @@ class DeviceRow {
   );
 }
 
+class BindRequest {
+  const BindRequest({
+    required this.platform,
+    this.deviceID,
+    this.deviceToken,
+  });
+
+  final String platform;
+  final String? deviceID;
+  final String? deviceToken;
+
+  factory BindRequest.fromJson(Map<String, dynamic> json) => BindRequest(
+    platform: json['platform'] as String,
+    deviceID: json['device_id'] as String?,
+    deviceToken: json['device_token'] as String?,
+  );
+}
+
+class BindResult {
+  const BindResult({
+    required this.deviceCode,
+    required this.rawCode,
+    required this.deviceID,
+    required this.deviceToken,
+    required this.platform,
+  });
+
+  final String deviceCode;
+  final String rawCode;
+  final String deviceID;
+  final String deviceToken;
+  final String platform;
+
+  factory BindResult.fromJson(Map<String, dynamic> json) => BindResult(
+    deviceCode: json['device_code'] as String,
+    rawCode: json['raw_code'] as String,
+    deviceID: json['device_id'] as String,
+    deviceToken: json['device_token'] as String,
+    platform: json['platform'] as String,
+  );
+}
+
 class SessionRow {
   const SessionRow({
     required this.iD,
@@ -269,7 +311,7 @@ const List<EndpointSpec> endpoints = <EndpointSpec>[
   EndpointSpec(id: 'GW-01', method: 'POST', path: '/v1/auth/sms', auth: 'none', response: 'OkResult', errors: <String>['AUTH_INVALID_CREDENTIAL', 'AUTH_SMS_RATE_LIMITED']),
   EndpointSpec(id: 'GW-02', method: 'POST', path: '/v1/auth/login', auth: 'none', response: 'any', errors: <String>['AUTH_INVALID_CREDENTIAL', 'AUTH_TOO_MANY_ATTEMPTS']),
   EndpointSpec(id: 'GW-03', method: 'GET', path: '/v1/devices', auth: 'bearer', response: 'any', errors: <String>['AUTH_TOKEN_EXPIRED', 'SRV_INTERNAL']),
-  EndpointSpec(id: 'GW-04', method: 'POST', path: '/v1/devices/bind', auth: 'bearer', response: 'any', errors: <String>['AUTH_TOKEN_EXPIRED', 'SRV_INTERNAL']),
+  EndpointSpec(id: 'GW-04', method: 'POST', path: '/v1/devices/bind', auth: 'bearer', response: 'BindResult', errors: <String>['AUTH_TOKEN_EXPIRED', 'SRV_INTERNAL']),
   EndpointSpec(id: 'GW-05', method: 'POST', path: '/v1/devices/verify-code', auth: 'device', response: 'any', errors: <String>['CONN_DEVICE_NOT_FOUND', 'ADMIN_FORBIDDEN']),
   EndpointSpec(id: 'GW-06', method: 'POST', path: '/v1/connect/request', auth: 'bearer', response: 'any', errors: <String>['CONN_DEVICE_NOT_FOUND', 'CONN_DEVICE_OFFLINE', 'CONN_CAPTCHA_INVALID', 'CONN_RATE_LIMITED']),
   EndpointSpec(id: 'GW-07', method: 'POST', path: '/v1/connect/consent', auth: 'device', response: 'any', errors: <String>['CONN_DEVICE_NOT_FOUND', 'ADMIN_FORBIDDEN']),

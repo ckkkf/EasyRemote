@@ -36,6 +36,22 @@ type DeviceRow struct {
 	LastSeen   time.Time `json:"last_seen"`
 }
 
+// BindRequest 的字段定义见 docs/spec/contract.yaml。
+type BindRequest struct {
+	Platform    string `json:"platform"`
+	DeviceID    string `json:"device_id,omitempty"`
+	DeviceToken string `json:"device_token,omitempty"`
+}
+
+// BindResult 的字段定义见 docs/spec/contract.yaml。
+type BindResult struct {
+	DeviceCode  string `json:"device_code"`
+	RawCode     string `json:"raw_code"`
+	DeviceID    string `json:"device_id"`
+	DeviceToken string `json:"device_token"`
+	Platform    string `json:"platform"`
+}
+
 // SessionRow 的字段定义见 docs/spec/contract.yaml。
 type SessionRow struct {
 	ID           string    `json:"id"`
@@ -117,7 +133,7 @@ var Endpoints = []Endpoint{
 	{ID: "GW-01", Method: "POST", Path: "/v1/auth/sms", Auth: "none", Response: "OkResult", Errors: []string{"AUTH_INVALID_CREDENTIAL", "AUTH_SMS_RATE_LIMITED"}},
 	{ID: "GW-02", Method: "POST", Path: "/v1/auth/login", Auth: "none", Response: "any", Errors: []string{"AUTH_INVALID_CREDENTIAL", "AUTH_TOO_MANY_ATTEMPTS"}},
 	{ID: "GW-03", Method: "GET", Path: "/v1/devices", Auth: "bearer", Response: "any", Errors: []string{"AUTH_TOKEN_EXPIRED", "SRV_INTERNAL"}},
-	{ID: "GW-04", Method: "POST", Path: "/v1/devices/bind", Auth: "bearer", Response: "any", Errors: []string{"AUTH_TOKEN_EXPIRED", "SRV_INTERNAL"}},
+	{ID: "GW-04", Method: "POST", Path: "/v1/devices/bind", Auth: "bearer", Response: "BindResult", Errors: []string{"AUTH_TOKEN_EXPIRED", "SRV_INTERNAL"}},
 	{ID: "GW-05", Method: "POST", Path: "/v1/devices/verify-code", Auth: "device", Response: "any", Errors: []string{"CONN_DEVICE_NOT_FOUND", "ADMIN_FORBIDDEN"}},
 	{ID: "GW-06", Method: "POST", Path: "/v1/connect/request", Auth: "bearer", Response: "any", Errors: []string{"CONN_DEVICE_NOT_FOUND", "CONN_DEVICE_OFFLINE", "CONN_CAPTCHA_INVALID", "CONN_RATE_LIMITED"}},
 	{ID: "GW-07", Method: "POST", Path: "/v1/connect/consent", Auth: "device", Response: "any", Errors: []string{"CONN_DEVICE_NOT_FOUND", "ADMIN_FORBIDDEN"}},

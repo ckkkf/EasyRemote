@@ -93,23 +93,41 @@ fn real_main() {
         code,
         captcha
     );
+    // 被控端要能**反复被连**：一个会话结束后回到等待，而不是进程直接收工。
+    // 之前是单次结构，第一个主控走后（哪怕是测试）后面所有连接都石沉大海
+    // —— 表现就是主控卡在「等待对方授权」，而被控端日志一片安静。
+    loop {
     println!("MAC: waiting_for_signalling ...");
 
     let session_id = target
         .wait_for_session(&signal, Duration::from_secs(3600))
         .expect("signalling");
     println!("MAC: session={session_id}");
-    target.consent(&session_id).expect("consent");
+    if let Err(e) = target.consent(&session_id) {
+        println!("MAC: consent_failed={e}");
+        continue;
+    }
     println!("MAC: consent=authorized");
 
     std::thread::sleep(Duration::from_millis(1200));
-    let (mut relay, mut crypto, msg) = target.begin(&session_id).expect("begin");
+    let (mut relay, mut crypto, msg) = match target.begin(&session_id) {
+        Ok(v) => v,
+        Err(e) => {
+            println!("MAC: begin_failed={e}");
+            continue;
+        }
+    };
     println!("MAC: relay_registered local={}", relay.local_addr());
     std::thread::sleep(Duration::from_millis(2500));
-    target.announce(&mut relay, &msg).expect("announce");
-    target
-        .finish(&mut relay, &mut crypto, &session_id)
-        .expect("handshake");
+    if let Err(e) = target.announce(&mut relay, &msg) {
+        println!("MAC: announce_failed={e}");
+        continue;
+    }
+    // 握手失败（主控没来/走了）不该让整个被控端崩掉：回到等待接下一个
+    if let Err(e) = target.finish(&mut relay, &mut crypto, &session_id) {
+        println!("MAC: handshake_failed={e}");
+        continue;
+    }
     println!("MAC: handshake_verified (ed25519 + x25519)");
     println!("MAC: streaming ...");
 
@@ -213,7 +231,15 @@ fn real_main() {
         }
     }
 
-    println!("MAC: HOST_DONE sent={sent} injected={injected} elapsed={}s", t_start.elapsed().as_secs());
+    println!(
+        "MAC: session_closed sent={sent} injected={injected}, back to waiting",
+    );
+    if duration_secs > 0 && t_start.elapsed().as_secs() >= duration_secs {
+        break;
+    }
+    }
+
+    println!("MAC: HOST_DONE elapsed={}s", t_start.elapsed().as_secs());
 }
 
 /// 被控端「临时密码」：本地生成一次、长期复用，明文存 ~/.easyremote/host_password。

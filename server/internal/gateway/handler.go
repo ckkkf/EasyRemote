@@ -11,6 +11,7 @@ import (
 
 	"github.com/easyremote/server/internal/appconfig"
 	"github.com/easyremote/server/internal/auth"
+	"github.com/easyremote/server/internal/contract"
 	"github.com/easyremote/server/internal/device"
 	"github.com/easyremote/server/internal/errcode"
 	"github.com/easyremote/server/internal/httpx"
@@ -175,23 +176,33 @@ func (a *App) Routes() http.Handler {
 			return
 		}
 		var req struct {
-			Platform string `json:"platform"`
+			Platform    string `json:"platform"`
+			DeviceID    string `json:"device_id"`
+			DeviceToken string `json:"device_token"`
 		}
-		_ = httpx.Decode(w, r, &req)
-		if req.Platform == "" {
-			req.Platform = "windows"
+		// 解析失败必须报错：以前这里 `_ = httpx.Decode` 吞掉错误、再用空值兜底成
+		// "windows"，于是任何不带 platform（或带了未知字段被 DisallowUnknownFields
+		// 拒掉）的调用都会把自己注册成 Windows 设备。
+		if err := httpx.Decode(w, r, &req); err != nil {
+			WriteErr(w, errcode.New(errcode.SrvInternal, "bad body: "+err.Error()))
+			return
 		}
-		d, deviceToken, err := a.Device.Bind(ctx, acc.ID, req.Platform)
+		// 带本机已有身份就复用同一台设备（幂等），否则新建。
+		d, deviceToken, err := a.Device.BindOrReuse(
+			ctx, acc.ID, normalizePlatform(req.Platform), req.DeviceID, req.DeviceToken,
+		)
 		if err != nil {
 			WriteErr(w, err)
 			return
 		}
 		// device_token 只在此处返回一次，客户端须安全保存。
-		httpx.OK(w, r, map[string]any{
-			"device_code":  device.FormatCode(d.DeviceCode),
-			"raw_code":     d.DeviceCode,
-			"device_id":    d.ID,
-			"device_token": deviceToken,
+		// platform 回显服务端落库的真值，客户端不得再用自己上报的字符串显示。
+		httpx.OK(w, r, contract.BindResult{
+			DeviceCode:  device.FormatCode(d.DeviceCode),
+			RawCode:     d.DeviceCode,
+			DeviceID:    d.ID,
+			DeviceToken: deviceToken,
+			Platform:    d.Platform,
 		})
 	})
 
@@ -512,6 +523,20 @@ func (a *App) ownsDevice(ctx context.Context, accountID, deviceID string) bool {
 		return false
 	}
 	return d.AccountID == accountID
+}
+
+// normalizePlatform 归一化客户端上报的平台名。
+//
+// 空值/纯空白一律记成 "unknown"：**绝不猜成 windows**。历史上这里默认
+// "windows"，任何没带 platform 的调用都会变成一台 Windows 设备，客户端列表里
+// 就会出现「macOS 机器显示成 Windows 设备」。大小写也在这里统一，避免同一台
+// 机器先后以 macOS/macos 两种写法出现。
+func normalizePlatform(raw string) string {
+	p := strings.ToLower(strings.TrimSpace(raw))
+	if p == "" {
+		return "unknown"
+	}
+	return p
 }
 
 // isHex 判断字符串是否为小写/大写十六进制。

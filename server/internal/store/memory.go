@@ -237,6 +237,17 @@ func (m *Memory) UpdateDeviceSeen(_ context.Context, id string, at time.Time, on
 	return nil
 }
 
+func (m *Memory) UpdateDevicePlatform(_ context.Context, id, platform string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	d, ok := m.devices[id]
+	if !ok {
+		return ErrNotFound
+	}
+	d.Platform = platform
+	return nil
+}
+
 func (m *Memory) UpdateDevicePassword(_ context.Context, id, passwordHash string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()

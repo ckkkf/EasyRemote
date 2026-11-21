@@ -31,7 +31,8 @@ class _ErNavItem {
   final String hint;
 }
 
-// 导航顺序 = 页面下标。设置放在最后（侧边栏固定最下方 / 移动端最后一个）。
+// 导航顺序 = 页面下标。设置是**导航组里的最后一项**（紧跟文件传输），
+// 不是整个侧边栏的最下方——外观/本机那类面板永远在导航组下面。
 const _mainNavItems = <_ErNavItem>[
   _ErNavItem(Icons.devices_rounded, '我的设备', '已绑定设备与本机设备码'),
   _ErNavItem(Icons.pin_rounded, '连接设备', '用 9 位设备码请求远程控制'),
@@ -41,6 +42,9 @@ const _mainNavItems = <_ErNavItem>[
 ];
 
 const _settingsNav = _ErNavItem(Icons.tune_rounded, '设置', '外观、画质与安全');
+
+/// 侧边栏/底部导航的完整顺序：业务导航 + 设置（设置永远是这一组的最后一项）。
+const _navItems = <_ErNavItem>[..._mainNavItems, _settingsNav];
 
 /// 设置页在列表中的下标（永远最后）。
 final _settingsIndex = _mainNavItems.length;
@@ -139,6 +143,10 @@ class _HomeShellState extends State<HomeShell> {
     final wide = MediaQuery.sizeOf(context).width >= ErTokens.mobileBreakpoint;
 
     final pages = _pages;
+    assert(
+      _navItems.length == pages.length && _settingsIndex == _navItems.length - 1,
+      '导航项必须与页面一一对应，且设置永远是导航组最后一项',
+    );
 
     if (!wide) {
       return Scaffold(
@@ -157,7 +165,7 @@ class _HomeShellState extends State<HomeShell> {
           selectedIndex: _index,
           onDestinationSelected: (i) => setState(() => _index = i),
           destinations: [
-            for (final item in [..._mainNavItems, _settingsNav])
+            for (final item in _navItems)
               NavigationDestination(
                 icon: Icon(item.icon, size: 22),
                 label: item.label,
@@ -262,10 +270,10 @@ class _Sidebar extends StatelessWidget {
           const SizedBox(height: 20),
           Expanded(
             child: ListView.separated(
-              itemCount: _mainNavItems.length,
+              itemCount: _navItems.length,
               separatorBuilder: (_, _) => const SizedBox(height: 4),
               itemBuilder: (context, i) {
-                final item = _mainNavItems[i];
+                final item = _navItems[i];
                 return _NavButton(
                   icon: item.icon,
                   label: item.label,
@@ -319,21 +327,13 @@ class _Sidebar extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(height: 8),
-          // 设置固定最下方：它是低频入口，夹在业务导航中间会打断「设备 → 连接」主路径。
-          _NavButton(
-            icon: _settingsNav.icon,
-            label: _settingsNav.label,
-            selected: index == _settingsIndex,
-            onTap: () => onSelect(_settingsIndex),
-          ),
         ],
       ),
     );
   }
 }
 
-class _NavButton extends StatefulWidget {
+class _NavButton extends StatelessWidget {
   const _NavButton({
     required this.icon,
     required this.label,
@@ -347,64 +347,51 @@ class _NavButton extends StatefulWidget {
   final VoidCallback onTap;
 
   @override
-  State<_NavButton> createState() => _NavButtonState();
-}
-
-class _NavButtonState extends State<_NavButton> {
-  bool _hover = false;
-
-  @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final selected = widget.selected;
-    final bg = selected
-        ? scheme.primaryContainer
-        : _hover
-        ? scheme.surfaceContainerHigh
-        : Colors.transparent;
     final fg = selected ? scheme.onPrimaryContainer : scheme.onSurfaceVariant;
 
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hover = true),
-      onExit: (_) => setState(() => _hover = false),
+    return Material(
+      // 未选中用「侧边栏同底色」而不是 Colors.transparent：
+      // Material 的底色过渡是按 RGBA 分量线性插值的，插到 (0,0,0,0) 会在中途变暗，
+      // 鼠标移出时就会闪一下灰黑——那是「离开还在闪」的真正原因。
+      color: selected ? scheme.primaryContainer : scheme.surfaceContainerLow,
+      animationDuration: const Duration(milliseconds: 120),
+      borderRadius: BorderRadius.circular(ErTokens.radiusMd),
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: widget.onTap,
-        borderRadius: BorderRadius.circular(ErTokens.radiusMd),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 120),
+        onTap: onTap,
+        // 悬停/按下交给 InkWell 原生处理：它给一块实色做透明度动画，
+        // 不会经过半透明中间色，也不会和底色叠成两层。
+        hoverColor: scheme.surfaceContainerHigh,
+        child: SizedBox(
           height: 46,
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          decoration: BoxDecoration(
-            color: bg,
-            borderRadius: BorderRadius.circular(ErTokens.radiusMd),
-          ),
-          child: Row(
-            children: [
-              Icon(
-                widget.icon,
-                size: 21,
-                color: selected ? scheme.primary : fg,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  widget.label,
-                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    color: selected ? scheme.onPrimaryContainer : fg,
-                    fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Row(
+              children: [
+                Icon(icon, size: 21, color: selected ? scheme.primary : fg),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    label,
+                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                      color: selected ? scheme.onPrimaryContainer : fg,
+                      fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+                    ),
                   ),
                 ),
-              ),
-              if (selected)
-                Container(
-                  width: 6,
-                  height: 6,
-                  decoration: BoxDecoration(
-                    color: scheme.primary,
-                    shape: BoxShape.circle,
+                if (selected)
+                  Container(
+                    width: 6,
+                    height: 6,
+                    decoration: BoxDecoration(
+                      color: scheme.primary,
+                      shape: BoxShape.circle,
+                    ),
                   ),
-                ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
