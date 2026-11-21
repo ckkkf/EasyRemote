@@ -1,5 +1,24 @@
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, defaultTargetPlatform, kIsWeb;
+
+/// 本机平台名（服务端用来决定图标与能力）。
+///
+/// 之前散落在登录页里硬编码 `kIsWeb ? "web" : "macos"`，Windows 版会把自己
+/// 绑定成 macOS 设备；统一到一处，登录/补绑被控都取同一个值。
+String currentPlatformName() {
+  if (kIsWeb) return 'web';
+  return switch (defaultTargetPlatform) {
+    TargetPlatform.windows => 'windows',
+    TargetPlatform.macOS => 'macos',
+    TargetPlatform.linux => 'linux',
+    TargetPlatform.android => 'android',
+    TargetPlatform.iOS => 'ios',
+    _ => 'unknown',
+  };
+}
+
 /// 设备与会话的最小模型（对接 gateway 的 JSON）。
 class DeviceInfo {
   const DeviceInfo({

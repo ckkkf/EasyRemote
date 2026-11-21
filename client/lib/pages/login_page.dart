@@ -1,7 +1,7 @@
-import 'package:flutter/foundation.dart' show TargetPlatform, defaultTargetPlatform, kIsWeb;
 import 'package:flutter/material.dart';
 
 import '../api.dart';
+import '../models.dart';
 import '../shell.dart';
 import '../theme.dart';
 
@@ -61,7 +61,7 @@ class _LoginPageState extends State<LoginPage> {
 
   /// 登录成功后的公共收尾：绑定本机设备，进主框架。
   Future<void> _enter() async {
-    final device = await widget.client.bindDevice(_platformName());
+    final device = await widget.client.bindDevice(currentPlatformName());
     if (!mounted) return;
     Navigator.of(context).pushReplacement(
       MaterialPageRoute<void>(builder: (_) => HomeShell(client: widget.client, device: device)),
@@ -743,18 +743,4 @@ class _BrandBanner extends StatelessWidget {
   }
 }
 
-/// 本机平台名（服务端用来决定图标与能力）。
-///
-/// 之前硬编码 `kIsWeb ? "web" : "macos"`，导致 Windows 版客户端把自己绑定成
-/// macOS 设备，设备列表里显示「macOS 设备」——用户在 Windows 上看到这个会以为串台了。
-String _platformName() {
-  if (kIsWeb) return "web";
-  return switch (defaultTargetPlatform) {
-    TargetPlatform.windows => "windows",
-    TargetPlatform.macOS => "macos",
-    TargetPlatform.linux => "linux",
-    TargetPlatform.android => "android",
-    TargetPlatform.iOS => "ios",
-    _ => "unknown",
-  };
-}
+

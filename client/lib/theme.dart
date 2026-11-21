@@ -137,17 +137,36 @@ TextTheme _text(TextTheme base) => base.copyWith(
       titleLarge: base.titleLarge?.copyWith(fontSize: 17, height: 1.4, fontWeight: FontWeight.w600, letterSpacing: -0.1),
       titleMedium: base.titleMedium?.copyWith(fontSize: 15, height: 1.4, fontWeight: FontWeight.w600),
       titleSmall: base.titleSmall?.copyWith(fontSize: 13, height: 1.4, fontWeight: FontWeight.w600),
-      bodyLarge: base.bodyLarge?.copyWith(fontSize: 15, height: 1.55),
-      bodyMedium: base.bodyMedium?.copyWith(fontSize: 14, height: 1.55),
-      bodySmall: base.bodySmall?.copyWith(fontSize: 12.5, height: 1.5),
+      bodyLarge: base.bodyLarge?.copyWith(fontSize: 15, height: 1.55, fontWeight: FontWeight.w400),
+      bodyMedium: base.bodyMedium?.copyWith(fontSize: 14, height: 1.55, fontWeight: FontWeight.w400),
+      bodySmall: base.bodySmall?.copyWith(fontSize: 12.5, height: 1.5, fontWeight: FontWeight.w400),
       labelLarge: base.labelLarge?.copyWith(fontSize: 13.5, fontWeight: FontWeight.w600),
-      labelMedium: base.labelMedium?.copyWith(fontSize: 12, fontWeight: FontWeight.w500, letterSpacing: 0.2),
-      labelSmall: base.labelSmall?.copyWith(fontSize: 11, fontWeight: FontWeight.w500, letterSpacing: 0.3),
+      // 只保留 w400 / w600 两档。
+      //
+      // 之前标签用 w500、正文用默认 w400、标题用 w600：拉丁字形能凑出 500，
+      // 中文回退字体往往只有 Regular/Bold，w500 会被渲染成 Regular、w600 被
+      // 渲染成 Bold，于是同一行里「有的字粗有的字细」。两档是最稳的语义层级。
+      labelMedium: base.labelMedium?.copyWith(fontSize: 12, fontWeight: FontWeight.w400, letterSpacing: 0.2),
+      labelSmall: base.labelSmall?.copyWith(fontSize: 11, fontWeight: FontWeight.w400, letterSpacing: 0.3),
     );
 
 ThemeData buildTheme(Brightness brightness) {
   final scheme = _scheme(brightness);
-  final base = ThemeData(useMaterial3: true, colorScheme: scheme);
+  final base = ThemeData(
+    useMaterial3: true,
+    colorScheme: scheme,
+    // 统一 CJK 回退链：不同系统默认回退到的中文字体字重覆盖不一样，
+    // 明写之后 macOS / Windows / Web 的字形与粗细才一致。
+    fontFamilyFallback: const <String>[
+      'PingFang SC',
+      'Hiragino Sans GB',
+      'Microsoft YaHei UI',
+      'Microsoft YaHei',
+      'Noto Sans CJK SC',
+      'Noto Sans SC',
+      'Segoe UI',
+    ],
+  );
   final text = _text(base.textTheme);
 
   OutlineInputBorder border(Color color, [double width = 1]) => OutlineInputBorder(
@@ -226,7 +245,7 @@ ThemeData buildTheme(Brightness brightness) {
       labelTextStyle: WidgetStateProperty.resolveWith(
         (s) => text.labelSmall?.copyWith(
           fontSize: 12,
-          fontWeight: s.contains(WidgetState.selected) ? FontWeight.w600 : FontWeight.w500,
+          fontWeight: s.contains(WidgetState.selected) ? FontWeight.w600 : FontWeight.w400,
           color: s.contains(WidgetState.selected) ? scheme.onPrimaryContainer : scheme.onSurfaceVariant,
         ),
       ),

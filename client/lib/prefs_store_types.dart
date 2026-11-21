@@ -8,6 +8,8 @@ class Prefs {
     this.quality = '自动',
     this.privacyScreen = false,
     this.preventSleep = true,
+    this.allowControl = true,
+    this.sameAccountDirect = false,
   });
 
   /// system | light | dark
@@ -16,17 +18,33 @@ class Prefs {
   final bool privacyScreen;
   final bool preventSleep;
 
+  /// 允许被控（本机共享）：默认开。
+  ///
+  /// 远控产品的默认价值在「这台机器能被连上」；默认关会让首次远控
+  /// 必然卡在「对方未开启被控」，用户还得先跑去开开关。
+  final bool allowControl;
+
+  /// 同账号设备免密直连：默认关。
+  ///
+  /// 关着更安全（点击连接会要求对方设备的临时密码）；打开后同一账号下
+  /// 已登录设备点一下就直接发起，不再输入密码。
+  final bool sameAccountDirect;
+
   Prefs copyWith({
     String? themeMode,
     String? quality,
     bool? privacyScreen,
     bool? preventSleep,
+    bool? allowControl,
+    bool? sameAccountDirect,
   }) =>
       Prefs(
         themeMode: themeMode ?? this.themeMode,
         quality: quality ?? this.quality,
         privacyScreen: privacyScreen ?? this.privacyScreen,
         preventSleep: preventSleep ?? this.preventSleep,
+        allowControl: allowControl ?? this.allowControl,
+        sameAccountDirect: sameAccountDirect ?? this.sameAccountDirect,
       );
 
   Map<String, dynamic> toJson() => <String, dynamic>{
@@ -34,6 +52,8 @@ class Prefs {
         'quality': quality,
         'privacy_screen': privacyScreen,
         'prevent_sleep': preventSleep,
+        'allow_control': allowControl,
+        'same_account_direct': sameAccountDirect,
       };
 
   /// 解析失败/字段缺失一律回落到默认值：偏好坏了不能挡住启动。
@@ -51,5 +71,8 @@ class Prefs {
         // 用 is bool 而不是 as bool?：脏数据是字符串时 as 会抛，偏好坏了不能挡住启动
         privacyScreen: json['privacy_screen'] is bool ? json['privacy_screen'] as bool : false,
         preventSleep: json['prevent_sleep'] is bool ? json['prevent_sleep'] as bool : true,
+        allowControl: json['allow_control'] is bool ? json['allow_control'] as bool : true,
+        sameAccountDirect:
+            json['same_account_direct'] is bool ? json['same_account_direct'] as bool : false,
       );
 }

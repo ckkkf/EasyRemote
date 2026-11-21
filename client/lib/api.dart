@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart' show ValueNotifier;
 import 'package:http/http.dart' as http;
 
 import 'models.dart';
@@ -31,6 +32,18 @@ class GatewayClient {
 
   String? get token => _token;
   String? get deviceToken => _deviceToken;
+  String? get deviceId => _deviceId;
+  String? get deviceCode => _deviceCode;
+
+  /// 登录态失效计数器。
+  ///
+  /// 任何一次请求拿到 AUTH_TOKEN_EXPIRED / AUTH_TOKEN_REVOKED，就在这里 +1；
+  /// App 根节点监听它并一次性清空导航栈回登录页。之前只有启动时校验，
+  /// 页面内令牌过期后每个接口各自报错，用户永远停在「加载失败」上。
+  final ValueNotifier<int> authExpired = ValueNotifier<int>(0);
+
+  /// 同一个令牌只通知一次，避免并发请求把登录页叠很多层。
+  bool _authExpiredNotified = false;
 
   Map<String, String> _headers({bool device = false}) {
     final h = {'content-type': 'application/json'};
@@ -68,8 +81,10 @@ class GatewayClient {
       // 服务端错误信封是扁平的 {code,name,message,retryable,trace_id}（见 docs/spec/error-codes.md §3），
       // 同时兼容旧式 {error:{...}} 包装，避免解析漂移把真实错误码吞成 UNKNOWN。
       final err = (body['error'] as Map<String, dynamic>?) ?? body;
+      final code = err['name'] as String? ?? err['code']?.toString() ?? 'UNKNOWN';
+      if (_isTokenDead(code)) _notifyAuthExpired();
       throw ApiException(
-        err['name'] as String? ?? err['code']?.toString() ?? 'UNKNOWN',
+        code,
         err['message'] as String? ?? '请求失败（HTTP ${res.statusCode}）',
       );
     }
@@ -85,6 +100,7 @@ class GatewayClient {
   Future<void> login(String phone, String code) async {
     final body = await _post('/v1/auth/login', {'phone': phone, 'code': code});
     _token = body['token'] as String?;
+    _authExpiredNotified = false;
     await _persist();
   }
 
@@ -167,6 +183,14 @@ class GatewayClient {
     await clearSession();
   }
 
+  /// 令牌不可用：清会话并通知根节点跳登录页。
+  void _notifyAuthExpired() {
+    if (_authExpiredNotified) return;
+    _authExpiredNotified = true;
+    unawaited(logout());
+    authExpired.value++;
+  }
+
   DeviceInfo _localDevice(StoredSession stored) => DeviceInfo(
     id: stored.deviceId,
     code: stored.deviceCode,
@@ -176,10 +200,13 @@ class GatewayClient {
 
   /// 只有「令牌本身不可用」才需要清会话；其它错误（限流、封禁）让页面自己提示。
   bool _isAuthError(String code) =>
-      code == 'AUTH_TOKEN_EXPIRED' ||
-      code == 'AUTH_TOKEN_REVOKED' ||
+      _isTokenDead(code) ||
       code == 'AUTH_DEVICE_NOT_BOUND' ||
       code == 'AUTH_INVALID_CREDENTIAL';
+
+  /// 登录态真的没了的码：令牌过期/被吊销。设备未绑定另走 ensureDevice 自愈。
+  bool _isTokenDead(String code) =>
+      code == 'AUTH_TOKEN_EXPIRED' || code == 'AUTH_TOKEN_REVOKED';
 
   /// 把当前令牌与设备身份写进本地快照；没有令牌就什么也不写。
   Future<void> _persist() async {
@@ -197,10 +224,17 @@ class GatewayClient {
 
   /// 发起连接。服务端要求主控设备凭证（X-Device-Token），
   /// 首次连接未建立信任时需要对方屏幕上的验证码。
-  Future<String> requestConnect(String deviceCode, {String? captcha}) async {
+  /// [direct] 只在客户端设置「同账号设备免密直连」打开时为 true。
+  /// 服务端仅对「目标设备与主控同一账号」放行；跨账号仍要求临时密码。
+  Future<String> requestConnect(
+    String deviceCode, {
+    String? captcha,
+    bool direct = false,
+  }) async {
     final body = await _post('/v1/connect/request', {
       'device_code': deviceCode,
       if (captcha != null && captcha.isNotEmpty) 'captcha': captcha,
+      if (direct) 'direct': true,
     }, device: true);
     return body['session_id'] as String? ?? '';
   }
@@ -217,7 +251,33 @@ class GatewayClient {
       'code': code,
     });
     _token = body['token'] as String?;
+    _authExpiredNotified = false;
     await _persist();
+  }
+
+  /// 确保本机有设备身份；没有就补一次 bind（服务端绑定是幂等的）。
+  ///
+  /// 历史快照里存在「令牌在、device_id 却为空」的情况（早期版本先落盘后绑设备），
+  /// 被控开关直接拿它去 prepare 会得到 Rust 的
+  /// `Bad state: missing session (token/device_id)`。这里先自愈，再决定是否报错。
+  Future<DeviceInfo> ensureDevice({String platform = 'unknown'}) async {
+    final token = _token;
+    if (token == null || token.isEmpty) {
+      _notifyAuthExpired();
+      throw ApiException('AUTH_TOKEN_EXPIRED', '登录已过期，请重新登录');
+    }
+    final id = _deviceId ?? '';
+    final code = _deviceCode ?? '';
+    final deviceToken = _deviceToken ?? '';
+    if (id.isNotEmpty && code.isNotEmpty && deviceToken.isNotEmpty) {
+      return DeviceInfo(
+        id: id,
+        code: code,
+        platform: (_devicePlatform ?? '').isNotEmpty ? _devicePlatform! : platform,
+        online: true,
+      );
+    }
+    return bindDevice(platform);
   }
 
   // ---------- 运行时配置（P1-1 / P1-4） ----------
