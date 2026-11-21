@@ -25,7 +25,7 @@ fn real_main() {
     use std::time::{Duration, Instant};
 
     use er_capture::{Capture, ScreenCapture};
-    use er_client::agent::{encode_video_msg, TargetAgent, MSG_INPUT};
+    use er_client::agent::{encode_video_msg, TargetAgent, MSG_HEARTBEAT, MSG_INPUT};
     use er_client::encoder::HybridEncoder;
     use er_client::link::VideoHeader;
     use er_codec::EncodeConfig;
@@ -157,6 +157,7 @@ fn real_main() {
         let mut sent: u64 = 0;
         let mut injected: u64 = 0;
         let mut last_input = Instant::now();
+        let mut last_beat = Instant::now();
         let mut last_stat = Instant::now();
         let mut last_rotate = Instant::now();
 
@@ -164,6 +165,11 @@ fn real_main() {
             // 主控断开判据：只在「没显式给时长」时启用（无人值守的默认模式）。
             // 显式给了 duration 就按 duration 走——演示时用户可能只是盯着画面不动鼠标，
             // 按静默超时退出会把正在看的会话掐断（实测 10 分钟就断了）。
+            // 心跳超时优先：主控走了就别继续空推（CLI 端与客户端行为保持一致）
+            if last_beat.elapsed() > Duration::from_secs(10) {
+                println!("MAC: peer_left (no heartbeat)");
+                break;
+            }
             if duration_secs == 0 && last_input.elapsed() > Duration::from_secs(1800) {
                 println!("MAC: no input for 1800s, assuming controller left");
                 break;
@@ -175,6 +181,9 @@ fn real_main() {
                 match relay.recv_timeout(Duration::from_millis(2)) {
                     Ok(Some(sealed)) => {
                         if let Ok(plain) = crypto.open(&sealed) {
+                            if !plain.is_empty() && plain[0] == MSG_HEARTBEAT {
+                                last_beat = Instant::now();
+                            }
                             if !plain.is_empty() && plain[0] == MSG_INPUT {
                                 if let Some(ev) = InputEvent::decode(&plain[1..]) {
                                     if injector.inject(&ev).is_ok() {

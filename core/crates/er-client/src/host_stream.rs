@@ -168,7 +168,13 @@ fn run_host_stream(
 
         // ③ 推流 + 注入，直到对方离开或 stop
         let mut last_input = std::time::Instant::now();
+        // 心跳超时 = 主控真的走了。比 idle 可靠：主控一动不动但还连着时不会误伤。
+        let mut last_beat = std::time::Instant::now();
+        let beat_timeout = std::time::Duration::from_secs(10);
         while !stop.load(Ordering::Relaxed) {
+            if last_beat.elapsed() > beat_timeout {
+                break;
+            }
             if last_input.elapsed() > idle {
                 break;
             }
@@ -177,6 +183,9 @@ fn run_host_stream(
                 match relay.recv_timeout(std::time::Duration::from_millis(2)) {
                     Ok(Some(sealed)) => {
                         if let Ok(plain) = crypto.open(&sealed) {
+                            if !plain.is_empty() && plain[0] == crate::agent::MSG_HEARTBEAT {
+                                last_beat = std::time::Instant::now();
+                            }
                             if !plain.is_empty() && plain[0] == crate::agent::MSG_INPUT {
                                 if let Some(ev) = er_input::InputEvent::decode(&plain[1..]) {
                                     if injector.inject(&ev).is_ok() {

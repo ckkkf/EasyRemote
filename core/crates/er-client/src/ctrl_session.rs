@@ -149,8 +149,16 @@ fn run_loop(
         }
     };
     let mut last_decode = Instant::now() - Duration::from_secs(1);
+    // 心跳：让被控端能区分「主控只是没动鼠标」和「主控已经走了」
+    let mut last_beat = Instant::now() - Duration::from_secs(10);
 
     while !stop.load(Ordering::Relaxed) {
+        if last_beat.elapsed() >= Duration::from_secs(2) {
+            last_beat = Instant::now();
+            let beat = [crate::agent::MSG_HEARTBEAT];
+            let sealed = crypto.seal(&beat);
+            let _ = relay.send(&sealed);
+        }
         // ① 先把输入发出去（UI 可能一次给很多个移动）
         while let Ok(ev) = input_rx.try_recv() {
             let _ = ctrl.send_input(relay, crypto, &[ev]);
