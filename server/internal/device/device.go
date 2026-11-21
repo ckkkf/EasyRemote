@@ -93,6 +93,47 @@ func (s *Service) Bind(ctx context.Context, accountID, platform string) (*store.
 	return d, deviceToken, nil
 }
 
+// BindOrReuse 绑定设备，带「幂等复用」语义（GW-04）。
+//
+// 调用方若出示本机已有身份（deviceID + deviceToken 且校验通过、属于同一账号），
+// 复用那一行：只刷新 platform / last_seen 并轮换设备凭证，不再 allocateCode 新建。
+// 没身份、或凭证对不上 → 走 Bind 新建（老客户端行为不变）。
+//
+// 为什么必须幂等：客户端每次登录都会 bind 一次。非幂等时同一个账号越攒越多设备行，
+// 列表又按设备码升序返回，客户端「取第一台」就会认领别人的设备——这正是
+// 「macOS 机器显示成 Windows 设备」的来源。
+func (s *Service) BindOrReuse(ctx context.Context, accountID, platform, deviceID, deviceToken string) (*store.Device, string, error) {
+	if accountID == "" {
+		return nil, "", errcode.New(errcode.AuthTokenExpired, "no account")
+	}
+	if platform == "" {
+		platform = "unknown"
+	}
+	if deviceID != "" && deviceToken != "" && s.VerifyDeviceToken(ctx, deviceID, deviceToken) {
+		d, err := s.store.GetDevice(ctx, deviceID)
+		if err == nil && d.AccountID == accountID {
+			if err := s.store.UpdateDevicePlatform(ctx, d.ID, platform); err != nil {
+				return nil, "", errcode.New(errcode.SrvInternal, err.Error())
+			}
+			if err := s.store.UpdateDeviceSeen(ctx, d.ID, s.now(), true); err != nil {
+				return nil, "", errcode.New(errcode.SrvInternal, err.Error())
+			}
+			token, err := randomToken()
+			if err != nil {
+				return nil, "", errcode.New(errcode.SrvInternal, err.Error())
+			}
+			if err := s.store.UpdateDeviceToken(ctx, d.ID, s.hashToken(token)); err != nil {
+				return nil, "", errcode.New(errcode.SrvInternal, err.Error())
+			}
+			d.Platform = platform
+			d.Online = true
+			d.LastSeenAt = s.now()
+			return d, token, nil
+		}
+	}
+	return s.Bind(ctx, accountID, platform)
+}
+
 func randomToken() (string, error) {
 	var buf [32]byte
 	if _, err := rand.Read(buf[:]); err != nil {
@@ -129,6 +170,36 @@ func (s *Service) RotateToken(ctx context.Context, deviceID string) (string, err
 		return "", errcode.New(errcode.SrvInternal, err.Error())
 	}
 	return token, nil
+}
+
+// hashPassword 与设备凭证同一套 HMAC：泄露库也拿不到明文密码。
+func (s *Service) hashPassword(deviceID, password string) string {
+	m := hmac.New(sha256.New, s.secret)
+	m.Write([]byte("dp:" + deviceID + ":" + password))
+	return base64.RawURLEncoding.EncodeToString(m.Sum(nil))
+}
+
+// SetPassword 设置/覆盖设备临时密码。明文由被控端本地保存（可查看、可复制），
+// 服务端只存哈希，且**不做轮换、不做消费**——这是与一次性验证码最大的区别。
+func (s *Service) SetPassword(ctx context.Context, deviceID, password string) error {
+	if len(password) < 6 || len(password) > 16 {
+		return errcode.New(errcode.ConnCaptchaInvalid, "password length must be 6..16")
+	}
+	for _, r := range password {
+		if !(r >= '0' && r <= '9') && !(r >= 'a' && r <= 'z') && !(r >= 'A' && r <= 'Z') {
+			return errcode.New(errcode.ConnCaptchaInvalid, "password must be alphanumeric")
+		}
+	}
+	return s.store.UpdateDevicePassword(ctx, deviceID, s.hashPassword(deviceID, password))
+}
+
+// CheckPassword 校验临时密码（恒定时间比较，不消费）。
+func (s *Service) CheckPassword(ctx context.Context, deviceCode, password string) bool {
+	d, err := s.store.GetDeviceByCode(ctx, normalize(deviceCode))
+	if err != nil || d.PasswordHash == "" || password == "" {
+		return false
+	}
+	return hmac.Equal([]byte(d.PasswordHash), []byte(s.hashPassword(d.ID, password)))
 }
 
 func (s *Service) hashCode(deviceCode, code string) string {

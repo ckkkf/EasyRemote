@@ -44,6 +44,20 @@ export type DeviceRow = {
   last_seen: string;
 };
 
+export type BindRequest = {
+  platform: string;
+  device_id?: string;
+  device_token?: string;
+};
+
+export type BindResult = {
+  device_code: string;
+  raw_code: string;
+  device_id: string;
+  device_token: string;
+  platform: string;
+};
+
 export type SessionRow = {
   id: string;
   controller_id: string;
@@ -117,7 +131,7 @@ export const ENDPOINTS: readonly EndpointSpec[] = [
   { id: 'GW-01', method: 'POST', path: '/v1/auth/sms', auth: 'none', response: 'OkResult', errors: ['AUTH_INVALID_CREDENTIAL', 'AUTH_SMS_RATE_LIMITED'] },
   { id: 'GW-02', method: 'POST', path: '/v1/auth/login', auth: 'none', response: 'any', errors: ['AUTH_INVALID_CREDENTIAL', 'AUTH_TOO_MANY_ATTEMPTS'] },
   { id: 'GW-03', method: 'GET', path: '/v1/devices', auth: 'bearer', response: 'any', errors: ['AUTH_TOKEN_EXPIRED', 'SRV_INTERNAL'] },
-  { id: 'GW-04', method: 'POST', path: '/v1/devices/bind', auth: 'bearer', response: 'any', errors: ['AUTH_TOKEN_EXPIRED', 'SRV_INTERNAL'] },
+  { id: 'GW-04', method: 'POST', path: '/v1/devices/bind', auth: 'bearer', response: 'BindResult', errors: ['AUTH_TOKEN_EXPIRED', 'SRV_INTERNAL'] },
   { id: 'GW-05', method: 'POST', path: '/v1/devices/verify-code', auth: 'device', response: 'any', errors: ['CONN_DEVICE_NOT_FOUND', 'ADMIN_FORBIDDEN'] },
   { id: 'GW-06', method: 'POST', path: '/v1/connect/request', auth: 'bearer', response: 'any', errors: ['CONN_DEVICE_NOT_FOUND', 'CONN_DEVICE_OFFLINE', 'CONN_CAPTCHA_INVALID', 'CONN_RATE_LIMITED'] },
   { id: 'GW-07', method: 'POST', path: '/v1/connect/consent', auth: 'device', response: 'any', errors: ['CONN_DEVICE_NOT_FOUND', 'ADMIN_FORBIDDEN'] },
@@ -133,5 +147,6 @@ export const ENDPOINTS: readonly EndpointSpec[] = [
   { id: 'GW-17', method: 'POST', path: '/v1/assist/redeem', auth: 'bearer', response: 'any', errors: ['CONN_ASSIST_CODE_INVALID', 'CONN_ASSIST_CODE_USED', 'CONN_ASSIST_CODE_EXPIRED', 'CONN_SELF_CONNECT'] },
   { id: 'GW-18', method: 'GET', path: '/v1/config', auth: 'none', response: 'any', errors: ['SRV_INTERNAL'] },
   { id: 'GW-19', method: 'POST', path: '/v1/net/reflect', auth: 'none', response: 'any', errors: ['SRV_INTERNAL'] },
+  { id: 'GW-20', method: 'POST', path: '/v1/devices/password', auth: 'bearer', response: 'any', errors: ['CONN_DEVICE_NOT_FOUND', 'CONN_CAPTCHA_INVALID', 'AUTH_TOKEN_EXPIRED'] },
   { id: 'SYS-01', method: 'GET', path: '/healthz', auth: 'none', response: 'OkResult', errors: ['[]'] },
 ];

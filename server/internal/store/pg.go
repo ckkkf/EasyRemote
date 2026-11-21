@@ -241,8 +241,30 @@ func (p *PG) UpdateDeviceSeen(ctx context.Context, id string, at time.Time, onli
 	return nil
 }
 
+func (p *PG) UpdateDevicePlatform(ctx context.Context, id, platform string) error {
+	tag, err := p.pool.Exec(ctx, `UPDATE devices SET platform=$2 WHERE id=$1`, id, platform)
+	if err != nil {
+		return mapErr(err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 func (p *PG) UpdateDeviceToken(ctx context.Context, id, tokenHash string) error {
 	tag, err := p.pool.Exec(ctx, `UPDATE devices SET token_hash=$2 WHERE id=$1`, id, tokenHash)
+	if err != nil {
+		return mapErr(err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+func (p *PG) UpdateDevicePassword(ctx context.Context, id, passwordHash string) error {
+	tag, err := p.pool.Exec(ctx, `UPDATE devices SET password_hash=$2 WHERE id=$1`, id, passwordHash)
 	if err != nil {
 		return mapErr(err)
 	}

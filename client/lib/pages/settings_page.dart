@@ -1,13 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../host_service.dart';
 import '../models.dart';
+import '../prefs.dart';
 import '../shell.dart';
 import '../theme.dart';
 
 /// 设置页：外观（浅色/深色/跟随系统）、画质、安全与设备信息。
 class SettingsPage extends StatefulWidget {
-  const SettingsPage({super.key, required this.device, this.config, this.onLogout});
+  const SettingsPage({
+    super.key,
+    required this.device,
+    this.config,
+    this.onLogout,
+  });
 
   final DeviceInfo device;
 
@@ -22,12 +29,31 @@ class SettingsPage extends StatefulWidget {
 }
 
 class _SettingsPageState extends State<SettingsPage> {
-  bool _privacyScreen = false;
-  bool _preventSleep = true;
-  String _quality = '自动';
+  @override
+  void initState() {
+    super.initState();
+    // 设置页读的是全局偏好总线，不是自己的临时 state：
+    // 之前纯 setState，刷新/重进必回默认值（用户改了等于没改）。
+    appPrefs.addListener(_onPrefs);
+  }
+
+  @override
+  void dispose() {
+    appPrefs.removeListener(_onPrefs);
+    super.dispose();
+  }
+
+  void _onPrefs() {
+    if (mounted) setState(() {});
+  }
+
+  void _patch(Prefs Function(Prefs p) change) {
+    updatePrefs(change(appPrefs.value));
+  }
 
   @override
   Widget build(BuildContext context) {
+    final prefs = appPrefs.value;
     final scheme = Theme.of(context).colorScheme;
     final text = Theme.of(context).textTheme;
     final wide = MediaQuery.sizeOf(context).width >= ErTokens.mobileBreakpoint;
@@ -42,18 +68,29 @@ class _SettingsPageState extends State<SettingsPage> {
             children: [
               if (widget.config?.forceUpdate ?? false) ...[
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
                   decoration: BoxDecoration(
                     color: scheme.errorContainer,
                     borderRadius: BorderRadius.circular(ErTokens.radiusMd),
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.system_update_alt_rounded, size: 16, color: scheme.onErrorContainer),
+                      Icon(
+                        Icons.system_update_alt_rounded,
+                        size: 16,
+                        color: scheme.onErrorContainer,
+                      ),
                       const SizedBox(width: 8),
                       Expanded(
-                        child: Text('服务端要求强制更新：请更新到最新版客户端后再连接。',
-                            style: text.bodySmall?.copyWith(color: scheme.onErrorContainer)),
+                        child: Text(
+                          '服务端要求强制更新：请更新到最新版客户端后再连接。',
+                          style: text.bodySmall?.copyWith(
+                            color: scheme.onErrorContainer,
+                          ),
+                        ),
                       ),
                     ],
                   ),
@@ -86,17 +123,59 @@ class _SettingsPageState extends State<SettingsPage> {
                       children: [
                         Expanded(child: Text('清晰度', style: text.bodyMedium)),
                         DropdownButton<String>(
-                          value: _quality,
+                          value: prefs.quality,
                           underline: const SizedBox.shrink(),
-                          borderRadius: BorderRadius.circular(ErTokens.radiusMd),
+                          borderRadius: BorderRadius.circular(
+                            ErTokens.radiusMd,
+                          ),
                           items: const [
                             DropdownMenuItem(value: '自动', child: Text('自动')),
                             DropdownMenuItem(value: '高清', child: Text('高清')),
                             DropdownMenuItem(value: '流畅', child: Text('流畅')),
                           ],
-                          onChanged: (v) => setState(() => _quality = v ?? '自动'),
+                          onChanged: (v) =>
+                              _patch((p) => p.copyWith(quality: v ?? '自动')),
                         ),
                       ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              _Section(
+                title: '连接',
+                subtitle: '同账号设备之间的默认连接行为',
+                children: [
+                  SwitchListTile(
+                    key: const Key('same-account-direct-switch'),
+                    value: prefs.sameAccountDirect,
+                    onChanged: (v) =>
+                        _patch((p) => p.copyWith(sameAccountDirect: v)),
+                    title: const Text('同账号设备免密直连'),
+                    subtitle: const Text(
+                      '开启后，同一账号下已登录的设备点「连接」直接发起会话，不再输入临时密码；默认关闭。',
+                    ),
+                  ),
+                  const Divider(height: 1),
+                  ListTile(
+                    leading: Icon(
+                      Icons.computer_rounded,
+                      size: 18,
+                      color: scheme.onSurfaceVariant,
+                    ),
+                    title: const Text('允许被控（本机共享）'),
+                    subtitle: const Text(
+                      '默认开启；开关在「我的设备 → 允许被控」，关闭后其他设备无法连接本机。',
+                    ),
+                    trailing: Text(
+                      !HostService.supported
+                          ? '当前平台不支持'
+                          : (prefs.allowControl ? '已开启' : '已关闭'),
+                      style: text.bodyMedium?.copyWith(
+                        color: HostService.supported && prefs.allowControl
+                            ? scheme.primary
+                            : scheme.onSurfaceVariant,
+                      ),
                     ),
                   ),
                 ],
@@ -106,15 +185,19 @@ class _SettingsPageState extends State<SettingsPage> {
                 title: '安全',
                 children: [
                   SwitchListTile(
-                    value: _privacyScreen,
-                    onChanged: (v) => setState(() => _privacyScreen = v),
+                    key: const Key('privacy-screen-switch'),
+                    value: prefs.privacyScreen,
+                    onChanged: (v) =>
+                        _patch((p) => p.copyWith(privacyScreen: v)),
                     title: const Text('隐私屏'),
                     subtitle: const Text('开启后被控端画面不离开本机（对方看到黑屏）'),
                   ),
                   const Divider(height: 1),
                   SwitchListTile(
-                    value: _preventSleep,
-                    onChanged: (v) => setState(() => _preventSleep = v),
+                    key: const Key('prevent-sleep-switch'),
+                    value: prefs.preventSleep,
+                    onChanged: (v) =>
+                        _patch((p) => p.copyWith(preventSleep: v)),
                     title: const Text('会话期间阻止睡眠'),
                     subtitle: const Text('避免长时间无人操作时主机休眠断连'),
                   ),
@@ -127,18 +210,27 @@ class _SettingsPageState extends State<SettingsPage> {
                 children: [
                   ListTile(
                     title: const Text('单次会话上限'),
-                    trailing: Text('${widget.config?.sessionMaxMinutes ?? 720} 分钟', style: text.bodyMedium),
+                    trailing: Text(
+                      '${widget.config?.sessionMaxMinutes ?? 720} 分钟',
+                      style: text.bodyMedium,
+                    ),
                   ),
                   const Divider(height: 1),
                   ListTile(
                     title: const Text('单文件上传上限'),
-                    trailing: Text(_sizeText(widget.config?.fileMaxBytes ?? 33554432), style: text.bodyMedium),
+                    trailing: Text(
+                      _sizeText(widget.config?.fileMaxBytes ?? 33554432),
+                      style: text.bodyMedium,
+                    ),
                   ),
                   const Divider(height: 1),
                   ListTile(
                     title: const Text('诊断自动刷新'),
                     subtitle: const Text('每轮自动重新测量时延与丢包'),
-                    trailing: Text('${widget.config?.diagAutoRefreshSecs ?? 30} 秒', style: text.bodyMedium),
+                    trailing: Text(
+                      '${widget.config?.diagAutoRefreshSecs ?? 30} 秒',
+                      style: text.bodyMedium,
+                    ),
                   ),
                 ],
               ),
@@ -148,15 +240,22 @@ class _SettingsPageState extends State<SettingsPage> {
                 children: [
                   ListTile(
                     title: const Text('本机设备码'),
-                    subtitle: Text(widget.device.prettyCode,
-                        style: text.titleSmall?.copyWith(letterSpacing: 2)),
+                    subtitle: Text(
+                      widget.device.prettyCode,
+                      style: text.titleSmall?.copyWith(letterSpacing: 2),
+                    ),
                     trailing: IconButton(
                       tooltip: '复制',
                       icon: const Icon(Icons.copy_rounded, size: 18),
                       onPressed: () {
-                        Clipboard.setData(ClipboardData(text: widget.device.prettyCode));
-                        ScaffoldMessenger.of(context)
-                            .showSnackBar(SnackBar(content: Text('已复制 ' + widget.device.prettyCode)));
+                        Clipboard.setData(
+                          ClipboardData(text: widget.device.prettyCode),
+                        );
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('已复制 ' + widget.device.prettyCode),
+                          ),
+                        );
                       },
                     ),
                   ),
@@ -176,8 +275,15 @@ class _SettingsPageState extends State<SettingsPage> {
                   children: [
                     ListTile(
                       key: const Key('logout-tile'),
-                      leading: Icon(Icons.logout_rounded, size: 18, color: scheme.error),
-                      title: Text('退出登录', style: text.bodyMedium?.copyWith(color: scheme.error)),
+                      leading: Icon(
+                        Icons.logout_rounded,
+                        size: 18,
+                        color: scheme.error,
+                      ),
+                      title: Text(
+                        '退出登录',
+                        style: text.bodyMedium?.copyWith(color: scheme.error),
+                      ),
                       onTap: widget.onLogout,
                     ),
                   ],
@@ -186,11 +292,19 @@ class _SettingsPageState extends State<SettingsPage> {
               const SizedBox(height: 16),
               Row(
                 children: [
-                  Icon(Icons.shield_outlined, size: 15, color: scheme.onSurfaceVariant),
+                  Icon(
+                    Icons.shield_outlined,
+                    size: 15,
+                    color: scheme.onSurfaceVariant,
+                  ),
                   const SizedBox(width: 6),
                   Expanded(
-                    child: Text('会话全程端到端加密，中继节点只转发密文。',
-                        style: text.labelSmall?.copyWith(color: scheme.onSurfaceVariant)),
+                    child: Text(
+                      '会话全程端到端加密，中继节点只转发密文。',
+                      style: text.labelSmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -231,22 +345,32 @@ class _Section extends StatelessWidget {
       child: Material(
         type: MaterialType.transparency,
         child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: EdgeInsets.fromLTRB(16, 14, 16, subtitle == null ? 0 : 4),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: text.titleSmall),
-                if (subtitle != null)
-                  Text(subtitle!, style: text.labelSmall?.copyWith(color: scheme.onSurfaceVariant)),
-              ],
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: EdgeInsets.fromLTRB(
+                16,
+                14,
+                16,
+                subtitle == null ? 0 : 4,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: text.titleSmall),
+                  if (subtitle != null)
+                    Text(
+                      subtitle!,
+                      style: text.labelSmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(height: 8),
-          ...children,
-        ],
+            const SizedBox(height: 8),
+            ...children,
+          ],
         ),
       ),
     );

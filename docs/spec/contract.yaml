@@ -31,6 +31,21 @@ types:
     platform: string
     online: bool
     last_seen: time
+  # GW-04 请求体。platform 必填语义：空值落成 "unknown"，绝不猜成 "windows"。
+  # device_id + device_token 可选：带上本机已有身份就复用那一行（幂等绑定），
+  # 服务端只刷新 platform / last_seen 并轮换凭证，不再新建一台设备。
+  BindRequest:
+    platform: string
+    device_id: string?
+    device_token: string?
+  # 绑设备返回体。platform 必须是服务端归一化后的真值（客户端据此显示图标/能力），
+  # 不允许客户端拿自己上报的字符串当结果显示——那会让 macOS 设备顶着别人的平台名。
+  BindResult:
+    device_code: string
+    raw_code: string
+    device_id: string
+    device_token: string
+    platform: string
   SessionRow:
     id: string
     controller_id: string
@@ -160,11 +175,12 @@ endpoints:
     auth: bearer
     response: any
     errors: AUTH_TOKEN_EXPIRED, SRV_INTERNAL
+  # 请求体：BindRequest（platform 必填语义见上；device_id/device_token 可选，用于幂等复用）。
   GW-04:
     method: POST
     path: /v1/devices/bind
     auth: bearer
-    response: any
+    response: BindResult
     errors: AUTH_TOKEN_EXPIRED, SRV_INTERNAL
   GW-05:
     method: POST
@@ -256,3 +272,11 @@ endpoints:
     auth: none
     response: any
     errors: SRV_INTERNAL
+  GW-20:
+    # 被控端设置「临时密码」：长期有效、校验不消费（对比 GW-07 的一次性验证码）。
+    # 明文只存在被控端本地，服务端只存 HMAC。
+    method: POST
+    path: /v1/devices/password
+    auth: bearer
+    response: any
+    errors: CONN_DEVICE_NOT_FOUND, CONN_CAPTCHA_INVALID, AUTH_TOKEN_EXPIRED

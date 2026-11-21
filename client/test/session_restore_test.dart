@@ -123,6 +123,57 @@ void main() {
     expect(await sessionFile.exists(), isTrue);
   });
 
+  // 回归：内存库重启/设备被清后，本地 device_id 在服务端已经不存在。
+  // 这时**不许**认领 devices.first（列表按设备码升序，第一台常是同账号下的
+  // 另一台机器，例如 Windows），否则本机会顶着别人的设备码和平台名。
+  test('本地身份失效时重新绑定本机，不认领列表第一台', () async {
+    final first = GatewayClient(baseUrl: 'http://gw.test', client: _fake());
+    await first.login('13800000000', '123456');
+    await first.bindDevice('macos');
+
+    final other = MockClient((req) async {
+      switch (req.url.path) {
+        case '/v1/devices':
+          return _ok({
+            'devices': [
+              {
+                'id': 'dev-other',
+                'raw_code': '999888777',
+                'platform': 'windows',
+                'online': true,
+              },
+            ],
+          });
+        case '/v1/devices/bind':
+          // 重绑必须把快照里的身份带上，服务端才能复用同一行（幂等），
+          // 而不是每次启动都新建一台幽灵设备。
+          final sent = jsonDecode(req.body) as Map<String, dynamic>;
+          expect(sent['device_id'], 'dev-1');
+          expect(sent['device_token'], 'dtok-1');
+          expect(sent['platform'], isNotEmpty);
+          return _ok({
+            'device_id': 'dev-new',
+            'device_token': 'dtok-new',
+            'raw_code': '111222333',
+            'platform': 'macos',
+          });
+      }
+      return http.Response('{"code":404,"name":"NOT_FOUND"}', 404);
+    });
+
+    final second = GatewayClient(baseUrl: 'http://gw.test', client: other);
+    final restored = await second.restoreSession();
+
+    expect(restored, isNotNull);
+    expect(restored!.id, 'dev-new', reason: '必须重新绑一台本机设备');
+    expect(restored.code, '111222333');
+    expect(restored.platform, 'macos', reason: '平台取服务端回显，不是本机入参');
+    expect(second.deviceToken, 'dtok-new');
+
+    final raw = jsonDecode(await sessionFile.readAsString()) as Map<String, dynamic>;
+    expect(raw['device_id'], 'dev-new', reason: '重绑结果必须写回快照，否则每次启动都重绑');
+  });
+
   test('没有本地快照时直接回登录页', () async {
     final client = GatewayClient(baseUrl: 'http://gw.test', client: _fake());
     expect(await client.restoreSession(), isNull);

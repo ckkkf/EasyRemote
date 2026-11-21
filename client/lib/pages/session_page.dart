@@ -1,10 +1,15 @@
 import 'dart:async';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../api.dart';
 import '../models.dart';
+import '../net_probe.dart';
+import '../main.dart' show erGatewayBaseUrl;
+import '../net_probe_cache.dart';
+import '../session_video.dart';
 import '../theme.dart';
 import 'diagnostics_page.dart';
 
@@ -65,6 +70,9 @@ class _SessionPageState extends State<SessionPage> {
   int _lost = 0;
   ReflectInfo? _reflect;
 
+  /// 本机 NAT 实测结果（与诊断页同一套 STUN 探测）。
+  NatProbeResult? _nat;
+
   bool _sheetOpen = false;
   bool _immersive = false;
 
@@ -72,18 +80,53 @@ class _SessionPageState extends State<SessionPage> {
   void initState() {
     super.initState();
     _loadTarget();
+    _probeNat();
     _pollOnce();
     _poll = Timer.periodic(const Duration(seconds: 1), (_) => _pollOnce());
     _tick = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) setState(() {});
     });
+    _startVideo();
+  }
+
+
+  Timer? _videoTimer;
+
+  /// 接管会话并开始拉帧：FFI 里已经建好双缓冲，这里只是定时把最新帧解码成 ui.Image。
+  void _startVideo() {
+    final token = widget.client.token ?? "";
+    final deviceId = widget.client.deviceId ?? "";
+    final deviceToken = widget.client.deviceToken ?? "";
+    if (token.isEmpty || deviceId.isEmpty) {
+      debugPrint("[video] 缺少登录态，跳过画面接管");
+      return;
+    }
+    SessionVideo.instance.attach(
+      gateway: erGatewayBaseUrl.isEmpty ? "http://127.0.0.1:18090" : erGatewayBaseUrl,
+      relay: "127.0.0.1:19000",
+      token: token,
+      deviceId: deviceId,
+      deviceToken: deviceToken,
+      sessionId: widget.sessionId,
+    );
+    _videoTimer = Timer.periodic(const Duration(milliseconds: 60), (_) async {
+      await SessionVideo.instance.poll();
+      if (mounted && SessionVideo.instance.image != null) setState(() {});
+    });
   }
 
   @override
   void dispose() {
+    _videoTimer?.cancel();
+    SessionVideo.instance.close();
     _poll?.cancel();
     _tick?.cancel();
     super.dispose();
+  }
+
+  Future<void> _probeNat() async {
+    final result = await probeNatCached();
+    if (mounted) setState(() => _nat = result);
   }
 
   Future<void> _loadTarget() async {
@@ -438,7 +481,8 @@ class _SessionPageState extends State<SessionPage> {
           const SizedBox(height: 8),
           row('本机设备码', _ownCode),
           row('连接方式', widget.assist ? '协助码临时授权' : '设备码直连'),
-          row('本机 NAT', '未知（需桌面端）'),
+          row('本机 NAT',
+              _nat == null ? '探测中…' : (_nat!.supported ? _nat!.nat : '不支持（当前平台）')),
           row('中继节点', '未知（需桌面端）'),
           row('加密协议', 'Ed25519 握手 · 中继只见密文'),
           row('画质策略', '智能 · 自动（本机设置）'),
@@ -474,7 +518,7 @@ class _SessionPageState extends State<SessionPage> {
 
     return Stack(
       children: [
-        Positioned.fill(child: _remotePlaceholder(context)),
+        Positioned.fill(child: _remoteView(context)),
         if (!_immersive)
           Positioned(
             top: 0,
@@ -507,7 +551,49 @@ class _SessionPageState extends State<SessionPage> {
     );
   }
 
-  Widget _remotePlaceholder(BuildContext context) {
+  /// 远端画面：有帧就画，没帧才显示占位说明。
+  Widget _remoteView(BuildContext context) {
+    final img = SessionVideo.instance.image;
+    if (img == null) {
+      // 把 FFI 侧的错误直接显示出来：黑屏时这是唯一能自证的线索
+      return _remotePlaceholder(context, SessionVideo.instance.error);
+    }
+    return Container(
+      key: const Key("remote-canvas"),
+      color: Colors.black,
+      child: LayoutBuilder(
+        builder: (context, c) {
+          final iw = img.width.toDouble();
+          final ih = img.height.toDouble();
+          final scale = (c.maxWidth / iw).clamp(0.0, c.maxHeight / ih);
+          return Center(
+            child: Listener(
+              onPointerMove: (e) => _sendPointer(e.localPosition, scale, img),
+              onPointerDown: (e) {
+                _sendPointer(e.localPosition, scale, img);
+                SessionVideo.instance.send(1, 0, 1);
+              },
+              onPointerUp: (e) => SessionVideo.instance.send(1, 0, 0),
+              child: SizedBox(
+                width: iw * scale,
+                height: ih * scale,
+                child: RawImage(image: img, fit: BoxFit.fill),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  /// 把窗口坐标换算成被控端像素坐标再发过去。
+  void _sendPointer(Offset local, double scale, ui.Image img) {
+    final x = (local.dx / scale).clamp(0.0, img.width.toDouble()).round();
+    final y = (local.dy / scale).clamp(0.0, img.height.toDouble()).round();
+    SessionVideo.instance.send(0, x, y);
+  }
+
+  Widget _remotePlaceholder(BuildContext context, [String error = '']) {
     return Container(
       key: const Key('remote-canvas'),
       decoration: const BoxDecoration(
@@ -535,8 +621,16 @@ class _SessionPageState extends State<SessionPage> {
           const Text('桌面端渲染远端画面',
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white70)),
           const SizedBox(height: 6),
-          const Text('Web 预览不解码视频流：画面与控制通道由桌面端 Rust 核心（硬件解码）输出',
-              style: TextStyle(fontSize: 12, color: Colors.white38)),
+          Text(
+            error.isEmpty
+                ? '等待被控端画面…（若长时间无画面，请确认对方已开启「允许被控」）'
+                : '画面接管失败：' + error,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 12,
+              color: error.isEmpty ? Colors.white38 : Colors.orangeAccent,
+            ),
+          ),
         ],
       ),
     );
@@ -736,7 +830,7 @@ class _StepLine extends StatelessWidget {
                 labels[i],
                 style: text.labelSmall?.copyWith(
                   color: i <= step ? scheme.onSurface : scheme.onSurfaceVariant,
-                  fontWeight: i == step ? FontWeight.w700 : FontWeight.w500,
+                  fontWeight: i == step ? FontWeight.w600 : FontWeight.w400,
                 ),
               ),
             ],
@@ -805,12 +899,12 @@ class _QualityBadge extends StatelessWidget {
             RichText(
               text: TextSpan(
                 text: value,
-                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.white),
+                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Colors.white),
                 children: [
                   if (unit != null)
                     TextSpan(
                         text: unit,
-                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w500, color: Colors.white38)),
+                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w400, color: Colors.white38)),
                 ],
               ),
             ),
@@ -912,6 +1006,7 @@ class _QualityDrawerState extends State<_QualityDrawer> {
   int _total = 0;
   int _lost = 0;
   ReflectInfo? _reflect;
+  NatProbeResult? _nat;
   Timer? _periodic;
   bool _sampling = false;
 
@@ -919,6 +1014,7 @@ class _QualityDrawerState extends State<_QualityDrawer> {
   void initState() {
     super.initState();
     _measure();
+    _probeNat();
     // 原型写「数据每 2 秒刷新」：这里每 2 秒补一次真实 ping，滚动窗口 5 个。
     _periodic = Timer.periodic(const Duration(seconds: 2), (_) => _sample());
   }
@@ -945,6 +1041,11 @@ class _QualityDrawerState extends State<_QualityDrawer> {
       await Future<void>.delayed(const Duration(milliseconds: 120));
     }
     _sampling = false;
+  }
+
+  Future<void> _probeNat() async {
+    final result = await probeNatCached();
+    if (mounted) setState(() => _nat = result);
   }
 
   Future<void> _sample() async {
@@ -1137,7 +1238,8 @@ class _QualityDrawerState extends State<_QualityDrawer> {
                         _detail('丢包率', _loss.toStringAsFixed(1) + ' %'),
                         _detail('编码器', '未知（需桌面端）'),
                         _detail('编码 / 解码耗时', '未知（需桌面端）'),
-                        _detail('NAT 类型', '未知（需桌面端）'),
+                        _detail('NAT 类型',
+                            _nat == null ? '探测中…' : (_nat!.supported ? _nat!.nat : '不支持（当前平台）')),
                         _detail('当前档位', '智能 · 自动（本机设置）'),
                         const SizedBox(height: 10),
                         Text(

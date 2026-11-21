@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../api.dart';
+import '../prefs.dart';
 import '../shell.dart';
 import '../theme.dart';
 
@@ -32,12 +33,13 @@ class ConnectPage extends StatefulWidget {
   State<ConnectPage> createState() => _ConnectPageState();
 }
 
-/// 连接方式：设备码（首次连接要验证码）/ 协助码（被控端临时授权，免验证码）。
+/// 连接方式：设备码 + 临时密码（被控端窗口显示，长期有效）/ 协助码（被控端临时授权）。
 enum _ConnectMode { device, assist }
 
 class _ConnectPageState extends State<ConnectPage> {
   final _codeCtl = TextEditingController();
-  final _codeFocus = FocusNode();
+  /// 9 格输入的句柄：粘贴后把焦点放到第一个空格。
+  final _codeEntryKey = GlobalKey<_CodeEntryState>();
   final _captcha = TextEditingController();
   final _assistCtl = TextEditingController();
   final _assistFocus = FocusNode();
@@ -69,11 +71,20 @@ class _ConnectPageState extends State<ConnectPage> {
   @override
   void dispose() {
     _codeCtl.dispose();
-    _codeFocus.dispose();
     _captcha.dispose();
     _assistCtl.dispose();
     _assistFocus.dispose();
     super.dispose();
+  }
+
+  /// 从剪贴板取 9 位设备码填进格子（剪贴板里混着空格/横线也能用）。
+  Future<void> _pasteCodeFromClipboard() async {
+    final data = await Clipboard.getData(Clipboard.kTextPlain);
+    final digits = (data?.text ?? "").replaceAll(RegExp(r"[^0-9]"), "");
+    if (digits.isEmpty) return;
+    _codeCtl.text = digits.length > 9 ? digits.substring(0, 9) : digits;
+    _codeEntryKey.currentState?.focusNextEmpty();
+    setState(() => _error = null);
   }
 
   Future<void> _connect() async {
@@ -83,11 +94,16 @@ class _ConnectPageState extends State<ConnectPage> {
     });
     try {
       final code = _code;
-      final sid = await widget.client.requestConnect(code, captcha: _captcha.text.trim());
+      final sid = await widget.client.requestConnect(
+        code,
+        captcha: _captcha.text.trim(),
+        // 只对「同一账号」的目标生效：跨账号服务端仍会要求临时密码。
+        direct: appPrefs.value.sameAccountDirect,
+      );
       widget.onCodeUsed(code);
       widget.onSessionStarted(sid, code.replaceAll(RegExp(r'[^0-9]'), ''));
     } on ApiException catch (e) {
-      setState(() => _error = e.message);
+      setState(() => _error = _friendlyConnectError(e));
     } catch (e) {
       setState(() => _error = e.toString());
     } finally {
@@ -188,19 +204,31 @@ class _ConnectPageState extends State<ConnectPage> {
                           const SizedBox(height: 18),
                           if (_mode == _ConnectMode.device) ...[
                           _CodeEntry(
+                            key: _codeEntryKey,
                             controller: _codeCtl,
-                            focusNode: _codeFocus,
                             onChanged: () => setState(() {}),
                           ),
-                          const SizedBox(height: 14),
+                          // 粘贴入口：透明输入层的光标与格子对不上，
+                          // 与其纠结光标位置，不如给一个显式的「粘贴设备码」。
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: TextButton.icon(
+                              onPressed: _pasteCodeFromClipboard,
+                              icon: const Icon(Icons.content_paste_rounded, size: 16),
+                              label: const Text("粘贴设备码"),
+                            ),
+                          ),
+                          const SizedBox(height: 6),
                           TextField(
                             key: const Key('captcha-field'),
                             controller: _captcha,
                             keyboardType: TextInputType.number,
-                            decoration: const InputDecoration(
-                              labelText: '验证码（首次连接必填）',
-                              hintText: '对方屏幕上显示的数字',
-                              prefixIcon: Icon(Icons.verified_user_outlined, size: 18),
+                            decoration: InputDecoration(
+                              labelText: '临时密码',
+                              hintText: appPrefs.value.sameAccountDirect
+                                  ? '同账号设备可留空（免密直连已开启）'
+                                  : '被控端窗口里显示的 8 位数字（可长期复用）',
+                              prefixIcon: const Icon(Icons.verified_user_outlined, size: 18),
                             ),
                           ),
                           ] else ...[
@@ -331,7 +359,7 @@ class _ModeSwitch extends StatelessWidget {
                   label,
                   style: text.labelMedium?.copyWith(
                     color: on ? scheme.onPrimaryContainer : scheme.onSurfaceVariant,
-                    fontWeight: on ? FontWeight.w600 : FontWeight.w500,
+                    fontWeight: on ? FontWeight.w600 : FontWeight.w400,
                   ),
                 ),
               ],
@@ -358,89 +386,238 @@ class _ModeSwitch extends StatelessWidget {
   }
 }
 
-class _CodeEntry extends StatelessWidget {
-  const _CodeEntry({required this.controller, required this.focusNode, required this.onChanged});
+/// 9 格设备码输入：每一格都是一个**真的** TextField。
+///
+/// 旧实现是「一个透明 TextField 盖在 9 个画出来的格子上」——文字和光标都透明，
+/// 光标位置永远和格子对不上，选区也看不见，结果就是「没光标、选不中数字」。
+/// 这里换成 9 个真输入框：光标、选区、输入法、退格全部走系统原生行为。
+class _CodeEntry extends StatefulWidget {
+  const _CodeEntry({super.key, required this.controller, required this.onChanged});
 
+  /// 聚合值：恒为 0–9 位纯数字。页面其它入口（粘贴按钮、最近连接）只改这里。
   final TextEditingController controller;
-  final FocusNode focusNode;
   final VoidCallback onChanged;
 
   @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final text = Theme.of(context).textTheme;
-    final value = controller.text;
+  State<_CodeEntry> createState() => _CodeEntryState();
+}
 
-    Widget box(int i) {
-      final filled = i < value.length;
-      final active = focusNode.hasFocus && i == value.length.clamp(0, 8);
-      return AnimatedContainer(
-        duration: const Duration(milliseconds: 120),
-        width: 46,
-        height: 56,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: scheme.surfaceContainerLowest,
-          borderRadius: BorderRadius.circular(ErTokens.radiusMd),
-          border: Border.all(
-            color: active ? scheme.primary : scheme.outlineVariant,
-            width: active ? 1.8 : 1.2,
-          ),
-        ),
-        child: Text(
-          filled ? value[i] : '',
-          style: text.headlineSmall?.copyWith(fontFeatures: const [FontFeature.tabularFigures()]),
-        ),
-      );
+class _CodeEntryState extends State<_CodeEntry> {
+  static const _len = 9;
+
+  final List<String> _chars = List<String>.filled(_len, '');
+  late final List<TextEditingController> _ctls = List.generate(
+    _len,
+    (_) => TextEditingController(),
+  );
+  late final List<FocusNode> _focus = List.generate(_len, (_) => FocusNode());
+
+  /// 防回环：我们自己写 widget.controller.text 时不要再触发一次分发。
+  bool _publishing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    for (var i = 0; i < _len; i++) {
+      _focus[i].addListener(_onFocusChanged);
     }
+    _distribute(widget.controller.text);
+    widget.controller.addListener(_onExternalChange);
+  }
 
-    Widget group(int start) => Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            for (var i = start; i < start + 3; i++) ...[
-              box(i),
-              if (i != start + 2) const SizedBox(width: 6),
-            ],
-          ],
-        );
+  @override
+  void dispose() {
+    widget.controller.removeListener(_onExternalChange);
+    for (final c in _ctls) {
+      c.dispose();
+    }
+    for (final f in _focus) {
+      f.removeListener(_onFocusChanged);
+      f.dispose();
+    }
+    super.dispose();
+  }
 
-    return Stack(
-      alignment: Alignment.center,
-      children: [
-        FittedBox(
-          fit: BoxFit.scaleDown,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [group(0), const SizedBox(width: 14), group(3), const SizedBox(width: 14), group(6)],
+  void _onFocusChanged() {
+    if (mounted) setState(() {});
+  }
+
+  void _onExternalChange() {
+    if (_publishing) return;
+    if (widget.controller.text == _chars.join()) return;
+    setState(() => _distribute(widget.controller.text));
+  }
+
+  /// 把一串数字铺进 9 格（外部粘贴 / 从「最近连接」带入）。
+  void _distribute(String raw) {
+    final digits = raw.replaceAll(RegExp(r'[^0-9]'), '');
+    for (var i = 0; i < _len; i++) {
+      _chars[i] = i < digits.length ? digits[i] : '';
+      if (_ctls[i].text != _chars[i]) _ctls[i].text = _chars[i];
+    }
+  }
+
+  /// 把格子内容写回聚合控制器（页面的 _code 取的就是这里）。
+  void _publish() {
+    _publishing = true;
+    widget.controller.text = _chars.join();
+    _publishing = false;
+    widget.onChanged();
+  }
+
+  void _onCellChanged(int i, String value) {
+    final digits = value.replaceAll(RegExp(r'[^0-9]'), '');
+    if (digits.length > 1) {
+      // 粘贴 / 自动填充：从当前格开始往后铺，焦点落到下一个空格。
+      var j = i;
+      for (final d in digits.split('')) {
+        if (j >= _len) break;
+        _chars[j] = d;
+        _ctls[j].text = d;
+        j++;
+      }
+      _focus[j < _len ? j : _len - 1].requestFocus();
+    } else {
+      _chars[i] = digits;
+      if (_ctls[i].text != digits) _ctls[i].text = digits;
+      if (digits.isNotEmpty && i < _len - 1) _focus[i + 1].requestFocus();
+    }
+    setState(() {});
+    _publish();
+  }
+
+  /// 空格子上的退格：回到上一格并删掉它；左右方向键在格子间移动。
+  KeyEventResult _onKey(int i, KeyEvent event) {
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
+      return KeyEventResult.ignored;
+    }
+    final key = event.logicalKey;
+    if (key == LogicalKeyboardKey.backspace && _chars[i].isEmpty && i > 0) {
+      setState(() {
+        _chars[i - 1] = '';
+        _ctls[i - 1].text = '';
+      });
+      _focus[i - 1].requestFocus();
+      _publish();
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.arrowLeft && i > 0) {
+      _focus[i - 1].requestFocus();
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.arrowRight && i < _len - 1) {
+      _focus[i + 1].requestFocus();
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
+  }
+
+  /// 给页面「粘贴设备码」用：把焦点放到第一个空格。
+  void focusNextEmpty() {
+    final i = _chars.indexWhere((c) => c.isEmpty);
+    _focus[i < 0 ? _len - 1 : i].requestFocus();
+  }
+
+  Widget _cell(int i) {
+    final scheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final active = _focus[i].hasFocus;
+
+    return Focus(
+      skipTraversal: true,
+      onKeyEvent: (_, event) => _onKey(i, event),
+      child: GestureDetector(
+        onTap: () => _focus[i].requestFocus(),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 120),
+          width: 46,
+          height: 56,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: scheme.surfaceContainerLowest,
+            borderRadius: BorderRadius.circular(ErTokens.radiusMd),
+            border: Border.all(
+              color: active ? scheme.primary : scheme.outlineVariant,
+              width: active ? 1.8 : 1.2,
+            ),
           ),
-        ),
-        // 透明输入层：承接键盘、粘贴与退格，视觉完全由上面的格子表达。
-        Positioned.fill(
           child: TextField(
-            key: const Key('device-code-field'),
-            controller: controller,
-            focusNode: focusNode,
-            autofocus: false,
-            showCursor: false,
-            enableInteractiveSelection: false,
+            key: Key('device-code-digit-$i'),
+            controller: _ctls[i],
+            focusNode: _focus[i],
+            textAlign: TextAlign.center,
             keyboardType: TextInputType.number,
-            maxLength: 9,
-            onChanged: (_) => onChanged(),
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(9)],
-            style: const TextStyle(color: Colors.transparent, fontSize: 1),
-            cursorColor: Colors.transparent,
+            textInputAction: TextInputAction.next,
+            cursorColor: scheme.primary,
+            cursorWidth: 1.6,
+            style: textTheme.headlineSmall?.copyWith(
+              fontFeatures: const [FontFeature.tabularFigures()],
+            ),
+            strutStyle: const StrutStyle(forceStrutHeight: true, height: 1.1),
+            // 不做长度截断：粘贴 9 位时先让它进来，再分发到后面几格。
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            onChanged: (v) => _onCellChanged(i, v),
             decoration: const InputDecoration(
+              isDense: true,
               counterText: '',
               border: InputBorder.none,
               enabledBorder: InputBorder.none,
               focusedBorder: InputBorder.none,
-              filled: false,
-              isDense: true,
               contentPadding: EdgeInsets.zero,
+              // Material 3 的 InputDecorator 会在悬停时自己画一块灰色高亮，
+              // 而格子的底色/边框是外层 AnimatedContainer 画的——两层叠在一起就是
+              // 鼠标划过时格子中间多出来的那个灰色小方块。这里关掉它。
+              hoverColor: Colors.transparent,
             ),
           ),
         ),
-      ],
+      ),
     );
   }
+
+  Widget _group(int start) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      for (var i = start; i < start + 3; i++) ...[
+        _cell(i),
+        if (i != start + 2) const SizedBox(width: 6),
+      ],
+    ],
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _group(0),
+          const SizedBox(width: 14),
+          _group(3),
+          const SizedBox(width: 14),
+          _group(6),
+        ],
+      ),
+    );
+  }
+}
+
+/// 连接阶段的服务端错误 → 用户能照做的提示。
+///
+/// 连接错误 → 用户能照做的提示。
+///
+/// 现在的主流程是「设备码 + 临时密码」：密码长期有效、可重复使用，被控端窗口里
+/// 点「显示」就能看到明文、点「复制」可直接粘。仍保留对旧「一次性验证码」错误的兼容文案。
+String _friendlyConnectError(ApiException e) {
+  if (e.code.contains("CAPTCHA_EXPIRED") || e.message.contains("验证码已过期")) {
+    return "密码/验证码已失效：请让对方在被控端窗口重新查看密码后再试（9 位设备码不用换）";
+  }
+  if (e.code.contains("CAPTCHA") || e.message.contains("验证码不正确")) {
+    return "密码不正确：请核对被控端窗口显示的 8 位数字（可点「显示」查看明文）";
+  }
+  if (e.code.contains("DEVICE")) {
+    return "设备码不存在或对方未开启被控：请确认 9 位设备码，并让对方在该设备上允许被控";
+  }
+  return e.message;
 }

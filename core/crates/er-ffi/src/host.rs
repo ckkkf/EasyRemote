@@ -151,3 +151,166 @@ pub unsafe extern "C" fn er_host_release(host_id: *const c_char) -> i32 {
         None => 0,
     }
 }
+
+/// 设置本机「临时密码」（被控端本地生成；服务端只存哈希，校验不消费）。
+///
+/// # Safety
+/// 参数必须是以 NUL 结尾的 UTF-8 字符串。
+#[no_mangle]
+pub unsafe extern "C" fn er_host_set_password(
+    host_id: *const c_char,
+    password: *const c_char,
+) -> *mut c_char {
+    let (Some(hid), Some(pw)) = (cstr(host_id), cstr(password)) else {
+        return into_c_string("{\"ok\":false,\"error\":\"null argument\"}");
+    };
+    let r = catch_unwind(AssertUnwindSafe(|| match set_host_password(&hid, &pw) {
+        Ok(()) => into_c_string("{\"ok\":true}"),
+        Err(e) => into_c_string(&format!(
+            "{{\"ok\":false,\"error\":\"{}\"}}",
+            escape_json(&e)
+        )),
+    }));
+    r.unwrap_or_else(|_| into_c_string("{\"ok\":false,\"error\":\"panic\"}"))
+}
+
+/// 启动流式被控（后台线程：等主控→授权→握手→持续推流 + 注入）。
+///
+/// # Safety
+/// 参数必须是以 NUL 结尾的 UTF-8 字符串。
+#[no_mangle]
+pub unsafe extern "C" fn er_host_start_stream(
+    host_id: *const c_char,
+    signal_base: *const c_char,
+    fps: u32,
+    idle_timeout_secs: u64,
+) -> *mut c_char {
+    let (Some(hid), Some(sig)) = (cstr(host_id), cstr(signal_base)) else {
+        return into_c_string("{\"ok\":false,\"error\":\"null argument\"}");
+    };
+    let r = catch_unwind(AssertUnwindSafe(
+        || match er_client::host_stream::start_host_stream(&hid, &sig, fps, idle_timeout_secs) {
+            Ok(()) => into_c_string("{\"ok\":true}"),
+            Err(e) => into_c_string(&format!(
+                "{{\"ok\":false,\"error\":\"{}\"}}",
+                escape_json(&e)
+            )),
+        },
+    ));
+    r.unwrap_or_else(|_| into_c_string("{\"ok\":false,\"error\":\"panic\"}"))
+}
+
+/// 查询流式被控状态：{"running":bool,"session_id":..,"frames":n,"injected":n,"error":..}
+///
+/// # Safety
+/// host_id 必须是以 NUL 结尾的 UTF-8 字符串。
+#[no_mangle]
+pub unsafe extern "C" fn er_host_stream_status(host_id: *const c_char) -> *mut c_char {
+    let Some(hid) = cstr(host_id) else {
+        return into_c_string("{\"running\":false,\"error\":\"null argument\"}");
+    };
+    let st = er_client::host_stream::host_stream_status(&hid);
+    into_c_string(&format!(
+        "{{\"running\":{},\"session_id\":\"{}\",\"frames\":{},\"injected\":{},\"error\":\"{}\"}}",
+        st.running,
+        escape_json(&st.session_id),
+        st.frames,
+        st.injected,
+        escape_json(&st.last_error)
+    ))
+}
+
+/// 停止流式被控（保留 host 可再次启动）。
+///
+/// # Safety
+/// host_id 必须是以 NUL 结尾的 UTF-8 字符串。
+#[no_mangle]
+pub unsafe extern "C" fn er_host_stop_stream(host_id: *const c_char) -> i32 {
+    match cstr(host_id) {
+        Some(hid) => {
+            er_client::host_stream::stop_host_stream(&hid);
+            1
+        }
+        None => 0,
+    }
+}
+
+/// 从注册表取 host 并设置临时密码。
+fn set_host_password(host_id: &str, password: &str) -> Result<(), String> {
+    let (target, _relay) = er_client::conductor::host_target(host_id)?;
+    target.set_password(password).map_err(|e| e.to_string())
+}
+
+/// 读取/生成被控端临时密码并同步到服务端，返回 {"ok":true,"password":"..."}。
+///
+/// # Safety
+/// host_id 必须是以 NUL 结尾的 UTF-8 字符串。
+#[no_mangle]
+pub unsafe extern "C" fn er_host_ensure_password(host_id: *const c_char) -> *mut c_char {
+    let Some(hid) = cstr(host_id) else {
+        return into_c_string("{\"ok\":false,\"error\":\"null argument\"}");
+    };
+    let r = catch_unwind(AssertUnwindSafe(|| {
+        let pw = er_client::conductor::ensure_host_password();
+        match set_host_password(&hid, &pw) {
+            Ok(()) => into_c_string(&format!(
+                "{{\"ok\":true,\"password\":\"{}\"}}",
+                escape_json(&pw)
+            )),
+            Err(e) => into_c_string(&format!(
+                "{{\"ok\":false,\"error\":\"{}\"}}",
+                escape_json(&e)
+            )),
+        }
+    }));
+    r.unwrap_or_else(|_| into_c_string("{\"ok\":false,\"error\":\"panic\"}"))
+}
+
+/// 用已登录会话准备主机：不重复登录/绑设备，设备码与客户端「我的设备」一致。
+///
+/// 参数：gateway, relay, token, device_id, device_code, device_token
+/// 返回：{"ok":true,"host_id":"..","device_code":".."}
+///
+/// # Safety
+/// 参数必须是以 NUL 结尾的 UTF-8 字符串。
+#[no_mangle]
+pub unsafe extern "C" fn er_host_prepare_ex(
+    gateway_url: *const c_char,
+    relay_addr: *const c_char,
+    token: *const c_char,
+    device_id: *const c_char,
+    device_code: *const c_char,
+    device_token: *const c_char,
+) -> *mut c_char {
+    let (Some(gw), Some(relay), Some(tok), Some(did), Some(dcode), Some(dtok)) = (
+        cstr(gateway_url),
+        cstr(relay_addr),
+        cstr(token),
+        cstr(device_id),
+        cstr(device_code),
+        cstr(device_token),
+    ) else {
+        return into_c_string("{\"ok\":false,\"error\":\"null argument\"}");
+    };
+    let r = catch_unwind(AssertUnwindSafe(|| {
+        let addr: std::net::SocketAddr = match relay.parse() {
+            Ok(a) => a,
+            Err(e) => {
+                return into_c_string(&format!("{{\"ok\":false,\"error\":\"bad relay: {e}\"}}"));
+            }
+        };
+        match er_client::conductor::prepare_host_from_session(&gw, addr, &tok, &did, &dcode, &dtok)
+        {
+            Ok((host_id, code)) => into_c_string(&format!(
+                "{{\"ok\":true,\"host_id\":\"{}\",\"device_code\":\"{}\"}}",
+                escape_json(&host_id),
+                escape_json(&code)
+            )),
+            Err(e) => into_c_string(&format!(
+                "{{\"ok\":false,\"error\":\"{}\"}}",
+                escape_json(&e)
+            )),
+        }
+    }));
+    r.unwrap_or_else(|_| into_c_string("{\"ok\":false,\"error\":\"panic\"}"))
+}

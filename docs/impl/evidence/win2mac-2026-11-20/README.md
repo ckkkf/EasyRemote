@@ -95,3 +95,53 @@ bash scripts/mac/step4_win2mac.sh
 
 脚本会把 mac-target.log / win-controller.log 落到本目录，并按
 permission_screen=ok、moved_to_target=true、双方 VERDICT PASS 断言。
+
+---
+
+## 可视化演示（2026-11-21 13:10，DEMO PASS）
+
+`bash scripts/mac/demo_win2mac.sh 3` 一条命令跑完，产物在 `docs/impl/evidence/win2mac-demo/`。
+
+### 演示做了什么
+
+1. **输入方向**：Windows 主控画一个圆（75 个鼠标事件，3 秒）→ macOS 被控端
+   `CGEventPost` 实时注入。跑脚本时盯着 Mac 屏幕，能看到光标自己沿圆转圈。
+2. **画面方向**：注入结束后 macOS 采集自己的真实 1920x1080 屏幕，编码 30 帧回传；
+   Windows 端落盘 H.264 裸流（113560 字节），Mac 侧 ffmpeg 转成 mp4 并抽帧。
+
+### 产物
+
+| 文件 | 说明 |
+|---|---|
+| `demo_mac.mp4` | **Windows 端录下的 macOS 桌面**（30 帧 @25fps，1920x1080） |
+| `demo_mac_trajectory.png` | 把被控端实际注入的 75 个坐标画在 Mac 真实桌面上（红圈） |
+| `demo_mac_01..05.png` | 回传码流的关键帧截图 |
+| `demo_mac.h264` | Windows 端原始录像（Annex-B H.264） |
+| `mac-target.log` / `win-demo.log` | 两端原始日志 |
+
+### 关键断言行
+
+```
+MAC: injected_moves=[(1180, 540), (1179, 558), ... (1010, 326)]   # 75 个点构成一个圆
+MAC: moved_to_target=true (target=Some((1010, 326)) actual=Some((1010, 326)) delta=(0, 0))
+MAC: frames_sent=30 bytes_total=113560 ms=12281 (after_input=true)
+MAC: VERDICT PASS
+WIN: demo_moves_sent=75 circle_center=(960,540) r=220 secs=3
+WIN: recorded_frames=30 bytes=113560 path=C:\EasyRemote\demo_mac.h264
+WIN: VERDICT PASS
+```
+
+### 怎么自己看
+
+```bash
+bash scripts/mac/demo_win2mac.sh 5      # 5 秒画圆，跑的时候看 Mac 屏幕上的光标
+open docs/impl/evidence/win2mac-demo/demo_mac.mp4
+```
+
+### 边界
+
+- Mac 侧采集用 `CGWindowListCreateImage`，**不包含鼠标指针**，所以录像里看不到光标；
+  光标轨迹用 `demo_mac_trajectory.png` 叠加展示。
+- Windows 主控端仍是 CLI（Flutter Windows 客户端未构建），录像是在 Windows 上落盘后
+  传回 Mac 播放的，不是「隔着网络实时看到画面」。要实时预览得写一个 Windows 窗口程序。
+

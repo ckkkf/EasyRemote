@@ -1,7 +1,7 @@
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
 import '../api.dart';
+import '../models.dart';
 import '../shell.dart';
 import '../theme.dart';
 
@@ -61,7 +61,7 @@ class _LoginPageState extends State<LoginPage> {
 
   /// 登录成功后的公共收尾：绑定本机设备，进主框架。
   Future<void> _enter() async {
-    final device = await widget.client.bindDevice(kIsWeb ? 'web' : 'macos');
+    final device = await widget.client.bindDevice(currentPlatformName());
     if (!mounted) return;
     Navigator.of(context).pushReplacement(
       MaterialPageRoute<void>(builder: (_) => HomeShell(client: widget.client, device: device)),
@@ -623,7 +623,7 @@ class _BrandPanel extends StatelessWidget {
                     alignment: Alignment.center,
                     child: const Text(
                       'ER',
-                      style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: 0.5),
+                      style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600, letterSpacing: 0.5),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -662,7 +662,7 @@ class _BrandPanel extends StatelessWidget {
                       alignment: Alignment.center,
                       child: Text(
                         item.$1,
-                        style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700),
+                        style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
                       ),
                     ),
                     const SizedBox(width: 11),
@@ -725,7 +725,7 @@ class _BrandBanner extends StatelessWidget {
               borderRadius: BorderRadius.circular(11),
             ),
             alignment: Alignment.center,
-            child: const Text('ER', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700)),
+            child: const Text('ER', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
           ),
           const SizedBox(height: 12),
           const Text(
@@ -742,3 +742,5 @@ class _BrandBanner extends StatelessWidget {
     );
   }
 }
+
+

@@ -8,5 +8,8 @@
 	<true/>
 	<key>com.apple.security.network.server</key>
 	<true/>
+	<!-- 出站 TCP（网关/中继）与 UDP（STUN/打洞）都需要；缺这一项连 HTTP 都会被沙箱拦。 -->
+	<key>com.apple.security.network.client</key>
+	<true/>
 </dict>
 </plist>

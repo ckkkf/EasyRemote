@@ -11,6 +11,7 @@ import (
 
 	"github.com/easyremote/server/internal/appconfig"
 	"github.com/easyremote/server/internal/auth"
+	"github.com/easyremote/server/internal/contract"
 	"github.com/easyremote/server/internal/device"
 	"github.com/easyremote/server/internal/errcode"
 	"github.com/easyremote/server/internal/httpx"
@@ -175,23 +176,33 @@ func (a *App) Routes() http.Handler {
 			return
 		}
 		var req struct {
-			Platform string `json:"platform"`
+			Platform    string `json:"platform"`
+			DeviceID    string `json:"device_id"`
+			DeviceToken string `json:"device_token"`
 		}
-		_ = httpx.Decode(w, r, &req)
-		if req.Platform == "" {
-			req.Platform = "windows"
+		// 解析失败必须报错：以前这里 `_ = httpx.Decode` 吞掉错误、再用空值兜底成
+		// "windows"，于是任何不带 platform（或带了未知字段被 DisallowUnknownFields
+		// 拒掉）的调用都会把自己注册成 Windows 设备。
+		if err := httpx.Decode(w, r, &req); err != nil {
+			WriteErr(w, errcode.New(errcode.SrvInternal, "bad body: "+err.Error()))
+			return
 		}
-		d, deviceToken, err := a.Device.Bind(ctx, acc.ID, req.Platform)
+		// 带本机已有身份就复用同一台设备（幂等），否则新建。
+		d, deviceToken, err := a.Device.BindOrReuse(
+			ctx, acc.ID, normalizePlatform(req.Platform), req.DeviceID, req.DeviceToken,
+		)
 		if err != nil {
 			WriteErr(w, err)
 			return
 		}
 		// device_token 只在此处返回一次，客户端须安全保存。
-		httpx.OK(w, r, map[string]any{
-			"device_code":  device.FormatCode(d.DeviceCode),
-			"raw_code":     d.DeviceCode,
-			"device_id":    d.ID,
-			"device_token": deviceToken,
+		// platform 回显服务端落库的真值，客户端不得再用自己上报的字符串显示。
+		httpx.OK(w, r, contract.BindResult{
+			DeviceCode:  device.FormatCode(d.DeviceCode),
+			RawCode:     d.DeviceCode,
+			DeviceID:    d.ID,
+			DeviceToken: deviceToken,
+			Platform:    d.Platform,
 		})
 	})
 
@@ -222,6 +233,38 @@ func (a *App) Routes() http.Handler {
 		httpx.OK(w, r, map[string]any{"code": code, "expires_at": exp})
 	})
 
+	// 被控端设置「临时密码」：长期有效、校验不消费、可反复使用。
+	// 明文只留在被控端本地（可查看/复制），服务端只存 HMAC。
+	mux.HandleFunc("/v1/devices/password", func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		acc, err := a.account(ctx, r)
+		if err != nil {
+			WriteErr(w, err)
+			return
+		}
+		var req struct {
+			DeviceID string `json:"device_id"`
+			Password string `json:"password"`
+		}
+		if err := httpx.Decode(w, r, &req); err != nil {
+			WriteErr(w, errcode.New(errcode.SrvInternal, "bad body"))
+			return
+		}
+		d, err := a.Store.GetDevice(ctx, req.DeviceID)
+		if err != nil || d.AccountID != acc.ID {
+			WriteErr(w, errcode.New(errcode.ConnDeviceNotFound, "device not found"))
+			return
+		}
+		if err := a.Device.SetPassword(ctx, d.ID, req.Password); err != nil {
+			WriteErr(w, err)
+			return
+		}
+		// 新路由用具体类型，不再往存量的无类型响应体里加（gate 禁止模式）
+		httpx.OK(w, r, struct {
+			OK bool `json:"ok"`
+		}{OK: true})
+	})
+
 	mux.HandleFunc("/v1/connect/request", func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		acc, err := a.account(ctx, r)
@@ -232,6 +275,9 @@ func (a *App) Routes() http.Handler {
 		var req struct {
 			DeviceCode string `json:"device_code"`
 			Captcha    string `json:"captcha"`
+			// Direct 由客户端「同账号设备免密直连」设置置为 true。
+			// 仅当目标设备与主控属于同一账号时才跳过临时密码；跨账号仍强制校验。
+			Direct bool `json:"direct"`
 		}
 		if err := httpx.Decode(w, r, &req); err != nil {
 			WriteErr(w, errcode.New(errcode.SrvInternal, "bad body"))
@@ -261,15 +307,23 @@ func (a *App) Routes() http.Handler {
 			WriteErr(w, errcode.New(errcode.ConnSelfConnect, "self connect"))
 			return
 		}
+		sameAccount := target.AccountID == acc.ID
 		trusted := a.Device.HasTrust(ctx, controllerID, target.ID)
-		if !trusted {
+		// 同账号免密直连：账号本身就是最强的身份证明，同一账号下的设备
+		// 不需要再向自己输入对方屏幕上的临时密码。
+		directSameAccount := req.Direct && sameAccount
+		if !trusted && !directSameAccount {
 			if req.Captcha == "" {
 				WriteErr(w, errcode.New(errcode.ConnCaptchaExpired, "captcha required"))
 				return
 			}
-			if err := a.Device.VerifyCode(ctx, target.DeviceCode, req.Captcha); err != nil {
-				WriteErr(w, err)
-				return
+			// 先按「临时密码」校验：长期有效、校验不消费（被控端可查看/复制同一串密码反复用）。
+			// 不匹配再回退到一次性验证码，保证旧客户端与旧流程不受影响。
+			if !a.Device.CheckPassword(ctx, target.DeviceCode, req.Captcha) {
+				if err := a.Device.VerifyCode(ctx, target.DeviceCode, req.Captcha); err != nil {
+					WriteErr(w, err)
+					return
+				}
 			}
 		}
 		sess, err := a.Session.Request(ctx, controllerID, target.ID)
@@ -283,7 +337,15 @@ func (a *App) Routes() http.Handler {
 		if a.Notifier != nil && sess.State == session.StateRequested {
 			_ = a.Notifier.NotifyConsentRequired(sess.ID, controllerID, target.ID)
 		}
-		httpx.OK(w, r, map[string]any{"session_id": sess.ID, "state": sess.State, "trusted": trusted})
+		httpx.OK(w, r, struct {
+			SessionID string `json:"session_id"`
+			State     string `json:"state"`
+			Trusted   bool   `json:"trusted"`
+		}{
+			SessionID: sess.ID,
+			State:     sess.State,
+			Trusted:   trusted || directSameAccount,
+		})
 	})
 
 	mux.HandleFunc("/v1/connect/consent", func(w http.ResponseWriter, r *http.Request) {
@@ -461,6 +523,20 @@ func (a *App) ownsDevice(ctx context.Context, accountID, deviceID string) bool {
 		return false
 	}
 	return d.AccountID == accountID
+}
+
+// normalizePlatform 归一化客户端上报的平台名。
+//
+// 空值/纯空白一律记成 "unknown"：**绝不猜成 windows**。历史上这里默认
+// "windows"，任何没带 platform 的调用都会变成一台 Windows 设备，客户端列表里
+// 就会出现「macOS 机器显示成 Windows 设备」。大小写也在这里统一，避免同一台
+// 机器先后以 macOS/macos 两种写法出现。
+func normalizePlatform(raw string) string {
+	p := strings.ToLower(strings.TrimSpace(raw))
+	if p == "" {
+		return "unknown"
+	}
+	return p
 }
 
 // isHex 判断字符串是否为小写/大写十六进制。

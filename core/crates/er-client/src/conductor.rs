@@ -15,6 +15,7 @@ pub struct PreparedHost {
     pub device_code: String,
     pub captcha: String,
     target: TargetAgent,
+    relay_addr: SocketAddr,
 }
 
 /// 主机侧接收结果。
@@ -50,6 +51,7 @@ pub fn prepare_host(
                 device_code: code.clone(),
                 captcha: captcha.clone(),
                 target,
+                relay_addr: relay,
             },
         );
     Ok((host_id, code, captcha))
@@ -159,4 +161,85 @@ fn nanos_hex() -> String {
         .map(|d| d.as_nanos())
         .unwrap_or(0);
     format!("{nanos:x}")
+}
+
+/// 取某个已准备主机的 TargetAgent 与中继地址（供流式被控使用）。
+///
+/// 返回的是 clone：`TargetAgent` 内部只有网关客户端与身份，克隆后共享同一设备身份，
+/// 不会重复绑设备。
+pub fn host_target(host_id: &str) -> Result<(TargetAgent, SocketAddr), String> {
+    let reg = registry()
+        .lock()
+        .map_err(|_| "registry poisoned".to_string())?;
+    let h = reg
+        .get(host_id)
+        .ok_or_else(|| format!("unknown host: {host_id}"))?;
+    Ok((h.target.clone(), h.relay_addr))
+}
+
+/// 读/生成被控端「临时密码」（明文存本机，服务端只存哈希）。
+///
+/// 与 mac_host 示例里的同名逻辑一致：8 位数字、`~/.easyremote/host_password`、权限 600。
+/// 放进库里是为了让 Flutter（走 FFI）和 CLI 共用同一个密码，不会各生成一套。
+pub fn ensure_host_password() -> String {
+    let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
+    let dir = format!("{home}/.easyremote");
+    let path = format!("{dir}/host_password");
+    if let Ok(s) = std::fs::read_to_string(&path) {
+        let s = s.trim().to_string();
+        if s.len() >= 6 {
+            return s;
+        }
+    }
+    let mut seed = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_nanos() as u64)
+        .unwrap_or(12345);
+    seed ^= (std::process::id() as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15);
+    let mut pw = String::with_capacity(8);
+    for _ in 0..8 {
+        seed = seed
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
+        pw.push(char::from(b'0' + ((seed >> 33) % 10) as u8));
+    }
+    let _ = std::fs::create_dir_all(&dir);
+    let _ = std::fs::write(&path, &pw);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600));
+    }
+    pw
+}
+
+/// 用已登录会话准备主机（不重复登录、不重复绑设备）。
+///
+/// 返回 host_id 与设备码（设备码就是这台机器在「我的设备」页里显示的那个）。
+pub fn prepare_host_from_session(
+    gateway: &str,
+    relay: SocketAddr,
+    token: &str,
+    device_id: &str,
+    device_code: &str,
+    device_token: &str,
+) -> Result<(String, String), String> {
+    let target =
+        TargetAgent::from_session(gateway, token, device_id, device_code, device_token, relay)
+            .map_err(|e| e.to_string())?;
+    let host_id = format!("host-{}", nanos_hex());
+    registry()
+        .lock()
+        .map_err(|_| "registry poisoned".to_string())?
+        .insert(
+            host_id.clone(),
+            PreparedHost {
+                host_id: host_id.clone(),
+                device_code: device_code.to_string(),
+                captcha: String::new(),
+                target,
+                relay_addr: relay,
+            },
+        );
+    Ok((host_id, device_code.to_string()))
 }

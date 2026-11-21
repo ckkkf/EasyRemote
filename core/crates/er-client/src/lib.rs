@@ -2,8 +2,10 @@
 
 pub mod agent;
 pub mod conductor;
+pub mod ctrl_session;
 pub mod encoder;
 pub mod gpu_policy;
+pub mod host_stream;
 pub mod link;
 
 #[cfg(target_os = "windows")]
@@ -59,6 +61,7 @@ pub struct SessionKeys {
 }
 
 /// 网关客户端。
+#[derive(Clone)]
 pub struct Gateway {
     base: String,
     token: String,
@@ -102,12 +105,36 @@ impl Gateway {
             None => req.call(),
         };
         match resp {
-            Ok(r) => r
-                .into_json::<serde_json::Value>()
-                .map_err(|e| ServiceError {
-                    code: "PARSE".into(),
-                    message: e.to_string(),
-                }),
+            Ok(r) => {
+                let v = r
+                    .into_json::<serde_json::Value>()
+                    .map_err(|e| ServiceError {
+                        code: "PARSE".into(),
+                        message: e.to_string(),
+                    })?;
+                // 服务端按契约返回信封 {code,name,data,trace_id}；早期版本直接返回裸对象。
+                // 两种都要能解析：有 code 且 code==0 就取 data，否则当裸对象原样返回。
+                // （踩坑记录：/tmp/erbin 里的旧 stack 是裸对象，重建后的 stack 是信封，
+                //   不兼容解析会报 PARSE: missing token。）
+                if let Some(code) = v.get("code").and_then(|c| c.as_u64()) {
+                    if code == 0 {
+                        return Ok(v.get("data").cloned().unwrap_or(serde_json::Value::Null));
+                    }
+                    return Err(ServiceError {
+                        code: v
+                            .get("name")
+                            .and_then(|n| n.as_str())
+                            .unwrap_or("ERR")
+                            .to_string(),
+                        message: v
+                            .get("message")
+                            .and_then(|m| m.as_str())
+                            .unwrap_or("request failed")
+                            .to_string(),
+                    });
+                }
+                Ok(v)
+            }
             Err(ureq::Error::Status(_, r)) => {
                 let err = r.into_json::<ErrorBody>().unwrap_or(ErrorBody {
                     code: "HTTP".into(),
@@ -165,6 +192,17 @@ impl Gateway {
             code: "PARSE".into(),
             message: e.to_string(),
         })
+    }
+
+    /// 设置设备「临时密码」（长期有效、校验不消费）。
+    pub fn set_password(&self, device_id: &str, password: &str) -> Result<(), ServiceError> {
+        self.call(
+            "POST",
+            "/v1/devices/password",
+            Some(serde_json::json!({ "device_id": device_id, "password": password })),
+            false,
+        )?;
+        Ok(())
     }
 
     /// 登记设备身份公钥（32 字节 hex）。

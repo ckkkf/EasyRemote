@@ -1,8 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../api.dart';
+import '../host_service.dart';
+import '../main.dart' show erGatewayBaseUrl;
 import '../models.dart';
+import '../prefs.dart';
 import '../shell.dart';
 import '../theme.dart';
 
@@ -13,11 +18,15 @@ class DeviceListPage extends StatefulWidget {
     required this.client,
     required this.ownDevice,
     required this.onConnect,
+    this.onSessionStarted,
   });
 
   final GatewayClient client;
   final DeviceInfo ownDevice;
   final ValueChanged<String> onConnect;
+
+  /// 同账号免密直连成功后直接打开会话页（不经过连接页）。
+  final void Function(String sessionId, String targetCode)? onSessionStarted;
 
   @override
   State<DeviceListPage> createState() => _DeviceListPageState();
@@ -30,14 +39,170 @@ class _DeviceListPageState extends State<DeviceListPage> {
   final _search = TextEditingController();
   _Filter _filter = _Filter.all;
 
+  // 被控（「允许被控」开关）：值全来自 HostService，UI 只做展示。
+  bool _hostOn = false;
+  bool _hostBusy = false;
+  String? _hostPassword;
+  bool _showPw = false;
+  String _hostError = "";
+  HostStatus _hostStatus = HostStatus.idle;
+  Timer? _hostTimer;
+  String? _directBusyCode;
+
   @override
   void initState() {
     super.initState();
     _future = widget.client.listDevices();
+    // 偏好（免密直连）改了要立刻反映到设备卡片上的按钮文案。
+    appPrefs.addListener(_onPrefs);
+    // 被控状态每 2 秒轮询一次（主控连进来后 frames/injected 会变）
+    _hostTimer = Timer.periodic(const Duration(seconds: 2), (_) {
+      if (!mounted || !_hostOn) return;
+      final st = HostService.instance.status();
+      if (st.running != _hostStatus.running ||
+          st.sessionId != _hostStatus.sessionId ||
+          st.frames != _hostStatus.frames ||
+          st.injected != _hostStatus.injected) {
+        setState(() => _hostStatus = st);
+      }
+    });
+    // 默认允许被控：登录进主界面就把本机共享打开，不再让用户先找开关。
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final already = HostService.instance.active;
+      if (already) {
+        setState(() {
+          _hostOn = true;
+          _hostPassword = HostService.instance.password;
+        });
+        return;
+      }
+      if (appPrefs.value.allowControl && HostService.supported) {
+        _toggleHost(true, fromUser: false);
+      }
+    });
+  }
+
+  void _onPrefs() {
+    if (mounted) setState(() {});
+  }
+
+  /// 「允许被控」开关：prepare（复用本机设备身份）→ 生成/同步密码 → 开流。
+  ///
+  /// [fromUser] 为 false 表示启动时的自动开启：失败只提示，不改用户偏好。
+  Future<void> _toggleHost(bool on, {bool fromUser = true}) async {
+    if (_hostBusy) return;
+    setState(() {
+      _hostBusy = true;
+      _hostError = "";
+    });
+    try {
+      if (on) {
+        if (!HostService.supported) {
+          throw StateError("当前平台不支持被控：浏览器预览没有原生采集/注入，请在桌面客户端开启");
+        }
+        // 历史快照可能缺少 device_id（先落盘后绑设备），直接 prepare 只会得到
+        // Rust 的 missing session。这里先用令牌把设备身份补齐。
+        final device = await widget.client.ensureDevice(
+          platform: currentPlatformName(),
+        );
+        final code = HostService.instance.prepare(
+          gateway: erGatewayBaseUrl.isEmpty
+              ? "http://127.0.0.1:18090"
+              : erGatewayBaseUrl,
+          relay: "127.0.0.1:19000",
+          token: widget.client.token ?? "",
+          deviceId: device.id,
+          deviceCode: device.code,
+          deviceToken: widget.client.deviceToken ?? "",
+        );
+        final pw = HostService.instance.ensurePassword();
+        HostService.instance.start(
+          signalBase: erGatewayBaseUrl.isEmpty
+              ? "http://127.0.0.1:18090"
+              : erGatewayBaseUrl,
+        );
+        setState(() {
+          _hostOn = true;
+          _hostPassword = pw;
+          _hostStatus = HostStatus.idle;
+        });
+        if (fromUser) _patchAllowControl(true);
+        debugPrint("[host] 允许被控已开启 device_code=$code password=$pw");
+      } else {
+        HostService.instance.stop();
+        setState(() {
+          _hostOn = false;
+          _hostStatus = HostStatus.idle;
+        });
+        if (fromUser) _patchAllowControl(false);
+      }
+    } catch (e) {
+      setState(() {
+        _hostOn = false;
+        _hostError = _friendlyHostError(e);
+      });
+    } finally {
+      if (mounted) setState(() => _hostBusy = false);
+    }
+  }
+
+  void _patchAllowControl(bool on) {
+    updatePrefs(appPrefs.value.copyWith(allowControl: on));
+  }
+
+  String _friendlyHostError(Object e) {
+    final text = e.toString();
+    if (text.contains('missing session') ||
+        text.contains('AUTH_TOKEN_EXPIRED')) {
+      return '登录态或本机设备绑定信息缺失：已尝试自动补绑，请重试；仍失败请重新登录。';
+    }
+    if (text.contains('er_ffi library not found')) {
+      return '缺少本机核心库（er_ffi）：请先构建 core，或设置 ER_CORE_LIB 指向 liber_ffi。';
+    }
+    return text;
+  }
+
+  /// 同账号免密直连：点设备卡片的「连接」直接发起会话。
+  Future<void> _directConnect(DeviceInfo d) async {
+    if (_directBusyCode != null) return;
+    setState(() => _directBusyCode = d.code);
+    try {
+      final sid = await widget.client.requestConnect(d.code, direct: true);
+      if (!mounted) return;
+      if (sid.isEmpty) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('服务端未返回会话 ID，请重试')));
+        return;
+      }
+      final open = widget.onSessionStarted;
+      if (open != null) {
+        open(sid, d.code);
+      } else {
+        widget.onConnect(d.code);
+      }
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      final hint = e.code.contains('CAPTCHA')
+          ? '该设备不属于当前账号，请关闭免密直连或输入对方临时密码'
+          : e.message;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('连接失败：' + hint)));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('连接失败：' + e.toString())));
+    } finally {
+      if (mounted) setState(() => _directBusyCode = null);
+    }
   }
 
   @override
   void dispose() {
+    appPrefs.removeListener(_onPrefs);
+    _hostTimer?.cancel();
+    // 只有应用真的销毁这个页面才停被控；切导航由 IndexedStack 保留页面，不会走到这里。
+    if (_hostOn) HostService.instance.stop();
     _search.dispose();
     super.dispose();
   }
@@ -48,7 +213,8 @@ class _DeviceListPageState extends State<DeviceListPage> {
 
   void _copy(String text) {
     Clipboard.setData(ClipboardData(text: text));
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('已复制 ' + text)));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text('已复制 ' + text)));
   }
 
   /// 生成一次性协助码（6 位、10 分钟、一码一用）。
@@ -58,7 +224,8 @@ class _DeviceListPageState extends State<DeviceListPage> {
       final code = await widget.client.createAssistCode();
       if (!mounted) return;
       if (code.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('服务端未返回协助码')));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('服务端未返回协助码')));
         return;
       }
       await showDialog<void>(
@@ -90,17 +257,25 @@ class _DeviceListPageState extends State<DeviceListPage> {
                   ),
                 ),
                 const SizedBox(height: 10),
-                Text('10 分钟内有效，只能用一次。把它告诉对方，对方在「连接设备 → 协助码」里兑换。',
-                    style: text.bodySmall?.copyWith(color: scheme.onSurfaceVariant)),
+                Text(
+                  '10 分钟内有效，只能用一次。把它告诉对方，对方在「连接设备 → 协助码」里兑换。',
+                  style: text.bodySmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
               ],
             ),
             actions: [
-              TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('关闭')),
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: const Text('关闭'),
+              ),
               FilledButton.icon(
                 onPressed: () {
                   Clipboard.setData(ClipboardData(text: code));
                   Navigator.of(ctx).pop();
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('已复制协助码 ' + code)));
+                  ScaffoldMessenger.of(context)
+                      .showSnackBar(SnackBar(content: Text('已复制协助码 ' + code)));
                 },
                 icon: const Icon(Icons.copy_rounded, size: 16),
                 label: const Text('复制'),
@@ -111,11 +286,111 @@ class _DeviceListPageState extends State<DeviceListPage> {
       );
     } on ApiException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('生成失败：' + e.message)));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('生成失败：' + e.message)));
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('生成失败：' + e.toString())));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('生成失败：' + e.toString())));
     }
+  }
+
+  /// 「被控服务」卡片：开关 + 设备码 + 临时密码（可查看/复制）+ 状态。
+  Widget _hostCard(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final text = Theme.of(context).textTheme;
+    final st = _hostStatus;
+    final tail = st.sessionId.length > 8
+        ? st.sessionId.substring(st.sessionId.length - 8)
+        : st.sessionId;
+    final supported = HostService.supported;
+    final statusText = !supported
+        ? "当前平台不支持被控：浏览器没有原生采集/注入，请用桌面客户端"
+        : !_hostOn
+        ? "未开启：打开开关后，这台设备才能被远程控制"
+        : st.hasSession
+        ? "正在被控 · $tail · 已传 ${st.frames} 帧 / 注入 ${st.injected} 次"
+        : "已就绪，等待对方连接";
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.fromLTRB(18, 14, 18, 14),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(ErTokens.radiusLg),
+        border: Border.all(color: scheme.outlineVariant.withValues(alpha: 0.6)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.computer_rounded, size: 18, color: scheme.primary),
+              const SizedBox(width: 8),
+              Expanded(child: Text("允许被控（本机共享）", style: text.titleSmall)),
+              Switch(
+                value: supported && _hostOn,
+                onChanged: (!supported || _hostBusy) ? null : _toggleHost,
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            statusText,
+            style: text.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+          ),
+          if (_hostError.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              _hostError,
+              style: text.bodySmall?.copyWith(color: scheme.error),
+            ),
+          ],
+          if (_hostOn) ...[
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Text(
+                  "临时密码",
+                  style: text.labelMedium?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  _showPw ? (_hostPassword ?? "") : "●" * 8,
+                  style: text.titleMedium?.copyWith(letterSpacing: 2),
+                ),
+                const Spacer(),
+                TextButton(
+                  onPressed: () => setState(() => _showPw = !_showPw),
+                  child: Text(_showPw ? "隐藏" : "显示"),
+                ),
+                TextButton(
+                  onPressed: _hostPassword == null
+                      ? null
+                      : () async {
+                          await Clipboard.setData(
+                            ClipboardData(text: _hostPassword!),
+                          );
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text("临时密码已复制")),
+                            );
+                          }
+                        },
+                  child: const Text("复制"),
+                ),
+              ],
+            ),
+            Text(
+              "对方在「连接设备」里输入设备码 + 这串密码即可；密码长期有效，可反复使用。",
+              style: text.labelSmall?.copyWith(color: scheme.onSurfaceVariant),
+            ),
+          ],
+        ],
+      ),
+    );
   }
 
   @override
@@ -162,12 +437,18 @@ class _DeviceListPageState extends State<DeviceListPage> {
                 if (_filter == _Filter.online && !d.online) return false;
                 if (_filter == _Filter.offline && d.online) return false;
                 if (query.isEmpty) return true;
-                return d.code.contains(query) || d.platform.toLowerCase().contains(query.toLowerCase());
+                return d.code.contains(query) ||
+                    d.platform.toLowerCase().contains(query.toLowerCase());
               }).toList();
               final online = all.where((d) => d.online).length;
 
               return ListView(
-                padding: EdgeInsets.fromLTRB(wide ? 32 : 16, 0, wide ? 32 : 16, 32),
+                padding: EdgeInsets.fromLTRB(
+                  wide ? 32 : 16,
+                  0,
+                  wide ? 32 : 16,
+                  32,
+                ),
                 children: [
                   _OwnDeviceCard(device: widget.ownDevice, onCopy: _copy),
                   const SizedBox(height: 24),
@@ -176,13 +457,22 @@ class _DeviceListPageState extends State<DeviceListPage> {
                       Text('设备', style: text.titleMedium),
                       const SizedBox(width: 8),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 2,
+                        ),
                         decoration: BoxDecoration(
                           color: scheme.surfaceContainer,
-                          borderRadius: BorderRadius.circular(ErTokens.radiusPill),
+                          borderRadius: BorderRadius.circular(
+                            ErTokens.radiusPill,
+                          ),
                         ),
-                        child: Text(online.toString() + ' 在线 / ' + all.length.toString(),
-                            style: text.labelSmall?.copyWith(color: scheme.onSurfaceVariant)),
+                        child: Text(
+                          online.toString() + ' 在线 / ' + all.length.toString(),
+                          style: text.labelSmall?.copyWith(
+                            color: scheme.onSurfaceVariant,
+                          ),
+                        ),
                       ),
                       const Spacer(),
                       _FilterBar(
@@ -215,7 +505,10 @@ class _DeviceListPageState extends State<DeviceListPage> {
                       icon: Icons.cloud_off_rounded,
                       title: '设备列表加载失败',
                       subtitle: snap.error.toString(),
-                      action: TextButton(onPressed: _reload, child: const Text('重试')),
+                      action: TextButton(
+                        onPressed: _reload,
+                        child: const Text('重试'),
+                      ),
                     )
                   else if (devices.isEmpty)
                     const _EmptyHint(
@@ -226,8 +519,14 @@ class _DeviceListPageState extends State<DeviceListPage> {
                   else
                     LayoutBuilder(
                       builder: (context, constraints) {
-                        final columns = constraints.maxWidth >= 1000 ? 3 : constraints.maxWidth >= 640 ? 2 : 1;
-                        final cardWidth = (constraints.maxWidth - (columns - 1) * 16) / columns;
+                        final columns = constraints.maxWidth >= 1000
+                            ? 3
+                            : constraints.maxWidth >= 640
+                            ? 2
+                            : 1;
+                        final cardWidth =
+                            (constraints.maxWidth - (columns - 1) * 16) /
+                            columns;
                         return Wrap(
                           spacing: 16,
                           runSpacing: 16,
@@ -237,8 +536,14 @@ class _DeviceListPageState extends State<DeviceListPage> {
                                 width: cardWidth,
                                 child: _DeviceCard(
                                   device: d,
-                                  isOwn: d.code == widget.ownDevice.code || (d.id.isNotEmpty && d.id == widget.ownDevice.id),
+                                  isOwn:
+                                      d.code == widget.ownDevice.code ||
+                                      (d.id.isNotEmpty &&
+                                          d.id == widget.ownDevice.id),
+                                  direct: appPrefs.value.sameAccountDirect,
+                                  busy: _directBusyCode == d.code,
                                   onConnect: widget.onConnect,
+                                  onDirect: () => _directConnect(d),
                                   onCopy: _copy,
                                 ),
                               ),
@@ -246,16 +551,23 @@ class _DeviceListPageState extends State<DeviceListPage> {
                         );
                       },
                     ),
-                  const SizedBox(height: 28),
+                  const SizedBox(height: 20),
+                  _hostCard(context),
+                  const SizedBox(height: 8),
                   Text('其他连接方式', style: text.titleMedium),
                   const SizedBox(height: 4),
-                  Text('无需在列表里找到设备，直接用设备码连接',
-                      style: text.bodySmall?.copyWith(color: scheme.onSurfaceVariant)),
+                  Text(
+                    '无需在列表里找到设备，直接用设备码连接',
+                    style: text.bodySmall?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
                   const SizedBox(height: 12),
                   LayoutBuilder(
                     builder: (context, constraints) {
                       final columns = constraints.maxWidth >= 720 ? 2 : 1;
-                      final cardWidth = (constraints.maxWidth - (columns - 1) * 16) / columns;
+                      final cardWidth =
+                          (constraints.maxWidth - (columns - 1) * 16) / columns;
                       return Wrap(
                         spacing: 16,
                         runSpacing: 12,
@@ -320,7 +632,8 @@ class _OwnDeviceCard extends StatelessWidget {
           end: Alignment.bottomRight,
           colors: [
             scheme.primary,
-            Color.lerp(scheme.primary, scheme.primaryContainer, 0.45) ?? scheme.primary,
+            Color.lerp(scheme.primary, scheme.primaryContainer, 0.45) ??
+                scheme.primary,
           ],
         ),
       ),
@@ -329,22 +642,42 @@ class _OwnDeviceCard extends StatelessWidget {
           Container(
             width: 44,
             height: 44,
-            decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.18), borderRadius: BorderRadius.circular(12)),
-            child: const Icon(Icons.computer_rounded, color: Colors.white, size: 24),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.18),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(
+              Icons.computer_rounded,
+              color: Colors.white,
+              size: 24,
+            ),
           ),
           const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('本机设备码', style: text.labelMedium?.copyWith(color: Colors.white.withValues(alpha: 0.85))),
+                Text(
+                  '本机设备码',
+                  style: text.labelMedium?.copyWith(
+                    color: Colors.white.withValues(alpha: 0.85),
+                  ),
+                ),
                 const SizedBox(height: 4),
                 Text(
                   device.prettyCode,
-                  style: text.headlineSmall?.copyWith(color: Colors.white, letterSpacing: 4, fontFeatures: const [FontFeature.tabularFigures()]),
+                  style: text.headlineSmall?.copyWith(
+                    color: Colors.white,
+                    letterSpacing: 4,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
                 ),
-                Text('让对方在「连接设备」里输入这 9 位数字',
-                    style: text.bodySmall?.copyWith(color: Colors.white.withValues(alpha: 0.8))),
+                Text(
+                  '让对方在「连接设备」里输入这 9 位数字',
+                  style: text.bodySmall?.copyWith(
+                    color: Colors.white.withValues(alpha: 0.8),
+                  ),
+                ),
               ],
             ),
           ),
@@ -363,13 +696,21 @@ class _DeviceCard extends StatelessWidget {
   const _DeviceCard({
     required this.device,
     required this.isOwn,
+    required this.direct,
+    required this.busy,
     required this.onConnect,
+    required this.onDirect,
     required this.onCopy,
   });
 
   final DeviceInfo device;
   final bool isOwn;
+
+  /// 设置里的「同账号设备免密直连」是否开启。
+  final bool direct;
+  final bool busy;
   final ValueChanged<String> onConnect;
+  final VoidCallback onDirect;
   final ValueChanged<String> onCopy;
 
   @override
@@ -394,9 +735,17 @@ class _DeviceCard extends StatelessWidget {
               Container(
                 width: 38,
                 height: 38,
-                decoration: BoxDecoration(color: scheme.surfaceContainerHigh, borderRadius: BorderRadius.circular(10)),
-                child: Icon(isWindows ? Icons.desktop_windows_rounded : Icons.laptop_mac_rounded,
-                    size: 20, color: scheme.onSurfaceVariant),
+                decoration: BoxDecoration(
+                  color: scheme.surfaceContainerHigh,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  isWindows
+                      ? Icons.desktop_windows_rounded
+                      : Icons.laptop_mac_rounded,
+                  size: 20,
+                  color: scheme.onSurfaceVariant,
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -406,25 +755,42 @@ class _DeviceCard extends StatelessWidget {
                     Row(
                       children: [
                         Flexible(
-                          child: Text(isWindows ? 'Windows 设备' : 'macOS 设备',
-                              style: text.titleSmall, overflow: TextOverflow.ellipsis),
+                          child: Text(
+                            isWindows ? 'Windows 设备' : 'macOS 设备',
+                            style: text.titleSmall,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                         if (isOwn) ...[
                           const SizedBox(width: 6),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 1,
+                            ),
                             decoration: BoxDecoration(
                               color: scheme.primaryContainer,
-                              borderRadius: BorderRadius.circular(ErTokens.radiusPill),
+                              borderRadius: BorderRadius.circular(
+                                ErTokens.radiusPill,
+                              ),
                             ),
-                            child: Text('本机',
-                                style: text.labelSmall?.copyWith(
-                                    color: scheme.onPrimaryContainer, fontWeight: FontWeight.w600)),
+                            child: Text(
+                              '本机',
+                              style: text.labelSmall?.copyWith(
+                                color: scheme.onPrimaryContainer,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                           ),
                         ],
                       ],
                     ),
-                    Text(device.platform, style: text.labelSmall?.copyWith(color: scheme.onSurfaceVariant)),
+                    Text(
+                      device.platform,
+                      style: text.labelSmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -437,7 +803,10 @@ class _DeviceCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   device.prettyCode,
-                  style: text.headlineSmall?.copyWith(letterSpacing: 3, fontFeatures: const [FontFeature.tabularFigures()]),
+                  style: text.headlineSmall?.copyWith(
+                    letterSpacing: 3,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
                 ),
               ),
               IconButton(
@@ -451,21 +820,55 @@ class _DeviceCard extends StatelessWidget {
           const SizedBox(height: 12),
           Row(
             children: [
-              Icon(online ? Icons.bolt_rounded : Icons.schedule_rounded, size: 15, color: scheme.onSurfaceVariant),
+              Icon(
+                online ? Icons.bolt_rounded : Icons.schedule_rounded,
+                size: 15,
+                color: scheme.onSurfaceVariant,
+              ),
               const SizedBox(width: 4),
-              Text(online ? '在线' : '离线', style: text.labelSmall?.copyWith(color: scheme.onSurfaceVariant)),
+              Text(
+                online ? '在线' : '离线',
+                style: text.labelSmall?.copyWith(
+                  color: scheme.onSurfaceVariant,
+                ),
+              ),
               const Spacer(),
-              online
-                  ? FilledButton.tonal(
-                      onPressed: () => onConnect(device.code),
-                      style: FilledButton.styleFrom(minimumSize: const Size(0, 36), padding: const EdgeInsets.symmetric(horizontal: 16)),
-                      child: const Text('连接'),
-                    )
-                  : FilledButton.tonal(
-                      onPressed: null,
-                      style: FilledButton.styleFrom(minimumSize: const Size(0, 36), padding: const EdgeInsets.symmetric(horizontal: 16)),
-                      child: const Text('离线'),
-                    ),
+              // 本机设备不能"连接自己"：那只会开一个指向本机的会话，纯噪音。
+              // 要给别人连自己，看上面的本机设备码。
+              if (isOwn)
+                Text(
+                  '当前设备',
+                  style: text.labelSmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
+                )
+              else if (online)
+                FilledButton.tonal(
+                  // 免密直连开启时点一下就发起；关闭时仍走设备码 + 临时密码页。
+                  onPressed: busy
+                      ? null
+                      : (direct ? onDirect : () => onConnect(device.code)),
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size(0, 36),
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                  ),
+                  child: busy
+                      ? const SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : Text(direct ? '直接连接' : '连接'),
+                )
+              else
+                FilledButton.tonal(
+                  onPressed: null,
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size(0, 36),
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                  ),
+                  child: const Text('离线'),
+                ),
             ],
           ),
         ],
@@ -486,14 +889,27 @@ class _StatusChip extends StatelessWidget {
     final bg = online ? const Color(0xFFC8F6D0) : scheme.surfaceContainerHigh;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(ErTokens.radiusPill)),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(ErTokens.radiusPill),
+      ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Container(width: 6, height: 6, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+          Container(
+            width: 6,
+            height: 6,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          ),
           const SizedBox(width: 5),
-          Text(online ? '在线' : '离线',
-              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: color)),
+          Text(
+            online ? '在线' : '离线',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: color,
+            ),
+          ),
         ],
       ),
     );
@@ -521,11 +937,13 @@ class _FilterBar extends StatelessWidget {
             color: on ? scheme.primaryContainer : Colors.transparent,
             borderRadius: BorderRadius.circular(ErTokens.radiusPill),
           ),
-          child: Text(label,
-              style: text.labelSmall?.copyWith(
-                color: on ? scheme.onPrimaryContainer : scheme.onSurfaceVariant,
-                fontWeight: on ? FontWeight.w600 : FontWeight.w500,
-              )),
+          child: Text(
+            label,
+            style: text.labelSmall?.copyWith(
+              color: on ? scheme.onPrimaryContainer : scheme.onSurfaceVariant,
+              fontWeight: on ? FontWeight.w600 : FontWeight.w400,
+            ),
+          ),
         ),
       );
     }
@@ -536,17 +954,25 @@ class _FilterBar extends StatelessWidget {
         color: scheme.surfaceContainer,
         borderRadius: BorderRadius.circular(ErTokens.radiusPill),
       ),
-      child: Row(mainAxisSize: MainAxisSize.min, children: [
-        chip(_Filter.all, '全部'),
-        chip(_Filter.online, '在线'),
-        chip(_Filter.offline, '离线'),
-      ]),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          chip(_Filter.all, '全部'),
+          chip(_Filter.online, '在线'),
+          chip(_Filter.offline, '离线'),
+        ],
+      ),
     );
   }
 }
 
 class _QuickCard extends StatelessWidget {
-  const _QuickCard({required this.icon, required this.title, required this.subtitle, required this.onTap});
+  const _QuickCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
 
   final IconData icon;
   final String title;
@@ -567,14 +993,19 @@ class _QuickCard extends StatelessWidget {
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(ErTokens.radiusLg),
-            border: Border.all(color: scheme.outlineVariant.withValues(alpha: 0.7)),
+            border: Border.all(
+              color: scheme.outlineVariant.withValues(alpha: 0.7),
+            ),
           ),
           child: Row(
             children: [
               Container(
                 width: 38,
                 height: 38,
-                decoration: BoxDecoration(color: scheme.primaryContainer, borderRadius: BorderRadius.circular(10)),
+                decoration: BoxDecoration(
+                  color: scheme.primaryContainer,
+                  borderRadius: BorderRadius.circular(10),
+                ),
                 child: Icon(icon, size: 20, color: scheme.onPrimaryContainer),
               ),
               const SizedBox(width: 12),
@@ -583,11 +1014,20 @@ class _QuickCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(title, style: text.titleSmall),
-                    Text(subtitle, style: text.labelSmall?.copyWith(color: scheme.onSurfaceVariant)),
+                    Text(
+                      subtitle,
+                      style: text.labelSmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
                   ],
                 ),
               ),
-              Icon(Icons.chevron_right_rounded, size: 20, color: scheme.onSurfaceVariant),
+              Icon(
+                Icons.chevron_right_rounded,
+                size: 20,
+                color: scheme.onSurfaceVariant,
+              ),
             ],
           ),
         ),
@@ -597,7 +1037,12 @@ class _QuickCard extends StatelessWidget {
 }
 
 class _EmptyHint extends StatelessWidget {
-  const _EmptyHint({required this.icon, required this.title, required this.subtitle, this.action});
+  const _EmptyHint({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    this.action,
+  });
 
   final IconData icon;
   final String title;
@@ -616,7 +1061,11 @@ class _EmptyHint extends StatelessWidget {
           const SizedBox(height: 12),
           Text(title, style: text.titleSmall),
           const SizedBox(height: 4),
-          Text(subtitle, style: text.bodySmall?.copyWith(color: scheme.onSurfaceVariant), textAlign: TextAlign.center),
+          Text(
+            subtitle,
+            style: text.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+            textAlign: TextAlign.center,
+          ),
           if (action != null) ...[const SizedBox(height: 8), action!],
         ],
       ),

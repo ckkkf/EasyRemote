@@ -27,7 +27,7 @@ fn real_main() {
     use std::time::{Duration, Instant};
 
     use er_capture::{Capture, ScreenCapture};
-    use er_client::agent::{encode_video_msg, ControllerAgent, MSG_VIDEO};
+    use er_client::agent::{encode_video_msg, ControllerAgent, FrameInfo, MSG_VIDEO};
     use er_client::link::VideoHeader;
     use er_codec::{create_encoder, EncodeConfig, Encoder};
     use er_input::InputEvent;
@@ -97,6 +97,10 @@ fn real_main() {
     let in_frames: usize = arg(7, "5").parse().expect("in_frames");
     let move_x: i32 = arg(8, "400").parse().expect("move_x");
     let move_y: i32 = arg(9, "300").parse().expect("move_y");
+    // 演示模式：demo_secs > 0 时持续画圆发鼠标移动（被控端实时注入，肉眼能看到光标动）
+    let demo_secs: u64 = arg(10, "0").parse().unwrap_or(0);
+    // 录像：非空则把收到的 H.264 裸码流（Annex-B）写到该文件，Mac 侧用 ffmpeg 转 mp4
+    let record_file = arg(11, "");
 
     let t_start = Instant::now();
     println!(
@@ -182,40 +186,93 @@ fn real_main() {
         frames_sent.iter().sum::<usize>()
     );
 
-    // ---------- ② 立刻发输入：被控端收完帧就进 recv_input，不能让它在那边空等 ----------
-    let events = vec![
-        InputEvent::MouseMove {
-            x: move_x,
-            y: move_y,
-        },
-        InputEvent::MouseMove {
-            x: move_x - 37,
-            y: move_y + 21,
-        },
-        InputEvent::MouseMove {
-            x: move_x,
-            y: move_y,
-        },
-    ];
-    let n = ctrl
-        .send_input(&mut relay, &mut crypto, &events)
-        .expect("send input");
-    println!("WIN: input_events_sent={n} target=({move_x},{move_y}) sent_before_recv=true");
+    // ---------- ② 发输入 ----------
+    // 演示模式要等被控端从"收帧"切到"收输入"：它刚收完 5 帧，还要读一次光标基线；
+    // 立刻灌输入会打进它的 UDP 缓冲（丢包），屏幕上只会看到光标跳一下。
+    let n: usize = if demo_secs > 0 {
+        std::thread::sleep(Duration::from_millis(3000));
+        // 画圆：被控端实时注入，肉眼可见鼠标在 macOS 桌面上转圈
+        let total = (demo_secs * 25) as usize;
+        let (cx, cy, r) = (960.0f64, 540.0f64, 220.0f64);
+        let mut sent = 0usize;
+        for i in 0..total {
+            let t = i as f64 / total as f64 * std::f64::consts::TAU;
+            let x = (cx + r * t.cos()).round() as i32;
+            let y = (cy + r * t.sin()).round() as i32;
+            sent += ctrl
+                .send_input(&mut relay, &mut crypto, &[InputEvent::MouseMove { x, y }])
+                .expect("send demo move");
+            std::thread::sleep(Duration::from_millis(40));
+        }
+        println!("WIN: demo_moves_sent={sent} circle_center=({cx},{cy}) r={r} secs={demo_secs}");
+        sent
+    } else {
+        let events = vec![
+            InputEvent::MouseMove {
+                x: move_x,
+                y: move_y,
+            },
+            InputEvent::MouseMove {
+                x: move_x - 37,
+                y: move_y + 21,
+            },
+            InputEvent::MouseMove {
+                x: move_x,
+                y: move_y,
+            },
+        ];
+        let sent = ctrl
+            .send_input(&mut relay, &mut crypto, &events)
+            .expect("send input");
+        println!("WIN: input_events_sent={sent} target=({move_x},{move_y}) sent_before_recv=true");
+        sent
+    };
 
-    // ---------- ③ 收被控端（macOS）真实屏幕帧并解码 ----------
+    // ---------- ③ 收被控端（macOS）真实屏幕帧 ----------
     // 收不到帧时不要 panic：打印 0 帧并让 VERDICT 判 FAIL，日志才完整可断言。
-    let got = ctrl
-        .recv_frames(&mut relay, &mut crypto, in_frames)
-        .unwrap_or_default();
+    // record_file 非空 = 录像模式：只落 H.264 码流不解码（软解 1080p 太慢会撑爆接收缓冲）。
+    let got: Vec<FrameInfo> = if record_file.is_empty() {
+        ctrl.recv_frames(&mut relay, &mut crypto, in_frames)
+            .unwrap_or_default()
+    } else {
+        let frames = ctrl
+            .recv_video_raw(&mut relay, &mut crypto, in_frames, Duration::from_secs(90))
+            .unwrap_or_default();
+        let mut all: Vec<u8> = Vec::new();
+        for f in &frames {
+            all.extend_from_slice(f);
+        }
+        if !all.is_empty() {
+            std::fs::write(&record_file, &all).expect("write record file");
+            println!(
+                "WIN: recorded_frames={} bytes={} path={record_file}",
+                frames.len(),
+                all.len()
+            );
+        }
+        frames
+            .iter()
+            .map(|f| FrameInfo {
+                width: 0,
+                height: 0,
+                h264_bytes: f.len(),
+            })
+            .collect()
+    };
     if got.is_empty() {
         println!("WIN: frames_from_target=0 (mac 侧没有发出可解码的帧)");
-    } else {
+    } else if record_file.is_empty() {
         println!(
             "WIN: frames_from_target={} resolution={}x{} first_h264_bytes={}",
             got.len(),
             got[0].width,
             got[0].height,
             got[0].h264_bytes
+        );
+    } else {
+        println!(
+            "WIN: frames_from_target={} (录像模式，码流已落盘)",
+            got.len()
         );
     }
     println!("WIN: MSG_VIDEO={MSG_VIDEO} (帧头 seq/ts/dim 已随帧传输)");

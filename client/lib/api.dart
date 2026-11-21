@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart' show ValueNotifier;
 import 'package:http/http.dart' as http;
 
 import 'models.dart';
@@ -13,7 +14,7 @@ class ApiException implements Exception {
   final String code;
   final String message;
   @override
-  String toString() => '$code: $message';
+  String toString() => message;
 }
 
 class GatewayClient {
@@ -31,6 +32,22 @@ class GatewayClient {
 
   String? get token => _token;
   String? get deviceToken => _deviceToken;
+  String? get deviceId => _deviceId;
+  String? get deviceCode => _deviceCode;
+
+  /// 登录态失效计数器。
+  ///
+  /// 任何一次请求拿到 AUTH_TOKEN_EXPIRED / AUTH_TOKEN_REVOKED，就在这里 +1；
+  /// App 根节点监听它并一次性清空导航栈回登录页。之前只有启动时校验，
+  /// 页面内令牌过期后每个接口各自报错，用户永远停在「加载失败」上。
+  final ValueNotifier<int> authExpired = ValueNotifier<int>(0);
+
+  /// 同一个令牌只通知一次，避免并发请求把登录页叠很多层。
+  bool _authExpiredNotified = false;
+
+  /// 启动恢复期间不要触发「跳登录页」通知：
+  /// 此时根节点还没挂好主界面，restoreSession 自己会决定回登录页还是留在本地身份。
+  bool _suppressAuthNotify = false;
 
   Map<String, String> _headers({bool device = false}) {
     final h = {'content-type': 'application/json'};
@@ -61,21 +78,64 @@ class GatewayClient {
   }
 
   Map<String, dynamic> _decode(http.Response res) {
-    final body = res.body.isEmpty
-        ? <String, dynamic>{}
-        : jsonDecode(res.body) as Map<String, dynamic>;
+    final raw = res.body.trim();
+    Map<String, dynamic> body;
+    if (raw.isEmpty) {
+      body = <String, dynamic>{};
+    } else {
+      final dynamic decoded;
+      try {
+        decoded = jsonDecode(raw);
+      } on FormatException {
+        // 反向代理/网关出错时经常直接回纯文本或 HTML（"bad gateway"、502 页面），
+        // 原样抛 FormatException 会让界面显示一串 SyntaxError，用户完全不知道该干什么。
+        throw ApiException(
+          'SRV_INTERNAL',
+          _nonJsonMessage(res.statusCode, raw),
+        );
+      }
+      if (decoded is! Map<String, dynamic>) {
+        throw ApiException(
+          'SRV_INTERNAL',
+          _nonJsonMessage(res.statusCode, raw),
+        );
+      }
+      body = decoded;
+    }
     if (res.statusCode >= 400) {
       // 服务端错误信封是扁平的 {code,name,message,retryable,trace_id}（见 docs/spec/error-codes.md §3），
       // 同时兼容旧式 {error:{...}} 包装，避免解析漂移把真实错误码吞成 UNKNOWN。
       final err = (body['error'] as Map<String, dynamic>?) ?? body;
+      final code =
+          err['name'] as String? ?? err['code']?.toString() ?? 'UNKNOWN';
+      if (_isTokenDead(code)) _notifyAuthExpired();
       throw ApiException(
-        err['name'] as String? ?? err['code']?.toString() ?? 'UNKNOWN',
+        code,
         err['message'] as String? ?? '请求失败（HTTP ${res.statusCode}）',
       );
     }
     // 成功信封：{code:0, name:"OK", data, trace_id}，业务体在 data 里。
     final data = body['data'];
     return data is Map<String, dynamic> ? data : <String, dynamic>{};
+  }
+
+  /// 非 JSON 响应（网关/反代错误页）转成人话。
+  String _nonJsonMessage(int status, String raw) {
+    final sample = _bodySample(raw);
+    if (status == 502 || status == 503 || status == 504) {
+      return '网关暂时不可用（HTTP $status'
+          '${sample.isEmpty ? '' : ' · $sample'}）：服务端可能未启动，或反向代理连不上后端。';
+    }
+    return '网关返回了非 JSON 响应（HTTP $status'
+        '${sample.isEmpty ? '' : ' · $sample'}）：请确认服务端与反向代理正常。';
+  }
+
+  String _bodySample(String raw) {
+    final text = raw.trim();
+    if (text.isEmpty) return '';
+    if (text.startsWith('<')) return 'HTML 页面';
+    final flat = text.replaceAll(RegExp(r'\s+'), ' ');
+    return flat.length > 60 ? '${flat.substring(0, 60)}…' : flat;
   }
 
   Future<void> sendSms(String phone) async {
@@ -85,16 +145,32 @@ class GatewayClient {
   Future<void> login(String phone, String code) async {
     final body = await _post('/v1/auth/login', {'phone': phone, 'code': code});
     _token = body['token'] as String?;
+    _authExpiredNotified = false;
     await _persist();
   }
 
-  Future<DeviceInfo> bindDevice(String platform) async {
-    final body = await _post('/v1/devices/bind', {'platform': platform});
+  /// 绑定本机设备。
+  ///
+  /// [deviceId] + [deviceToken] 是本机已有身份：带上它们服务端会复用那一行
+  /// （幂等绑定，只刷新平台并轮换凭证），不再凭空多出一台幽灵设备。
+  Future<DeviceInfo> bindDevice(
+    String platform, {
+    String? deviceId,
+    String? deviceToken,
+  }) async {
+    final body = await _post('/v1/devices/bind', {
+      'platform': platform,
+      if (deviceId != null && deviceId.isNotEmpty) 'device_id': deviceId,
+      if (deviceToken != null && deviceToken.isNotEmpty)
+        'device_token': deviceToken,
+    });
     _deviceToken = body['device_token'] as String?;
     final device = DeviceInfo(
       id: body['device_id'] as String? ?? '',
       code: (body['raw_code'] as String? ?? '').replaceAll(' ', ''),
-      platform: platform,
+      // 平台以服务端落库的真值为准（GW-04 会回显 platform）；
+      // 老服务端不回显时才退回本机上报值。
+      platform: (body['platform'] as String?) ?? platform,
       online: true,
     );
     _deviceId = device.id;
@@ -123,6 +199,7 @@ class GatewayClient {
     final stored = await loadSession();
     if (stored == null) return null;
 
+    _suppressAuthNotify = true;
     _token = stored.token;
     _deviceToken = stored.deviceToken.isEmpty ? null : stored.deviceToken;
     _deviceId = stored.deviceId;
@@ -133,13 +210,35 @@ class GatewayClient {
       final devices = await listDevices();
       DeviceInfo? self;
       for (final d in devices) {
-        if (d.id == stored.deviceId) {
+        // id 优先；老快照可能只有设备码，用码兜一次。
+        if (d.id == stored.deviceId ||
+            (stored.deviceCode.isNotEmpty && d.code == stored.deviceCode)) {
           self = d;
           break;
         }
       }
-      if (self == null && devices.isNotEmpty) self = devices.first;
-      if (self == null) return _localDevice(stored);
+      if (self == null) {
+        // 本地身份在服务端不存在（内存库重启、设备被清、换账号残留快照）：
+        // 重新绑一台本机设备，**绝不**拿 devices.first 凑数。
+        // 列表按设备码升序返回，第一台很可能是同账号下的另一台机器（比如 Windows），
+        // 认领它会让本机顶着别人的设备码和平台名，被控也会因 device_token 对不上而失败。
+        try {
+          // 带上快照里的身份：服务端命中就复用同一行（幂等），只是刷新平台与凭证。
+          return await bindDevice(
+            currentPlatformName(),
+            deviceId: stored.deviceId,
+            deviceToken: stored.deviceToken,
+          );
+        } on ApiException catch (e) {
+          if (_isAuthError(e.code)) {
+            await logout();
+            return null;
+          }
+          return _localDevice(stored);
+        } catch (_) {
+          return _localDevice(stored);
+        }
+      }
       _deviceId = self.id;
       _deviceCode = self.code;
       _devicePlatform = self.platform;
@@ -154,6 +253,8 @@ class GatewayClient {
     } catch (_) {
       // 断网/服务端未起：不把用户踢回登录页，先按本地身份进主界面，页面自己会报错。
       return _localDevice(stored);
+    } finally {
+      _suppressAuthNotify = false;
     }
   }
 
@@ -167,6 +268,14 @@ class GatewayClient {
     await clearSession();
   }
 
+  /// 令牌不可用：清会话并通知根节点跳登录页。
+  void _notifyAuthExpired() {
+    if (_suppressAuthNotify || _authExpiredNotified || _token == null) return;
+    _authExpiredNotified = true;
+    unawaited(logout());
+    authExpired.value++;
+  }
+
   DeviceInfo _localDevice(StoredSession stored) => DeviceInfo(
     id: stored.deviceId,
     code: stored.deviceCode,
@@ -176,31 +285,42 @@ class GatewayClient {
 
   /// 只有「令牌本身不可用」才需要清会话；其它错误（限流、封禁）让页面自己提示。
   bool _isAuthError(String code) =>
-      code == 'AUTH_TOKEN_EXPIRED' ||
-      code == 'AUTH_TOKEN_REVOKED' ||
+      _isTokenDead(code) ||
       code == 'AUTH_DEVICE_NOT_BOUND' ||
       code == 'AUTH_INVALID_CREDENTIAL';
+
+  /// 登录态真的没了的码：令牌过期/被吊销。设备未绑定另走 ensureDevice 自愈。
+  bool _isTokenDead(String code) =>
+      code == 'AUTH_TOKEN_EXPIRED' || code == 'AUTH_TOKEN_REVOKED';
 
   /// 把当前令牌与设备身份写进本地快照；没有令牌就什么也不写。
   Future<void> _persist() async {
     final token = _token;
     if (token == null || token.isEmpty) return;
-    await saveSession(StoredSession(
-      token: token,
-      deviceToken: _deviceToken ?? '',
-      deviceId: _deviceId ?? '',
-      deviceCode: _deviceCode ?? '',
-      devicePlatform: _devicePlatform ?? '',
-    ));
+    await saveSession(
+      StoredSession(
+        token: token,
+        deviceToken: _deviceToken ?? '',
+        deviceId: _deviceId ?? '',
+        deviceCode: _deviceCode ?? '',
+        devicePlatform: _devicePlatform ?? '',
+      ),
+    );
   }
-
 
   /// 发起连接。服务端要求主控设备凭证（X-Device-Token），
   /// 首次连接未建立信任时需要对方屏幕上的验证码。
-  Future<String> requestConnect(String deviceCode, {String? captcha}) async {
+  /// [direct] 只在客户端设置「同账号设备免密直连」打开时为 true。
+  /// 服务端仅对「目标设备与主控同一账号」放行；跨账号仍要求临时密码。
+  Future<String> requestConnect(
+    String deviceCode, {
+    String? captcha,
+    bool direct = false,
+  }) async {
     final body = await _post('/v1/connect/request', {
       'device_code': deviceCode,
       if (captcha != null && captcha.isNotEmpty) 'captcha': captcha,
+      if (direct) 'direct': true,
     }, device: true);
     return body['session_id'] as String? ?? '';
   }
@@ -217,7 +337,40 @@ class GatewayClient {
       'code': code,
     });
     _token = body['token'] as String?;
+    _authExpiredNotified = false;
     await _persist();
+  }
+
+  /// 确保本机有设备身份；没有就补一次 bind（服务端绑定是幂等的）。
+  ///
+  /// 历史快照里存在「令牌在、device_id 却为空」的情况（早期版本先落盘后绑设备），
+  /// 被控开关直接拿它去 prepare 会得到 Rust 的
+  /// `Bad state: missing session (token/device_id)`。这里先自愈，再决定是否报错。
+  Future<DeviceInfo> ensureDevice({String platform = 'unknown'}) async {
+    final token = _token;
+    if (token == null || token.isEmpty) {
+      _notifyAuthExpired();
+      throw ApiException('AUTH_TOKEN_EXPIRED', '登录已过期，请重新登录');
+    }
+    final id = _deviceId ?? '';
+    final code = _deviceCode ?? '';
+    final deviceToken = _deviceToken ?? '';
+    if (id.isNotEmpty && code.isNotEmpty && deviceToken.isNotEmpty) {
+      return DeviceInfo(
+        id: id,
+        code: code,
+        platform: (_devicePlatform ?? '').isNotEmpty
+            ? _devicePlatform!
+            : platform,
+        online: true,
+      );
+    }
+    // 缺 code/token 时补一次绑定；把现有身份一起带上，能复用就复用。
+    return bindDevice(
+      platform,
+      deviceId: id,
+      deviceToken: deviceToken,
+    );
   }
 
   // ---------- 运行时配置（P1-1 / P1-4） ----------

@@ -3,13 +3,18 @@ name: Release
 on:
   push:
     tags: ['v*.*.*']
+  workflow_dispatch:
 
 permissions:
   contents: write
-  packages: write
 
+# 客户端烧入的服务端地址。仓库没有配置 ER_GATEWAY 变量时为空串，
+# Web 版走同源相对路径，桌面版回落到默认 127.0.0.1。
+# 配置方式：Settings → Secrets and variables → Actions → Variables → 新建 ER_GATEWAY
 env:
   GO_VERSION: "1.26"
+  # 没配置仓库变量时的默认值：本机一体化服务（macOS/Windows 客户端的默认联调地址）
+  ER_GATEWAY: ${{ vars.ER_GATEWAY || 'http://127.0.0.1:18090' }}
 
 jobs:
   # ---------------------------------------------------------------- 一致性校验
@@ -19,18 +24,164 @@ jobs:
     outputs:
       version: ${{ steps.v.outputs.version }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
-          node-version: "20"
+          node-version: '20'
       - id: v
         run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
       - name: Tag 必须与包版本一致
         run: node scripts/check-version.mjs --tag "${{ github.ref_name }}"
+      - name: 报告客户端将连接的服务端地址
+        run: |
+          if [ -n "$ER_GATEWAY" ]; then
+            echo "客户端将烧入 ER_GATEWAY=$ER_GATEWAY"
+          else
+            echo "未配置 ER_GATEWAY：Web 版走同源相对路径，桌面版回落 127.0.0.1:8080"
+            echo "::warning title=未配置 ER_GATEWAY::客户端不会指向你的服务器，请在 Settings→Variables 添加 ER_GATEWAY"
+          fi
 
-  # ---------------------------------------------------------------- 服务端二进制
+  # ---------------------------------------------------------------- 客户端 Web
+  client-web:
+    name: 客户端 Web 版
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: 安装依赖
+        working-directory: client
+        run: flutter pub get
+      - name: 构建 Web（烧入服务端地址）
+        working-directory: client
+        run: |
+          flutter build web --release --no-web-resources-cdn \
+            --dart-define=ER_GATEWAY="${ER_GATEWAY}"
+      - name: 打包
+        run: |
+          set -euo pipefail
+          V="${{ needs.verify.outputs.version }}"
+          out="dist/easyremote-client-web-${V}"
+          mkdir -p "$out"
+          cp -R client/build/web/. "$out/"
+          printf "version: %s\nbuilt_at: %s\ngateway: %s\n" \
+            "$V" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "${ER_GATEWAY:-<same-origin>}" \
+            > "$out/BUILD_INFO.txt"
+          tar -czf "dist/easyremote-client-web-${V}.tar.gz" -C dist "easyremote-client-web-${V}"
+          ls -lh dist
+      - uses: actions/upload-artifact@v7
+        with:
+          name: client-web
+          path: dist/easyremote-client-web-*.tar.gz
+          if-no-files-found: error
+
+  # ---------------------------------------------------------------- 客户端 macOS
+
+  # ---------------------------------------------------------------- 客户端 Windows 版
+  # 之前只有 Web 和 macOS，Windows 包一直靠手工在验证机上编——CI 里补齐，
+  # 三个平台都从同一个 Release 出，才算「一个客户端多平台」。
+  client-windows:
+    name: 客户端 Windows 版
+    needs: verify
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      # 客户端要采集/编码/注入，必须有 Rust 核心 DLL；windows-latest 自带 rustup + MSVC
+      - name: 构建 Rust 核心（er_ffi.dll）
+        working-directory: core
+        run: cargo build -p er-ffi --release
+      - name: 安装依赖
+        working-directory: client
+        run: flutter pub get
+      - name: 构建 Windows（烧入服务端地址）
+        working-directory: client
+        run: flutter build windows --release --dart-define=ER_GATEWAY="${{ env.ER_GATEWAY }}"
+      - name: 放入 Rust 核心并打包
+        shell: pwsh
+        run: |
+          $rel = "client/build/windows/x64/runner/Release"
+          Copy-Item "core/target/release/er_ffi.dll" "$rel/er_ffi.dll" -Force
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          $out = "dist/easyremote-client-windows-x64"
+          Copy-Item $rel $out -Recurse -Force
+          "version: ${{ needs.verify.outputs.version }}`nbuilt_at: $((Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ"))`ngateway: $env:ER_GATEWAY`narch: x64" | Set-Content "$out/BUILD_INFO.txt"
+          Compress-Archive -Path $out -DestinationPath "$out.zip" -Force
+          Get-ChildItem dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: client-windows
+          path: dist/easyremote-client-windows-*.zip
+          if-no-files-found: error
+
+  client-macos:
+    name: 客户端 macOS 版
+    needs: verify
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: 安装依赖
+        working-directory: client
+        run: flutter pub get
+      # 客户端要能采集/编码/注入，必须有 Rust 核心的动态库；
+      # GitHub 的 macos-latest 自带 rustup，直接编 aarch64 Apple 目标。
+      - name: 构建 Rust 核心（liber_ffi.dylib）
+        working-directory: core
+        run: |
+          set -euo pipefail
+          rustup target add aarch64-apple-darwin || true
+          cargo build -p er-ffi --release
+          ls -lh target/release/liber_ffi.dylib
+      - name: 构建 macOS（烧入服务端地址）
+        working-directory: client
+        run: |
+          flutter build macos --release \
+            --dart-define=ER_GATEWAY="${ER_GATEWAY}"
+      # 把 dylib 塞进 .app 并重新签名：Flutter 默认的 ad-hoc 签名只覆盖它自己产出的东西，
+      # 新增文件后不重签，Gatekeeper 会直接拒绝启动。
+      - name: 放入 Rust 核心并重签 .app
+        run: |
+          set -euo pipefail
+          APP="$(ls -d client/build/macos/Build/Products/Release/*.app | head -1)"
+          mkdir -p "$APP/Contents/Frameworks"
+          cp core/target/release/liber_ffi.dylib "$APP/Contents/Frameworks/"
+          codesign --force --sign - "$APP/Contents/Frameworks/liber_ffi.dylib"
+          codesign --force --deep --sign - "$APP"
+          codesign -dv "$APP" 2>&1 | head -3
+      - name: 打包 .app
+        run: |
+          set -euo pipefail
+          V="${{ needs.verify.outputs.version }}"
+          out="dist/easyremote-client-macos-arm64-${V}"
+          mkdir -p "$out"
+          cp -R client/build/macos/Build/Products/Release/*.app "$out/"
+          printf "version: %s\nbuilt_at: %s\ngateway: %s\narch: arm64\n" \
+            "$V" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "${ER_GATEWAY:-http://127.0.0.1:8080}" \
+            > "$out/BUILD_INFO.txt"
+          # 注意：cd dist 之后 $out 已经是相对 dist 的路径，再用完整 $out 会变成 dist/dist/...
+          # （上一版就是这么炸的：ditto: Cannot get the real path for source）。用 basename。
+          base="$(basename "$out")"
+          ( cd dist && ditto -c -k --sequesterRsrc --keepParent "$base" "${base}.zip" )
+          ls -lh dist
+      - uses: actions/upload-artifact@v7
+        with:
+          name: client-macos
+          path: dist/easyremote-client-macos-*.zip
+          if-no-files-found: error
+
+  # ---------------------------------------------------------------- 服务端（配套，可选下载）
   server:
-    name: Go 服务端 (${{ matrix.goos }}-${{ matrix.goarch }})
+    name: 服务端 (${{ matrix.goos }}-${{ matrix.goarch }})
     needs: verify
     runs-on: ubuntu-latest
     strategy:
@@ -40,11 +191,10 @@ jobs:
           - { goos: linux,   goarch: amd64 }
           - { goos: linux,   goarch: arm64 }
           - { goos: darwin,  goarch: arm64 }
-          - { goos: darwin,  goarch: amd64 }
           - { goos: windows, goarch: amd64 }
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
           go-version: ${{ env.GO_VERSION }}
           cache-dependency-path: server/go.sum
@@ -52,125 +202,51 @@ jobs:
         env:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
-          CGO_ENABLED: "0"
         run: |
           set -euo pipefail
           V="${{ needs.verify.outputs.version }}"
           ext=""; [ "$GOOS" = "windows" ] && ext=".exe"
-          out="dist/easyremote-${V}-${GOOS}-${GOARCH}"
+          out="dist/easyremote-server-${V}-${GOOS}-${GOARCH}"
           mkdir -p "$out"
           cd server
           for cmd in admin gateway relay rendezvous stack udptun lossyproxy; do
             CGO_ENABLED=0 GOOS="$GOOS" GOARCH="$GOARCH" \
-              go build -trimpath -ldflags "-s -w -X main.version=$V" \
-              -o "../$out/$cmd$ext" "./cmd/$cmd"
+              go build -trimpath -ldflags "-s -w" -o "../$out/$cmd$ext" "./cmd/$cmd"
           done
-      - uses: actions/upload-artifact@v4
+          tar -czf "../$out.tar.gz" -C ../dist "$(basename "$out")"
+      - uses: actions/upload-artifact@v7
         with:
           name: server-${{ matrix.goos }}-${{ matrix.goarch }}
-          path: dist/easyremote-*
-          if-no-files-found: error
-
-  # ---------------------------------------------------------------- Rust 核心产物
-  core:
-    name: Rust 核心 (${{ matrix.target }})
-    needs: verify
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - { os: ubuntu-latest,  target: x86_64-unknown-linux-gnu }
-          - { os: macos-latest,   target: aarch64-apple-darwin }
-          - { os: windows-latest, target: x86_64-pc-windows-msvc }
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: core
-      - name: 安装 Linux 系统依赖
-        # core 依赖 libdbus 等系统库（屏幕捕获/输入/剪贴板），Ubuntu runner 默认没有
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            pkg-config libdbus-1-dev libx11-dev libxcb1-dev libxkbcommon-dev \
-            libwayland-dev libpipewire-0.3-dev libgbm-dev libdrm-dev
-      - name: 构建 cdylib
-        run: cargo build --release --manifest-path core/Cargo.toml -p er-ffi
-      - name: 打包
-        shell: bash
-        run: |
-          set -euo pipefail
-          V="${{ needs.verify.outputs.version }}"
-          out="dist/easyremote-core-${V}-${{ matrix.target }}"
-          mkdir -p "$out"
-          find core/target/release -maxdepth 1 -type f \
-            \( -name '*er_ffi*' -o -name '*er-ffi*' \) -exec cp {} "$out/" \;
-          ls -la "$out"
-      - uses: actions/upload-artifact@v4
-        with:
-          name: core-${{ matrix.target }}
-          path: dist/easyremote-core-*
-          if-no-files-found: error
-
-  # ---------------------------------------------------------------- 运营后台
-  web-admin:
-    name: 运营后台构建
-    needs: verify
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: web-admin
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: npm
-          cache-dependency-path: web-admin/package-lock.json
-      - run: npm ci
-      - run: npm run build
-      - name: 打包
-        run: |
-          set -euo pipefail
-          V="${{ needs.verify.outputs.version }}"
-          mkdir -p ../dist
-          tar -czf "../dist/easyremote-web-admin-${V}.tar.gz" -C dist .
-      - uses: actions/upload-artifact@v4
-        with:
-          name: web-admin
-          path: dist/easyremote-web-admin-*.tar.gz
+          path: dist/easyremote-server-*.tar.gz
           if-no-files-found: error
 
   # ---------------------------------------------------------------- 发布
   publish:
     name: 发布 GitHub Release
-    needs: [verify, server, core, web-admin]
+    needs: [verify, client-web, client-macos, server]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: artifacts
-      - name: 收集产物并生成校验和
+      - name: 收集产物与校验和
         run: |
           set -euo pipefail
           mkdir -p release
-          for d in artifacts/server-*; do
-            name=$(basename "$d")
-            ( cd artifacts && tar -czf "../release/${name}.tar.gz" "$name" )
-          done
-          cp artifacts/core-*/* release/ 2>/dev/null || true
-          cp artifacts/web-admin/* release/ 2>/dev/null || true
+          find artifacts -type f \( -name '*.tar.gz' -o -name '*.zip' \) -exec cp {} release/ \;
           ( cd release && sha256sum * > SHA256SUMS.txt )
-          ls -la release
+          ls -lh release
+      - name: 生成发布说明
+        env:
+          VERSION: ${{ needs.verify.outputs.version }}
+          GATEWAY: ${{ vars.ER_GATEWAY }}
+        run: node scripts/gen-release-notes.mjs
       - uses: softprops/action-gh-release@v2
         with:
+          body_path: release/RELEASE_NOTES.md
           files: release/*
-          generate_release_notes: true
           draft: false
           prerelease: ${{ contains(github.ref_name, '-rc') || contains(github.ref_name, '-beta') }}
