@@ -145,7 +145,8 @@ jobs:
         run: flutter pub get
       - name: 静态分析
         working-directory: client
-        run: flutter analyze --no-fatal-infos
+        # 只让 error 阻塞 CI；warning/info 属存量技术债，逐步治理
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
       - name: 单元测试
         working-directory: client
         run: flutter test

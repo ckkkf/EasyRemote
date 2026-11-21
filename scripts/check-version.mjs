@@ -21,22 +21,23 @@ const SOURCES = [
   {
     name: 'core/Cargo.toml (workspace.package.version)',
     file: 'core/Cargo.toml',
-    re: /(^\[workspace\.package\][\s\S]*?^version\s*=\s*)"([^"]+)"/m,
-    group: 2,
+    re: /^version\s*=\s*"(?<v>[^"]+)"(?<rest>[^\n]*)$/m,
+    group: 1,
+    build: (ver, g) => 'version = "' + ver + '"' + (g.rest || ''),
   },
   {
     name: 'web-admin/package.json',
     file: 'web-admin/package.json',
-    re: /("version"\s*:\s*)"([^"]+)"/,
-    group: 2,
+    re: /^\s*"version"\s*:\s*"(?<v>[^"]+)"(?<rest>[^\n]*)$/m,
+    group: 1,
+    build: (ver, g) => '  "version": "' + ver + '"' + (g.rest || '').trimEnd(),
   },
   {
     name: 'client/pubspec.yaml',
     file: 'client/pubspec.yaml',
-    // pubspec 的版本行不带引号，可带 +build 后缀
-    re: /(^version:\s*)([0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?)(\+[0-9]+)?/m,
-    group: 2,
-    quote: false,
+    re: /^version:\s*(?<v>[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?)(?<suffix>\+[0-9]+)?$/m,
+    group: 1,
+    build: (ver, g) => 'version: ' + ver + (g.suffix || ''),
   },
 ];
 
@@ -46,25 +47,55 @@ function readVersion(src) {
   const abs = path.join(ROOT, src.file);
   if (!fs.existsSync(abs)) return { ok: false, reason: '文件不存在' };
   const text = fs.readFileSync(abs, 'utf8');
+  // JSON 文件先保证语法合法，坏文件不能被当成"版本一致"
+  if (src.file.endsWith('.json')) {
+    try {
+      JSON.parse(text);
+    } catch (e) {
+      return { ok: false, reason: 'JSON 语法错误: ' + e.message };
+    }
+  }
   if (src.read) return { ok: true, value: src.read(text) };
   const m = text.match(src.re);
   if (!m) return { ok: false, reason: '未找到版本字段' };
   return { ok: true, value: m[src.group] };
 }
 
+// 每处版本源的替换方式：用命名锚点重建整行，避免捕获组错位把数字粘到版本号后面。
+// （历史事故：正则回调参数错位曾把 package.json 写成 "0.2.0"53，直接导致 npm ci 失败。）
 function writeVersion(src, version) {
   const abs = path.join(ROOT, src.file);
   if (src.write) {
     fs.writeFileSync(abs, src.write(version));
-    return true;
+    return 'written';
   }
   const text = fs.readFileSync(abs, 'utf8');
-  const q = src.quote === false ? '' : '"';
-  const next = text.replace(src.re, (all, pre, _old, suffix) =>
-    pre + q + version + q + (suffix || ''),
-  );
-  if (next === text) return false;
+  if (!src.build) return 'failed';
+  const m = text.match(src.re);
+  if (!m) return 'failed';
+  const next = text.slice(0, m.index) + src.build(version, m.groups || {}) + text.slice(m.index + m[0].length);
+  if (next === text) return 'unchanged';
   fs.writeFileSync(abs, next);
+  return 'written';
+}
+
+// 写回后必须还能被结构化解析，否则说明替换破坏了文件语法。
+// 历史事故：正则回调参数错位曾把 package.json 写成 "0.2.0"53、Cargo.toml 写成 "0.2.0"285，
+// 导致 npm ci 与 cargo metadata 双双失败——本地 tsc/go 都发现不了，只有 CI 才暴露。
+function assertStillValid(file) {
+  const abs = path.join(ROOT, file);
+  const raw = fs.readFileSync(abs, 'utf8');
+  if (file.endsWith('.json')) {
+    JSON.parse(raw);
+    return true;
+  }
+  if (file.endsWith('.toml')) {
+    // 版本行必须是 键 = "纯语义化版本"，后面不能粘任何字符
+    const line = raw.split('\n').find((l) => /^\s*version\s*=/.test(l));
+    if (line && !/^\s*version\s*=\s*"[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?"\s*$/.test(line)) {
+      throw new Error(file + ': 版本行格式异常 -> ' + line.trim());
+    }
+  }
   return true;
 }
 
@@ -82,9 +113,24 @@ if (setIdx !== -1) {
   if (!fs.existsSync(path.join(ROOT, 'VERSION'))) {
     fs.writeFileSync(path.join(ROOT, 'VERSION'), '0.0.0\n');
   }
+  let writeFail = false;
   for (const s of SOURCES) {
-    const ok = writeVersion(s, raw);
-    console.log((ok ? '✓ ' : '✗ ') + s.name + ' -> ' + raw);
+    const res = writeVersion(s, raw);
+    console.log((res === 'failed' ? '✗ ' : '✓ ') + s.name + ' -> ' + raw + (res === 'unchanged' ? '（已是该版本）' : ''));
+    if (res === 'failed') writeFail = true;
+    if (s.file.endsWith('.json') || s.file.endsWith('.toml')) {
+      try {
+        assertStillValid(s.file);
+      } catch (e) {
+        console.error('✗ 写回后文件语法损坏：' + e.message);
+        writeFail = true;
+      }
+    }
+  }
+  if (writeFail) {
+    console.error('');
+    console.error('❌ 有版本源写入失败或损坏了文件，请检查后重试。');
+    process.exit(1);
   }
   console.log('');
   console.log('版本已统一为 ' + raw + '。');
@@ -115,9 +161,12 @@ if (values.length > 1) {
   console.error('❌ 各处版本号不一致：' + values.join(' / '));
   console.error('   修复：node scripts/check-version.mjs --set <版本>');
   exitCode = 1;
-} else if (values.length === 1) {
+} else if (values.length === 1 && !bad) {
   console.log('');
   console.log('✓ 各处版本一致：' + values[0]);
+} else if (values.length === 1 && bad) {
+  console.error('');
+  console.error('❌ 有版本源读取失败（见上方 ✗ 项），无法确认版本一致');
 }
 
 // ---------------------------------------------------------------- --tag
