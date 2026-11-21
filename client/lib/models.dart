@@ -165,5 +165,6 @@ class SessionStatus {
 
   /// 「通道已建立」：已授权或已进入 active。
   /// Web 预览下服务端最多到 authorized，页面据此显示全屏占位而不是空白等待。
-  bool get isLive => state == SessionState.active || state == SessionState.authorized;
+  bool get isLive =>
+      state == SessionState.active || state == SessionState.authorized;
 }

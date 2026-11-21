@@ -5,6 +5,8 @@ import 'package:flutter/services.dart';
 
 import '../api.dart';
 import '../models.dart';
+import '../net_probe.dart';
+import '../net_probe_cache.dart';
 import '../theme.dart';
 import 'diagnostics_page.dart';
 
@@ -65,6 +67,9 @@ class _SessionPageState extends State<SessionPage> {
   int _lost = 0;
   ReflectInfo? _reflect;
 
+  /// 本机 NAT 实测结果（与诊断页同一套 STUN 探测）。
+  NatProbeResult? _nat;
+
   bool _sheetOpen = false;
   bool _immersive = false;
 
@@ -72,6 +77,7 @@ class _SessionPageState extends State<SessionPage> {
   void initState() {
     super.initState();
     _loadTarget();
+    _probeNat();
     _pollOnce();
     _poll = Timer.periodic(const Duration(seconds: 1), (_) => _pollOnce());
     _tick = Timer.periodic(const Duration(seconds: 1), (_) {
@@ -84,6 +90,11 @@ class _SessionPageState extends State<SessionPage> {
     _poll?.cancel();
     _tick?.cancel();
     super.dispose();
+  }
+
+  Future<void> _probeNat() async {
+    final result = await probeNatCached();
+    if (mounted) setState(() => _nat = result);
   }
 
   Future<void> _loadTarget() async {
@@ -438,7 +449,8 @@ class _SessionPageState extends State<SessionPage> {
           const SizedBox(height: 8),
           row('本机设备码', _ownCode),
           row('连接方式', widget.assist ? '协助码临时授权' : '设备码直连'),
-          row('本机 NAT', '未知（需桌面端）'),
+          row('本机 NAT',
+              _nat == null ? '探测中…' : (_nat!.supported ? _nat!.nat : '不支持（当前平台）')),
           row('中继节点', '未知（需桌面端）'),
           row('加密协议', 'Ed25519 握手 · 中继只见密文'),
           row('画质策略', '智能 · 自动（本机设置）'),
@@ -736,7 +748,7 @@ class _StepLine extends StatelessWidget {
                 labels[i],
                 style: text.labelSmall?.copyWith(
                   color: i <= step ? scheme.onSurface : scheme.onSurfaceVariant,
-                  fontWeight: i == step ? FontWeight.w700 : FontWeight.w500,
+                  fontWeight: i == step ? FontWeight.w600 : FontWeight.w400,
                 ),
               ),
             ],
@@ -805,12 +817,12 @@ class _QualityBadge extends StatelessWidget {
             RichText(
               text: TextSpan(
                 text: value,
-                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.white),
+                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Colors.white),
                 children: [
                   if (unit != null)
                     TextSpan(
                         text: unit,
-                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w500, color: Colors.white38)),
+                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w400, color: Colors.white38)),
                 ],
               ),
             ),
@@ -912,6 +924,7 @@ class _QualityDrawerState extends State<_QualityDrawer> {
   int _total = 0;
   int _lost = 0;
   ReflectInfo? _reflect;
+  NatProbeResult? _nat;
   Timer? _periodic;
   bool _sampling = false;
 
@@ -919,6 +932,7 @@ class _QualityDrawerState extends State<_QualityDrawer> {
   void initState() {
     super.initState();
     _measure();
+    _probeNat();
     // 原型写「数据每 2 秒刷新」：这里每 2 秒补一次真实 ping，滚动窗口 5 个。
     _periodic = Timer.periodic(const Duration(seconds: 2), (_) => _sample());
   }
@@ -945,6 +959,11 @@ class _QualityDrawerState extends State<_QualityDrawer> {
       await Future<void>.delayed(const Duration(milliseconds: 120));
     }
     _sampling = false;
+  }
+
+  Future<void> _probeNat() async {
+    final result = await probeNatCached();
+    if (mounted) setState(() => _nat = result);
   }
 
   Future<void> _sample() async {
@@ -1137,7 +1156,8 @@ class _QualityDrawerState extends State<_QualityDrawer> {
                         _detail('丢包率', _loss.toStringAsFixed(1) + ' %'),
                         _detail('编码器', '未知（需桌面端）'),
                         _detail('编码 / 解码耗时', '未知（需桌面端）'),
-                        _detail('NAT 类型', '未知（需桌面端）'),
+                        _detail('NAT 类型',
+                            _nat == null ? '探测中…' : (_nat!.supported ? _nat!.nat : '不支持（当前平台）')),
                         _detail('当前档位', '智能 · 自动（本机设置）'),
                         const SizedBox(height: 10),
                         Text(

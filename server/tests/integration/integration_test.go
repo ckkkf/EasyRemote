@@ -190,6 +190,61 @@ func TestFullFlow(t *testing.T) {
 	}
 }
 
+// TestSameAccountDirectConnect 覆盖「同账号设备免密直连」：
+// 账号令牌 + 同一账号的第二台设备 → direct=true 时不输入临时密码也能建会；
+// 跨账号即使 direct=true 也必须给密码，防止绕过授权。
+func TestSameAccountDirectConnect(t *testing.T) {
+	c := setup(t)
+	tok := login(t, c, "13800008883")
+	_, ctrlCode, ctrlDeviceToken := bind(t, c, tok)
+	_, targetCode, _ := bind(t, c, tok)
+
+	// 不给 direct、不给密码：同账号也要按旧规则要求密码。
+	code, body := c.do("POST", "/v1/connect/request",
+		reqOpts{bearer: tok, deviceToken: ctrlDeviceToken},
+		map[string]any{"device_code": targetCode})
+	if code == 200 {
+		t.Fatalf("same-account connect without direct/captcha must fail, got %v", body)
+	}
+	if name, _ := body["name"].(string); name != "CONN_CAPTCHA_EXPIRED" {
+		t.Fatalf("want CONN_CAPTCHA_EXPIRED, got %v", body)
+	}
+
+	// direct=true：同账号放行，并标记 same_account。
+	code, body = c.do("POST", "/v1/connect/request",
+		reqOpts{bearer: tok, deviceToken: ctrlDeviceToken},
+		map[string]any{"device_code": targetCode, "direct": true})
+	if code != 200 {
+		t.Fatalf("same-account direct connect: %d %v", code, body)
+	}
+	if state, _ := body["state"].(string); state != "requested" {
+		t.Fatalf("want requested, got %v", body)
+	}
+
+	// 自己连自己仍然拒绝（direct 不能绕开 CONN_SELF_CONNECT）。
+	code, body = c.do("POST", "/v1/connect/request",
+		reqOpts{bearer: tok, deviceToken: ctrlDeviceToken},
+		map[string]any{"device_code": ctrlCode, "direct": true})
+	if code == 200 {
+		t.Fatalf("self connect must fail, got %v", body)
+	}
+}
+
+// TestCrossAccountDirectStillRequiresCaptcha 锁死边界：direct 只对同账号生效。
+func TestCrossAccountDirectStillRequiresCaptcha(t *testing.T) {
+	c := setup(t)
+	f := newFixture(t, c)
+	code, body := c.do("POST", "/v1/connect/request",
+		reqOpts{bearer: f.ctrlToken, deviceToken: f.ctrlDeviceToken},
+		map[string]any{"device_code": f.targetCode, "direct": true})
+	if code == 200 {
+		t.Fatalf("cross-account direct must not bypass captcha, got %v", body)
+	}
+	if name, _ := body["name"].(string); name != "CONN_CAPTCHA_EXPIRED" {
+		t.Fatalf("want CONN_CAPTCHA_EXPIRED, got %v", body)
+	}
+}
+
 // ---- 安全回归：这些用例锁死已修复的阻断项，防止回退 ----
 
 func TestAdminForgedTokenRejected(t *testing.T) {

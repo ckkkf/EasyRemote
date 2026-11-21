@@ -14,7 +14,7 @@ class ApiException implements Exception {
   final String code;
   final String message;
   @override
-  String toString() => '$code: $message';
+  String toString() => message;
 }
 
 class GatewayClient {
@@ -45,6 +45,10 @@ class GatewayClient {
   /// 同一个令牌只通知一次，避免并发请求把登录页叠很多层。
   bool _authExpiredNotified = false;
 
+  /// 启动恢复期间不要触发「跳登录页」通知：
+  /// 此时根节点还没挂好主界面，restoreSession 自己会决定回登录页还是留在本地身份。
+  bool _suppressAuthNotify = false;
+
   Map<String, String> _headers({bool device = false}) {
     final h = {'content-type': 'application/json'};
     if (_token != null) h['authorization'] = 'Bearer $_token';
@@ -74,14 +78,36 @@ class GatewayClient {
   }
 
   Map<String, dynamic> _decode(http.Response res) {
-    final body = res.body.isEmpty
-        ? <String, dynamic>{}
-        : jsonDecode(res.body) as Map<String, dynamic>;
+    final raw = res.body.trim();
+    Map<String, dynamic> body;
+    if (raw.isEmpty) {
+      body = <String, dynamic>{};
+    } else {
+      final dynamic decoded;
+      try {
+        decoded = jsonDecode(raw);
+      } on FormatException {
+        // 反向代理/网关出错时经常直接回纯文本或 HTML（"bad gateway"、502 页面），
+        // 原样抛 FormatException 会让界面显示一串 SyntaxError，用户完全不知道该干什么。
+        throw ApiException(
+          'SRV_INTERNAL',
+          _nonJsonMessage(res.statusCode, raw),
+        );
+      }
+      if (decoded is! Map<String, dynamic>) {
+        throw ApiException(
+          'SRV_INTERNAL',
+          _nonJsonMessage(res.statusCode, raw),
+        );
+      }
+      body = decoded;
+    }
     if (res.statusCode >= 400) {
       // 服务端错误信封是扁平的 {code,name,message,retryable,trace_id}（见 docs/spec/error-codes.md §3），
       // 同时兼容旧式 {error:{...}} 包装，避免解析漂移把真实错误码吞成 UNKNOWN。
       final err = (body['error'] as Map<String, dynamic>?) ?? body;
-      final code = err['name'] as String? ?? err['code']?.toString() ?? 'UNKNOWN';
+      final code =
+          err['name'] as String? ?? err['code']?.toString() ?? 'UNKNOWN';
       if (_isTokenDead(code)) _notifyAuthExpired();
       throw ApiException(
         code,
@@ -91,6 +117,25 @@ class GatewayClient {
     // 成功信封：{code:0, name:"OK", data, trace_id}，业务体在 data 里。
     final data = body['data'];
     return data is Map<String, dynamic> ? data : <String, dynamic>{};
+  }
+
+  /// 非 JSON 响应（网关/反代错误页）转成人话。
+  String _nonJsonMessage(int status, String raw) {
+    final sample = _bodySample(raw);
+    if (status == 502 || status == 503 || status == 504) {
+      return '网关暂时不可用（HTTP $status'
+          '${sample.isEmpty ? '' : ' · $sample'}）：服务端可能未启动，或反向代理连不上后端。';
+    }
+    return '网关返回了非 JSON 响应（HTTP $status'
+        '${sample.isEmpty ? '' : ' · $sample'}）：请确认服务端与反向代理正常。';
+  }
+
+  String _bodySample(String raw) {
+    final text = raw.trim();
+    if (text.isEmpty) return '';
+    if (text.startsWith('<')) return 'HTML 页面';
+    final flat = text.replaceAll(RegExp(r'\s+'), ' ');
+    return flat.length > 60 ? '${flat.substring(0, 60)}…' : flat;
   }
 
   Future<void> sendSms(String phone) async {
@@ -139,6 +184,7 @@ class GatewayClient {
     final stored = await loadSession();
     if (stored == null) return null;
 
+    _suppressAuthNotify = true;
     _token = stored.token;
     _deviceToken = stored.deviceToken.isEmpty ? null : stored.deviceToken;
     _deviceId = stored.deviceId;
@@ -170,6 +216,8 @@ class GatewayClient {
     } catch (_) {
       // 断网/服务端未起：不把用户踢回登录页，先按本地身份进主界面，页面自己会报错。
       return _localDevice(stored);
+    } finally {
+      _suppressAuthNotify = false;
     }
   }
 
@@ -185,7 +233,7 @@ class GatewayClient {
 
   /// 令牌不可用：清会话并通知根节点跳登录页。
   void _notifyAuthExpired() {
-    if (_authExpiredNotified) return;
+    if (_suppressAuthNotify || _authExpiredNotified || _token == null) return;
     _authExpiredNotified = true;
     unawaited(logout());
     authExpired.value++;
@@ -212,15 +260,16 @@ class GatewayClient {
   Future<void> _persist() async {
     final token = _token;
     if (token == null || token.isEmpty) return;
-    await saveSession(StoredSession(
-      token: token,
-      deviceToken: _deviceToken ?? '',
-      deviceId: _deviceId ?? '',
-      deviceCode: _deviceCode ?? '',
-      devicePlatform: _devicePlatform ?? '',
-    ));
+    await saveSession(
+      StoredSession(
+        token: token,
+        deviceToken: _deviceToken ?? '',
+        deviceId: _deviceId ?? '',
+        deviceCode: _deviceCode ?? '',
+        devicePlatform: _devicePlatform ?? '',
+      ),
+    );
   }
-
 
   /// 发起连接。服务端要求主控设备凭证（X-Device-Token），
   /// 首次连接未建立信任时需要对方屏幕上的验证码。
@@ -273,7 +322,9 @@ class GatewayClient {
       return DeviceInfo(
         id: id,
         code: code,
-        platform: (_devicePlatform ?? '').isNotEmpty ? _devicePlatform! : platform,
+        platform: (_devicePlatform ?? '').isNotEmpty
+            ? _devicePlatform!
+            : platform,
         online: true,
       );
     }

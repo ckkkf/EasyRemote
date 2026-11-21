@@ -31,6 +31,9 @@ class HostService {
   String? get hostId => null;
   bool get active => false;
 
+  /// 浏览器没有原生采集/注入能力。
+  static bool get supported => false;
+
   Never _unsupported() => throw UnsupportedError('浏览器预览不支持被控（需要桌面端）');
 
   String prepare({

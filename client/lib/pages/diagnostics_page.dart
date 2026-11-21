@@ -4,11 +4,19 @@ import 'package:flutter/material.dart';
 
 import '../api.dart';
 import '../models.dart';
+import '../net_probe.dart';
+import '../net_probe_cache.dart';
 import '../shell.dart';
 import '../theme.dart';
 
 /// 诊断页：把链路探测结果翻译成可执行建议（D1）。
-/// 时延与丢包用真实 ping 网关的测量值；NAT/打洞需要桌面端 QUIC 栈，Web 预览下如实显示不可用。
+///
+/// 三类数据全部来自本机实测：
+///   - 时延/丢包：真实 HTTP ping 网关；
+///   - 出口地址：服务端回显的 TCP 源地址；
+///   - NAT 类型/打洞：本机 UDP socket 向多台 STUN 发 Binding Request，
+///     跨目的地比对映射端口，并向自己的映射地址发包做 hairpin 自检。
+/// Web 没有 UDP，会明确标注「此平台不支持」，不再用一句占位文案敷衍。
 class DiagnosticsPage extends StatefulWidget {
   const DiagnosticsPage({super.key, required this.client, this.config});
 
@@ -28,10 +36,13 @@ class _DiagnosticsPageState extends State<DiagnosticsPage> {
   int _lost = 0;
   String? _error;
   ReflectInfo? _reflect;
+  NatProbeResult? _nat;
+  bool _natRunning = false;
   bool _auto = true;
   Timer? _timer;
 
-  int get _autoSecs => (widget.config?.diagAutoRefreshSecs ?? 30).clamp(5, 3600);
+  int get _autoSecs =>
+      (widget.config?.diagAutoRefreshSecs ?? 30).clamp(5, 3600);
 
   @override
   void initState() {
@@ -43,7 +54,8 @@ class _DiagnosticsPageState extends State<DiagnosticsPage> {
   void didUpdateWidget(covariant DiagnosticsPage oldWidget) {
     super.didUpdateWidget(oldWidget);
     // 配置是异步拿到的：间隔变了就重排定时器。
-    if (oldWidget.config?.diagAutoRefreshSecs != widget.config?.diagAutoRefreshSecs) {
+    if (oldWidget.config?.diagAutoRefreshSecs !=
+        widget.config?.diagAutoRefreshSecs) {
       _restartTimer();
     }
   }
@@ -73,11 +85,14 @@ class _DiagnosticsPageState extends State<DiagnosticsPage> {
     if (_running) return;
     setState(() {
       _running = true;
+      _natRunning = true;
       _error = null;
       _lost = 0;
       _lossSamples = 0;
       _rtt = null;
     });
+    // NAT/打洞探测和 HTTP 采样并行跑：STUN 超时上限 2s，不能让它串行拖长整轮。
+    final natFuture = probeNatCached(force: true);
     // 出口地址：服务端看到的 TCP 源地址，Web 端拿不到自己的公网地址就靠它。
     try {
       final info = await widget.client.netReflect();
@@ -98,9 +113,12 @@ class _DiagnosticsPageState extends State<DiagnosticsPage> {
       setState(() {});
       await Future<void>.delayed(const Duration(milliseconds: 120));
     }
+    final nat = await natFuture;
     if (!mounted) return;
     setState(() {
       _running = false;
+      _natRunning = false;
+      _nat = nat;
       if (samples.isEmpty) {
         _error = '网关不可达，请检查服务是否在运行';
       } else {
@@ -127,14 +145,23 @@ class _DiagnosticsPageState extends State<DiagnosticsPage> {
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text('自动刷新', style: text.labelSmall?.copyWith(color: scheme.onSurfaceVariant)),
+                Text(
+                  '自动刷新',
+                  style: text.labelSmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
                 Switch(value: _auto, onChanged: _toggleAuto),
               ],
             ),
             FilledButton.icon(
               onPressed: _running ? null : _runDiagnostics,
               icon: _running
-                  ? const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                  ? const SizedBox(
+                      height: 16,
+                      width: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
                   : const Icon(Icons.play_arrow_rounded, size: 18),
               label: Text(_running ? '诊断中…' : '开始诊断'),
             ),
@@ -146,8 +173,13 @@ class _DiagnosticsPageState extends State<DiagnosticsPage> {
             children: [
               LayoutBuilder(
                 builder: (context, constraints) {
-                  final columns = constraints.maxWidth >= 900 ? 3 : constraints.maxWidth >= 560 ? 2 : 1;
-                  final width = (constraints.maxWidth - (columns - 1) * 12) / columns;
+                  final columns = constraints.maxWidth >= 900
+                      ? 3
+                      : constraints.maxWidth >= 560
+                      ? 2
+                      : 1;
+                  final width =
+                      (constraints.maxWidth - (columns - 1) * 12) / columns;
                   return Wrap(
                     spacing: 12,
                     runSpacing: 12,
@@ -156,18 +188,33 @@ class _DiagnosticsPageState extends State<DiagnosticsPage> {
                         width: width,
                         child: _MetricCard(
                           label: '网关往返时延',
-                          value: _rtt == null ? '— ms' : _rtt!.inMilliseconds.toString() + ' ms',
+                          value: _rtt == null
+                              ? '— ms'
+                              : _rtt!.inMilliseconds.toString() + ' ms',
                           hint: _rtt == null ? '点「开始诊断」实测' : '5 次采样取中位数',
-                          tone: _rtt == null ? null : (_rtt!.inMilliseconds <= 60 ? _Tone.good : _Tone.warn),
+                          tone: _rtt == null
+                              ? null
+                              : (_rtt!.inMilliseconds <= 60
+                                    ? _Tone.good
+                                    : _Tone.warn),
                         ),
                       ),
                       SizedBox(
                         width: width,
                         child: _MetricCard(
                           label: '丢包率',
-                          value: loss == null ? '— %' : loss.toStringAsFixed(0) + ' %',
-                          hint: _lossSamples == 0 ? '尚未采样' : _lost.toString() + ' / ' + _lossSamples.toString() + ' 次失败',
-                          tone: loss == null ? null : (loss <= 0 ? _Tone.good : _Tone.warn),
+                          value: loss == null
+                              ? '— %'
+                              : loss.toStringAsFixed(0) + ' %',
+                          hint: _lossSamples == 0
+                              ? '尚未采样'
+                              : _lost.toString() +
+                                    ' / ' +
+                                    _lossSamples.toString() +
+                                    ' 次失败',
+                          tone: loss == null
+                              ? null
+                              : (loss <= 0 ? _Tone.good : _Tone.warn),
                         ),
                       ),
                       SizedBox(
@@ -175,31 +222,57 @@ class _DiagnosticsPageState extends State<DiagnosticsPage> {
                         child: _MetricCard(
                           label: '出口地址（TCP）',
                           value: _reflect == null ? '—' : _reflect!.pretty,
-                          hint: _reflect == null ? '点「开始诊断」获取' : '服务端看到的源地址，不是 NAT 探测结果',
+                          hint: _reflect == null
+                              ? '点「开始诊断」获取'
+                              : '服务端看到的源地址，不是 NAT 探测结果',
                         ),
                       ),
                       SizedBox(
                         width: width,
                         child: _MetricCard(
-                          label: '当前链路',
-                          value: _rtt == null ? '未知' : '网关直连',
-                          hint: 'P2P 打洞需要桌面端 QUIC 栈',
+                          label: 'P2P 直连',
+                          value: _nat == null
+                              ? (_natRunning ? '探测中…' : '待探测')
+                              : (_nat!.punchable ? '可用' : '不可用'),
+                          hint: _nat?.linkHint ?? '点「开始诊断」做本机 UDP 实测',
+                          tone: _nat == null
+                              ? null
+                              : (_nat!.punchable ? _Tone.good : _Tone.warn),
                         ),
                       ),
                       SizedBox(
                         width: width,
                         child: _MetricCard(
                           label: 'NAT 类型',
-                          value: '待探测',
-                          hint: 'Web 预览不支持 STUN 探测',
+                          value: _nat?.nat ?? (_natRunning ? '探测中…' : '待探测'),
+                          hint: _nat?.natHint ?? '本机向多台 STUN 发 Binding Request',
+                          tone: _nat == null
+                              ? null
+                              : (_nat!.nat.contains('对称') ||
+                                        _nat!.nat.contains('不可达')
+                                    ? _Tone.warn
+                                    : _Tone.good),
                         ),
                       ),
                       SizedBox(
                         width: width,
                         child: _MetricCard(
                           label: '打洞结果',
-                          value: '未开始',
-                          hint: '需要信令 + 中继环境',
+                          value: _nat?.punch ?? (_natRunning ? '探测中…' : '待探测'),
+                          hint: _nat?.punchHint ?? '向自己的公网映射发包做 hairpin 自检',
+                          tone: _nat == null
+                              ? null
+                              : (_nat!.punchable ? _Tone.good : _Tone.warn),
+                        ),
+                      ),
+                      SizedBox(
+                        width: width,
+                        child: _MetricCard(
+                          label: '公网映射（STUN）',
+                          value: (_nat?.mapped.isNotEmpty ?? false)
+                              ? _nat!.mapped
+                              : '—',
+                          hint: 'STUN 返回的 ip:port，P2P 候选地址',
                         ),
                       ),
                       SizedBox(
@@ -221,7 +294,9 @@ class _DiagnosticsPageState extends State<DiagnosticsPage> {
                 decoration: BoxDecoration(
                   color: scheme.surfaceContainerLow,
                   borderRadius: BorderRadius.circular(ErTokens.radiusLg),
-                  border: Border.all(color: scheme.outlineVariant.withValues(alpha: 0.7)),
+                  border: Border.all(
+                    color: scheme.outlineVariant.withValues(alpha: 0.7),
+                  ),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -232,14 +307,21 @@ class _DiagnosticsPageState extends State<DiagnosticsPage> {
                       ok: _rtt != null,
                       text: _rtt == null
                           ? '先点右上角「开始诊断」，确认本机能连通网关。'
-                          : '本机到网关 ' + _rtt!.inMilliseconds.toString() + ' ms，属于' +
-                              (_rtt!.inMilliseconds <= 60 ? '良好' : '偏高') + '区间。',
+                          : '本机到网关 ' +
+                                _rtt!.inMilliseconds.toString() +
+                                ' ms，属于' +
+                                (_rtt!.inMilliseconds <= 60 ? '良好' : '偏高') +
+                                '区间。',
                     ),
                     _AdviceRow(
                       ok: _lost == 0 && _lossSamples > 0,
                       text: _lossSamples == 0
                           ? '丢包率尚未采样，诊断完成后会给出结论。'
-                          : (_lost == 0 ? '连续 5 次探测无丢包。' : '探测期间有 ' + _lost.toString() + ' 次失败，检查网络或服务负载。'),
+                          : (_lost == 0
+                                ? '连续 5 次探测无丢包。'
+                                : '探测期间有 ' +
+                                      _lost.toString() +
+                                      ' 次失败，检查网络或服务负载。'),
                     ),
                     _AdviceRow(
                       ok: _reflect != null,
@@ -247,13 +329,20 @@ class _DiagnosticsPageState extends State<DiagnosticsPage> {
                           ? '出口地址尚未取到：诊断会一并请求 /v1/net/reflect。'
                           : '服务端看到的出口地址是 ${_reflect!.pretty}（TCP 源地址）。',
                     ),
-                    const _AdviceRow(
-                      ok: false,
-                      text: 'P2P 直连、NAT 类型与打洞结果需要桌面端（QUIC/STUN）才能给出真实值。',
+                    _AdviceRow(
+                      ok: _nat?.punchable ?? false,
+                      text: _nat?.detail.isNotEmpty == true
+                          ? _nat!.detail
+                          : (_natRunning
+                                ? '本机 UDP STUN 探测进行中：向多台服务器取映射并做跨目的地比对。'
+                                : '点「开始诊断」会同时做 HTTP 采样与本机 UDP STUN 探测。'),
                     ),
                     if (_error != null) ...[
                       const SizedBox(height: 6),
-                      Text(_error!, style: text.bodySmall?.copyWith(color: scheme.error)),
+                      Text(
+                        _error!,
+                        style: text.bodySmall?.copyWith(color: scheme.error),
+                      ),
                     ],
                   ],
                 ),
@@ -261,11 +350,19 @@ class _DiagnosticsPageState extends State<DiagnosticsPage> {
               const SizedBox(height: 12),
               Row(
                 children: [
-                  Icon(Icons.privacy_tip_outlined, size: 15, color: scheme.onSurfaceVariant),
+                  Icon(
+                    Icons.privacy_tip_outlined,
+                    size: 15,
+                    color: scheme.onSurfaceVariant,
+                  ),
                   const SizedBox(width: 6),
                   Expanded(
-                    child: Text('诊断数据仅用于本机展示，不会上传到服务端。',
-                        style: text.labelSmall?.copyWith(color: scheme.onSurfaceVariant)),
+                    child: Text(
+                      '诊断数据仅用于本机展示，不会上传到服务端。',
+                      style: text.labelSmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -280,7 +377,12 @@ class _DiagnosticsPageState extends State<DiagnosticsPage> {
 enum _Tone { good, warn }
 
 class _MetricCard extends StatelessWidget {
-  const _MetricCard({required this.label, required this.value, required this.hint, this.tone});
+  const _MetricCard({
+    required this.label,
+    required this.value,
+    required this.hint,
+    this.tone,
+  });
 
   final String label;
   final String value;
@@ -306,11 +408,19 @@ class _MetricCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: text.labelSmall?.copyWith(color: scheme.onSurfaceVariant)),
+          Text(
+            label,
+            style: text.labelSmall?.copyWith(color: scheme.onSurfaceVariant),
+          ),
           const SizedBox(height: 6),
           Text(value, style: text.titleLarge?.copyWith(color: color)),
           const SizedBox(height: 2),
-          Text(hint, style: text.labelSmall?.copyWith(color: scheme.onSurfaceVariant.withValues(alpha: 0.85))),
+          Text(
+            hint,
+            style: text.labelSmall?.copyWith(
+              color: scheme.onSurfaceVariant.withValues(alpha: 0.85),
+            ),
+          ),
         ],
       ),
     );
@@ -332,8 +442,11 @@ class _AdviceRow extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(ok ? Icons.check_circle_rounded : Icons.info_outline_rounded,
-              size: 16, color: ok ? const Color(0xFF2A6239) : scheme.onSurfaceVariant),
+          Icon(
+            ok ? Icons.check_circle_rounded : Icons.info_outline_rounded,
+            size: 16,
+            color: ok ? const Color(0xFF2A6239) : scheme.onSurfaceVariant,
+          ),
           const SizedBox(width: 8),
           Expanded(child: Text(text, style: textTheme.bodySmall)),
         ],

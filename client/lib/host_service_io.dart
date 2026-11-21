@@ -68,6 +68,9 @@ class HostService {
   String? get hostId => _hostId;
   bool get active => _hostId != null;
 
+  /// 桌面端有真实 FFI 采集/注入能力。
+  static bool get supported => true;
+
   DynamicLibrary _load() {
     final cached = _lib;
     if (cached != null) return cached;
@@ -117,6 +120,9 @@ class HostService {
     required String deviceCode,
     required String deviceToken,
   }) {
+    if (token.isEmpty || deviceId.isEmpty) {
+      throw StateError('missing session (token/device_id)');
+    }
     final lib = _load();
     final fn = lib.lookupFunction<_PrepareExC, _PrepareExDart>('er_host_prepare_ex');
     final res = _take(fn(

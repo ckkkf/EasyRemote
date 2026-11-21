@@ -623,7 +623,7 @@ class _BrandPanel extends StatelessWidget {
                     alignment: Alignment.center,
                     child: const Text(
                       'ER',
-                      style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: 0.5),
+                      style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600, letterSpacing: 0.5),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -662,7 +662,7 @@ class _BrandPanel extends StatelessWidget {
                       alignment: Alignment.center,
                       child: Text(
                         item.$1,
-                        style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700),
+                        style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
                       ),
                     ),
                     const SizedBox(width: 11),
@@ -725,7 +725,7 @@ class _BrandBanner extends StatelessWidget {
               borderRadius: BorderRadius.circular(11),
             ),
             alignment: Alignment.center,
-            child: const Text('ER', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700)),
+            child: const Text('ER', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
           ),
           const SizedBox(height: 12),
           const Text(

@@ -35,7 +35,12 @@ void main() {
       const MaterialApp(
         home: Scaffold(
           body: SettingsPage(
-            device: DeviceInfo(id: 'dev-1', code: '123456789', platform: 'macos', online: true),
+            device: DeviceInfo(
+              id: 'dev-1',
+              code: '123456789',
+              platform: 'macos',
+              online: true,
+            ),
           ),
         ),
       ),
@@ -47,7 +52,10 @@ void main() {
     await pumpSettings(tester);
     expect(appPrefs.value.privacyScreen, isFalse);
 
-    await tester.tap(find.widgetWithText(SwitchListTile, '隐私屏'));
+    final privacy = find.widgetWithText(SwitchListTile, '隐私屏');
+    await tester.ensureVisible(privacy);
+    await tester.pumpAndSettle();
+    await tester.tap(privacy);
     await tester.pump(const Duration(milliseconds: 200));
 
     expect(appPrefs.value.privacyScreen, isTrue);
@@ -57,16 +65,37 @@ void main() {
     await pumpSettings(tester);
     expect(appPrefs.value.preventSleep, isTrue);
 
-    await tester.tap(find.widgetWithText(SwitchListTile, '会话期间阻止睡眠'));
+    final sleep = find.widgetWithText(SwitchListTile, '会话期间阻止睡眠');
+    await tester.ensureVisible(sleep);
+    await tester.pumpAndSettle();
+    await tester.tap(sleep);
     await tester.pump(const Duration(milliseconds: 200));
 
     expect(appPrefs.value.preventSleep, isFalse);
   });
 
+  testWidgets('同账号免密直连默认关，打开后写进偏好总线', (tester) async {
+    await pumpSettings(tester);
+    expect(appPrefs.value.sameAccountDirect, isFalse);
+
+    final tile = find.widgetWithText(SwitchListTile, '同账号设备免密直连');
+    expect(tile, findsOneWidget);
+    expect(tester.widget<SwitchListTile>(tile).value, isFalse);
+
+    await tester.tap(tile);
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(appPrefs.value.sameAccountDirect, isTrue);
+  });
+
   testWidgets('落盘后能读回（刷新后设置不会丢）', (tester) async {
     await tester.runAsync(() async {
       await updatePrefsAwait(
-        const Prefs(themeMode: 'dark', quality: '流畅', privacyScreen: true, preventSleep: false),
+        const Prefs(
+          themeMode: 'dark',
+          quality: '流畅',
+          privacyScreen: true,
+          preventSleep: false,
+        ),
       );
     });
 
@@ -80,7 +109,14 @@ void main() {
 
   testWidgets('重新进入设置页会读回已保存的值（模拟刷新后重进）', (tester) async {
     await tester.runAsync(() async {
-      await updatePrefsAwait(const Prefs(privacyScreen: true, preventSleep: false, quality: '流畅'));
+      await updatePrefsAwait(
+        const Prefs(
+          privacyScreen: true,
+          preventSleep: false,
+          quality: '流畅',
+          sameAccountDirect: true,
+        ),
+      );
     });
 
     await pumpSettings(tester);
@@ -90,7 +126,13 @@ void main() {
         .widgetList<SwitchListTile>(find.byType(SwitchListTile))
         .map((e) => e.value)
         .toList();
-    expect(values, containsAll(<bool>[true, false]),
-        reason: '隐私屏=true / 防睡眠=false 必须从本地偏好读回来');
+    expect(
+      values,
+      containsAll(<bool>[true, false]),
+      reason: '隐私屏=true / 防睡眠=false 必须从本地偏好读回来',
+    );
+    expect(appPrefs.value.sameAccountDirect, isTrue);
+    final direct = find.widgetWithText(SwitchListTile, '同账号设备免密直连');
+    expect(tester.widget<SwitchListTile>(direct).value, isTrue);
   });
 }

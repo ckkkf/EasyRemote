@@ -33,7 +33,19 @@ function proxy(req, res) {
     { host: upHost, port: Number(upPort), path: req.url, method: req.method, headers: { ...req.headers, host: upstream } },
     (r) => { res.writeHead(r.statusCode ?? 502, r.headers); r.pipe(res); },
   );
-  up.on('error', () => { res.writeHead(502); res.end('bad gateway'); });
+  // 后端没起/端口不对时，别回纯文本 "bad gateway"：客户端按信封解析会得到
+  // SyntaxError，界面只能显示一串 JSON 解析异常。这里按错误信封回，提示才可读。
+  up.on('error', () => {
+    const payload = JSON.stringify({
+      code: 700001,
+      name: 'SRV_INTERNAL',
+      message: `后端网关不可达（${upstream}）：请先启动 server，或检查代理上游地址`,
+      retryable: true,
+      trace_id: 'dev-proxy',
+    });
+    res.writeHead(502, { 'content-type': 'application/json; charset=utf-8' });
+    res.end(payload);
+  });
   req.pipe(up);
 }
 

@@ -4,5 +4,10 @@
 <dict>
 	<key>com.apple.security.app-sandbox</key>
 	<true/>
+	<key>com.apple.security.network.server</key>
+	<true/>
+	<!-- 出站 TCP（网关/中继）与 UDP（STUN/打洞）都需要。 -->
+	<key>com.apple.security.network.client</key>
+	<true/>
 </dict>
 </plist>

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../api.dart';
+import '../prefs.dart';
 import '../shell.dart';
 import '../theme.dart';
 
@@ -93,7 +94,12 @@ class _ConnectPageState extends State<ConnectPage> {
     });
     try {
       final code = _code;
-      final sid = await widget.client.requestConnect(code, captcha: _captcha.text.trim());
+      final sid = await widget.client.requestConnect(
+        code,
+        captcha: _captcha.text.trim(),
+        // 只对「同一账号」的目标生效：跨账号服务端仍会要求临时密码。
+        direct: appPrefs.value.sameAccountDirect,
+      );
       widget.onCodeUsed(code);
       widget.onSessionStarted(sid, code.replaceAll(RegExp(r'[^0-9]'), ''));
     } on ApiException catch (e) {
@@ -217,10 +223,12 @@ class _ConnectPageState extends State<ConnectPage> {
                             key: const Key('captcha-field'),
                             controller: _captcha,
                             keyboardType: TextInputType.number,
-                            decoration: const InputDecoration(
+                            decoration: InputDecoration(
                               labelText: '临时密码',
-                              hintText: '被控端窗口里显示的 8 位数字（可长期复用）',
-                              prefixIcon: Icon(Icons.verified_user_outlined, size: 18),
+                              hintText: appPrefs.value.sameAccountDirect
+                                  ? '同账号设备可留空（免密直连已开启）'
+                                  : '被控端窗口里显示的 8 位数字（可长期复用）',
+                              prefixIcon: const Icon(Icons.verified_user_outlined, size: 18),
                             ),
                           ),
                           ] else ...[
@@ -351,7 +359,7 @@ class _ModeSwitch extends StatelessWidget {
                   label,
                   style: text.labelMedium?.copyWith(
                     color: on ? scheme.onPrimaryContainer : scheme.onSurfaceVariant,
-                    fontWeight: on ? FontWeight.w600 : FontWeight.w500,
+                    fontWeight: on ? FontWeight.w600 : FontWeight.w400,
                   ),
                 ),
               ],

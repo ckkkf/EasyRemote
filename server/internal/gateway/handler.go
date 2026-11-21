@@ -264,6 +264,9 @@ func (a *App) Routes() http.Handler {
 		var req struct {
 			DeviceCode string `json:"device_code"`
 			Captcha    string `json:"captcha"`
+			// Direct 由客户端「同账号设备免密直连」设置置为 true。
+			// 仅当目标设备与主控属于同一账号时才跳过临时密码；跨账号仍强制校验。
+			Direct bool `json:"direct"`
 		}
 		if err := httpx.Decode(w, r, &req); err != nil {
 			WriteErr(w, errcode.New(errcode.SrvInternal, "bad body"))
@@ -293,8 +296,12 @@ func (a *App) Routes() http.Handler {
 			WriteErr(w, errcode.New(errcode.ConnSelfConnect, "self connect"))
 			return
 		}
+		sameAccount := target.AccountID == acc.ID
 		trusted := a.Device.HasTrust(ctx, controllerID, target.ID)
-		if !trusted {
+		// 同账号免密直连：账号本身就是最强的身份证明，同一账号下的设备
+		// 不需要再向自己输入对方屏幕上的临时密码。
+		directSameAccount := req.Direct && sameAccount
+		if !trusted && !directSameAccount {
 			if req.Captcha == "" {
 				WriteErr(w, errcode.New(errcode.ConnCaptchaExpired, "captcha required"))
 				return
@@ -319,7 +326,15 @@ func (a *App) Routes() http.Handler {
 		if a.Notifier != nil && sess.State == session.StateRequested {
 			_ = a.Notifier.NotifyConsentRequired(sess.ID, controllerID, target.ID)
 		}
-		httpx.OK(w, r, map[string]any{"session_id": sess.ID, "state": sess.State, "trusted": trusted})
+		httpx.OK(w, r, struct {
+			SessionID string `json:"session_id"`
+			State     string `json:"state"`
+			Trusted   bool   `json:"trusted"`
+		}{
+			SessionID: sess.ID,
+			State:     sess.State,
+			Trusted:   trusted || directSameAccount,
+		})
 	})
 
 	mux.HandleFunc("/v1/connect/consent", func(w http.ResponseWriter, r *http.Request) {

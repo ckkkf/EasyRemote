@@ -79,7 +79,9 @@ class _ErAppState extends State<ErApp> {
       final nav = erNavigatorKey.currentState;
       if (nav == null) return;
       nav.pushAndRemoveUntil(
-        MaterialPageRoute<void>(builder: (_) => LoginPage(client: widget.client)),
+        MaterialPageRoute<void>(
+          builder: (_) => LoginPage(client: widget.client),
+        ),
         (route) => false,
       );
     });
@@ -146,7 +148,11 @@ class _BootSplash extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.desktop_windows_rounded, size: 40, color: scheme.primary),
+            Icon(
+              Icons.desktop_windows_rounded,
+              size: 40,
+              color: scheme.primary,
+            ),
             const SizedBox(height: 14),
             Text('EasyRemote', style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 18),
