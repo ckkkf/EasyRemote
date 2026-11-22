@@ -2,12 +2,13 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>com.apple.security.app-sandbox</key>
+	<!-- 刻意不声明 app-sandbox：ad-hoc 签名（无 Team ID）+ sandbox 会让 launchd
+	     直接拒绝启动（Launch failed / POSIX 163）。
+	     同理不声明 keychain-access-groups：没有 Team 前缀的访问组在 ad-hoc 下无效，
+	     而**非沙盒** app 访问自己的 Keychain 项本来就不需要访问组。 -->
+	<key>com.apple.security.network.client</key>
 	<true/>
 	<key>com.apple.security.network.server</key>
-	<true/>
-	<!-- 出站 TCP（网关/中继）与 UDP（STUN/打洞）都需要。 -->
-	<key>com.apple.security.network.client</key>
 	<true/>
 </dict>
 </plist>

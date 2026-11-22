@@ -6,8 +6,9 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   test('TestIncompleteCapabilityIsDisabled', () {
     final release = CapabilityGate(channel: BuildChannel.release);
-    // 实验能力：发布构建一律不可用，即使本机偏好打开了允许被控。
-    expect(release.isAvailable('remote_control'), isFalse);
+    // beta 能力：发布构建可用（remote_control/remote_host 已通过 ready/active 闭环验收）。
+    expect(release.isAvailable('remote_control'), isTrue);
+    expect(release.isAvailable('remote_host'), isTrue);
     expect(release.isAvailable('file_transfer'), isFalse);
     expect(
       release.isAvailable('quality_metrics'),
@@ -32,7 +33,11 @@ void main() {
       isFalse,
       reason: 'A-14：文件尚未走会话 data stream，先隐藏',
     );
-    expect(release.isAvailable('remote_host'), isFalse, reason: '发布构建仍不开放');
+    expect(
+      release.isAvailable('quality_metrics'),
+      isFalse,
+      reason: '实验能力发布构建仍不开放',
+    );
   });
 
   test('TestUnknownCapabilityFailsClosed', () {
@@ -43,13 +48,16 @@ void main() {
     expect(state.reason, contains('未登记'));
   });
 
-  test('TestPreferenceCannotUnlockExperimentalInRelease', () {
-    // 偏好里 allow_control=true 是历史默认值；能力门不读它，发布构建仍然拒绝。
+  test('TestReleaseAllowsBetaButNotDisabledOrExperimental', () {
+    // 偏好不能把 disabled/experimental 能力解锁；beta 功能仍受本机偏好与授权门控。
     const prefs = Prefs(allowControl: true);
     expect(prefs.allowControl, isTrue);
     final release = CapabilityGate(channel: BuildChannel.release);
-    expect(release.isAvailable('remote_host'), isFalse);
-    expect(release.isAvailable('remote_control'), isFalse);
+    expect(release.isAvailable('remote_control'), isTrue);
+    expect(release.isAvailable('remote_host'), isTrue);
+    expect(release.isAvailable('file_transfer'), isFalse);
+    expect(release.isAvailable('privacy_screen'), isFalse);
+    expect(release.isAvailable('quality_metrics'), isFalse);
   });
 
   test('默认通道来自构建类型：测试环境是 debug', () {

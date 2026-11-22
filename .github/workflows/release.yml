@@ -155,9 +155,15 @@ jobs:
           APP="$(ls -d client/build/macos/Build/Products/Release/*.app | head -1)"
           mkdir -p "$APP/Contents/Frameworks"
           cp core/target/release/liber_ffi.dylib "$APP/Contents/Frameworks/"
-          codesign --force --sign - "$APP/Contents/Frameworks/liber_ffi.dylib"
-          codesign --force --deep --sign - "$APP"
-          codesign -dv "$APP" 2>&1 | head -3
+          # 关键：重签必须带 entitlements。之前用裸 `codesign --deep --sign -` 把
+          # xcodebuild 签进去的 app-sandbox / network / keychain-access-groups 全冲掉了，
+          # 结果客户端一碰 Keychain 就 PlatformException -34018（errSecMissingEntitlement）。
+          ENT="client/macos/Runner/Release.entitlements"
+          codesign --force --sign - --entitlements "$ENT" "$APP/Contents/Frameworks/liber_ffi.dylib"
+          codesign --force --sign - --entitlements "$ENT" "$APP/Contents/Frameworks/App.framework"
+          codesign --force --sign - --entitlements "$ENT" "$APP/Contents/Frameworks/FlutterMacOS.framework"
+          codesign --force --sign - --entitlements "$ENT" "$APP"
+          codesign -d --entitlements - "$APP" 2>&1 | head -20
       - name: 打包 .app
         run: |
           set -euo pipefail

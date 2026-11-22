@@ -17,14 +17,14 @@ version: 1
 capabilities:
   remote_control:
     title: 远程控制会话（主控端）
-    maturity: experimental
+    maturity: beta
     owner: ER-201
-    reason: 数据面未闭环：authorized 即被当成已连接，没有 ready/active、可靠输入与关闭传播
+    reason: ready/active 握手、有序输入+ACK、关闭传播已验收；原生纹理待真机验证，RGBA 回退可用
   remote_host:
     title: 允许被控（本机共享）
-    maturity: experimental
+    maturity: beta
     owner: ER-102
-    reason: 本地授权弹窗（C18）已接入；会话关闭/票据失效仍由 ER-202/203 验证，发布构建不开放
+    reason: 本地授权弹窗、控制条、关闭传播与票据撤销已接入；原生纹理待真机验证
   privacy_screen:
     title: 隐私屏
     maturity: disabled

@@ -12,8 +12,8 @@ export interface CapabilitySpec {
 }
 
 export const CAPABILITIES: readonly CapabilitySpec[] = [
-  { key: "remote_control", title: "远程控制会话（主控端）", maturity: "experimental", owner: "ER-201", reason: "数据面未闭环：authorized 即被当成已连接，没有 ready/active、可靠输入与关闭传播" },
-  { key: "remote_host", title: "允许被控（本机共享）", maturity: "experimental", owner: "ER-102", reason: "本地授权弹窗（C18）已接入；会话关闭/票据失效仍由 ER-202/203 验证，发布构建不开放" },
+  { key: "remote_control", title: "远程控制会话（主控端）", maturity: "beta", owner: "ER-201", reason: "ready/active 握手、有序输入+ACK、关闭传播已验收；原生纹理待真机验证，RGBA 回退可用" },
+  { key: "remote_host", title: "允许被控（本机共享）", maturity: "beta", owner: "ER-102", reason: "本地授权弹窗、控制条、关闭传播与票据撤销已接入；原生纹理待真机验证" },
   { key: "privacy_screen", title: "隐私屏", maturity: "disabled", owner: "ER-701", reason: "现实现是涂黑采集帧，与 PRD「本机物理显示不可见、远端采集继续」语义相反" },
   { key: "prevent_sleep", title: "会话期间阻止睡眠", maturity: "disabled", owner: "ER-702", reason: "只写本机偏好，未接系统防休眠 API，开关没有真实副作用" },
   { key: "file_transfer", title: "文件传输", maturity: "disabled", owner: "ER-711", reason: "尚未接入会话 data stream（A-14）；网关文件存储不等于点对点传输，先隐藏入口" },

@@ -24,8 +24,8 @@ type Spec struct {
 
 // generatedSpecs 由 docs/spec/capabilities.yaml 生成；顺序即展示顺序。
 var generatedSpecs = []Spec{
-	{Key: "remote_control", Title: "远程控制会话（主控端）", Maturity: MaturityExperimental, Owner: "ER-201", Reason: "数据面未闭环：authorized 即被当成已连接，没有 ready/active、可靠输入与关闭传播"},
-	{Key: "remote_host", Title: "允许被控（本机共享）", Maturity: MaturityExperimental, Owner: "ER-102", Reason: "本地授权弹窗（C18）已接入；会话关闭/票据失效仍由 ER-202/203 验证，发布构建不开放"},
+	{Key: "remote_control", Title: "远程控制会话（主控端）", Maturity: MaturityBeta, Owner: "ER-201", Reason: "ready/active 握手、有序输入+ACK、关闭传播已验收；原生纹理待真机验证，RGBA 回退可用"},
+	{Key: "remote_host", Title: "允许被控（本机共享）", Maturity: MaturityBeta, Owner: "ER-102", Reason: "本地授权弹窗、控制条、关闭传播与票据撤销已接入；原生纹理待真机验证"},
 	{Key: "privacy_screen", Title: "隐私屏", Maturity: MaturityDisabled, Owner: "ER-701", Reason: "现实现是涂黑采集帧，与 PRD「本机物理显示不可见、远端采集继续」语义相反"},
 	{Key: "prevent_sleep", Title: "会话期间阻止睡眠", Maturity: MaturityDisabled, Owner: "ER-702", Reason: "只写本机偏好，未接系统防休眠 API，开关没有真实副作用"},
 	{Key: "file_transfer", Title: "文件传输", Maturity: MaturityDisabled, Owner: "ER-711", Reason: "尚未接入会话 data stream（A-14）；网关文件存储不等于点对点传输，先隐藏入口"},
