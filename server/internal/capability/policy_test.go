@@ -3,7 +3,8 @@ package capability
 import "testing"
 
 // TestIncompleteCapabilityIsDisabled 对应 ER-000 验收断言：
-// 所有非 stable 能力在服务端必须报告不可用，且 ER_CAPABILITY_ENABLE 不能把它们打开。
+// experimental/disabled 能力在服务端必须报告不可用；beta/stable 可对外承诺。
+// ER_CAPABILITY_ENABLE 不能把 experimental/disabled 打开。
 func TestIncompleteCapabilityIsDisabled(t *testing.T) {
 	t.Setenv("ER_CAPABILITY_ENABLE", "remote_control,remote_host,privacy_screen,file_transfer")
 	t.Setenv("ER_CAPABILITY_DISABLE", "")
@@ -12,23 +13,26 @@ func TestIncompleteCapabilityIsDisabled(t *testing.T) {
 		t.Fatalf("Public() 覆盖 %d 条能力，台账有 %d 条", len(pub), len(Specs()))
 	}
 	for _, s := range Specs() {
-		if s.Maturity == MaturityStable {
+		if s.Maturity == MaturityStable || s.Maturity == MaturityBeta {
+			if !pub[s.Key] || !Enabled(s.Key) {
+				t.Errorf("能力 %s（%s）应可承诺", s.Key, s.Maturity)
+			}
 			continue
 		}
 		if pub[s.Key] {
-			t.Errorf("能力 %s（%s）被报告为可用；未达 stable 必须 fail-closed", s.Key, s.Maturity)
+			t.Errorf("能力 %s（%s）被报告为可用；未达 beta 必须 fail-closed", s.Key, s.Maturity)
 		}
 		if Enabled(s.Key) {
-			t.Errorf("Enabled(%q) = true；非 stable 能力不得被服务端承诺", s.Key)
+			t.Errorf("Enabled(%q) = true；experimental/disabled 不得被服务端承诺", s.Key)
 		}
 	}
 }
 
 // TestDisableListOnlySubtracts：ER_CAPABILITY_DISABLE 只能关，ER_CAPABILITY_ENABLE 不能开。
 func TestDisableListOnlySubtracts(t *testing.T) {
-	t.Setenv("ER_CAPABILITY_ENABLE", "remote_control")
-	if Enabled("remote_control") {
-		t.Fatal("未成熟能力被 ER_CAPABILITY_ENABLE 打开了")
+	t.Setenv("ER_CAPABILITY_ENABLE", "quality_metrics")
+	if Enabled("quality_metrics") {
+		t.Fatal("experimental 能力被 ER_CAPABILITY_ENABLE 打开了")
 	}
 	t.Setenv("ER_CAPABILITY_DISABLE", "remote_control")
 	if Enabled("remote_control") {
