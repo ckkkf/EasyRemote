@@ -33,10 +33,12 @@ Future<void> main() async {
   }
   final client = GatewayClient(baseUrl: erGatewayBaseUrl);
   try {
-    await client.loadRuntimeConfig();
-  } on ApiException catch (e) {
-    // 配置不可达不应阻塞启动；需要端点能力的入口会因空值被禁用。
-    debugPrint('[config] runtime endpoints unavailable: ${e.name}');
+    // 配置不可达绝不能阻塞首帧：离线/服务端没起时也必须能显示登录页。
+    // 之前只捕获 ApiException，SocketException/ArgumentError 会直接终止 main()，
+    // 表现为 Windows 双击无窗口、macOS 窗口全黑（Flutter 从未 runApp）。
+    await client.loadRuntimeConfig().timeout(const Duration(seconds: 2));
+  } catch (e) {
+    debugPrint('[config] runtime endpoints unavailable: $e');
   }
   runApp(ErApp(client: client));
 }
