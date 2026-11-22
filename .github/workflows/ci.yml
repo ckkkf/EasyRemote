@@ -171,32 +171,6 @@ jobs:
         run: flutter analyze
       - name: 单元与组件测试（Linux 排除桌面 E2E）
         run: flutter test --concurrency=1 --exclude-tags e2e-desktop
-      - uses: actions/upload-artifact@v7
-        with:
-          name: web-admin-dist
-          path: web-admin/dist
-          if-no-files-found: error
-
-  # ---------------------------------------------------------------- Flutter 客户端
-  flutter:
-    name: Flutter 客户端
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-          cache: true
-      - name: 安装依赖
-        working-directory: client
-        run: flutter pub get
-      - name: 静态分析
-        working-directory: client
-        # 只让 error 阻塞 CI；warning/info 属存量技术债，逐步治理
-        run: flutter analyze --no-fatal-infos --no-fatal-warnings
-      - name: 单元测试
-        working-directory: client
-        run: flutter test
 
   # ---------------------------------------------------------------- 汇总
   ci-status:
