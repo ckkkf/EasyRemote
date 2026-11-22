@@ -168,7 +168,7 @@ jobs:
       - name: 格式（生成物除外）
         run: find lib test -name '*.dart' ! -name '*_gen.dart' ! -name 'contract.dart' -print0 | xargs -0 dart format --output=none --set-exit-if-changed
       - name: 静态分析（error/warning 必须为 0）
-        run: flutter analyze
+        run: flutter analyze --no-fatal-infos
       - name: 单元与组件测试（Linux 排除桌面 E2E）
         run: flutter test --concurrency=1 --exclude-tags e2e-desktop
 

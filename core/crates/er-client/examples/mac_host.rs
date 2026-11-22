@@ -260,6 +260,7 @@ fn real_main() {
 ///
 /// 与一次性验证码的区别：不轮换、不消费，用户可以在被控端界面"查看明文 / 复制"，
 /// 主控端输入「设备码 + 这个密码」即可连接，不用每 10 分钟去找新码。
+#[cfg(target_os = "macos")]
 fn ensure_host_password() -> String {
     let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
     let dir = format!("{home}/.easyremote");
@@ -294,6 +295,7 @@ fn ensure_host_password() -> String {
 }
 
 /// 把「设备码 / 临时密码」写到固定文件，供被控端 GUI 显示（密码长期有效，无需时间戳）。
+#[cfg(target_os = "macos")]
 fn write_panel(device_code: &str, password: &str) {
     let ts = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
