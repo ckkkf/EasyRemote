@@ -8,6 +8,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:easyremote_client/api.dart';
+import 'package:easyremote_client/session_secret_store.dart';
 import 'package:easyremote_client/session_store_io.dart' as store;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -51,7 +52,12 @@ http.Client _fake({bool tokenValid = true, bool offline = false}) {
         expect(req.headers['authorization'], 'Bearer tok-1');
         return _ok({
           'devices': [
-            {'id': 'dev-1', 'raw_code': '123456789', 'platform': 'macos', 'online': true},
+            {
+              'id': 'dev-1',
+              'raw_code': '123456789',
+              'platform': 'macos',
+              'online': true,
+            },
           ],
         });
     }
@@ -59,12 +65,29 @@ http.Client _fake({bool tokenValid = true, bool offline = false}) {
   });
 }
 
+class _MemSecrets implements SecretStore {
+  final Map<String, String> data = {};
+
+  @override
+  Future<String?> read(String key) async => data[key];
+
+  @override
+  Future<void> write(String key, String value) async => data[key] = value;
+
+  @override
+  Future<void> delete(String key) async => data.remove(key);
+}
+
 void main() {
   late File sessionFile;
+  late _MemSecrets secrets;
 
   setUp(() {
+    secrets = _MemSecrets();
+    store.sessionSecretStore = secrets;
     sessionFile = File(
-        '${Directory.systemTemp.path}/er-session-test-${DateTime.now().microsecondsSinceEpoch}.json');
+      '${Directory.systemTemp.path}/er-session-test-${DateTime.now().microsecondsSinceEpoch}.json',
+    );
     store.sessionFilePathOverride = sessionFile.path;
   });
 
@@ -79,8 +102,8 @@ void main() {
     expect(device.id, 'dev-1');
     expect(device.code, '123456789');
 
-    expect(await sessionFile.exists(), isTrue, reason: '绑定设备后必须把会话写到本地');
-    final raw = jsonDecode(await sessionFile.readAsString()) as Map<String, dynamic>;
+    expect(secrets.data, isNotEmpty, reason: '绑定设备后必须把会话写入安全存储');
+    final raw = jsonDecode(secrets.data.values.single) as Map<String, dynamic>;
     expect(raw['token'], 'tok-1');
     expect(raw['device_token'], 'dtok-1');
     expect(raw['device_id'], 'dev-1');
@@ -102,11 +125,14 @@ void main() {
     final first = GatewayClient(baseUrl: 'http://gw.test', client: _fake());
     await first.login('13800000000', '123456');
     await first.bindDevice('macos');
-    expect(await sessionFile.exists(), isTrue);
+    expect(secrets.data, isNotEmpty);
 
-    final second = GatewayClient(baseUrl: 'http://gw.test', client: _fake(tokenValid: false));
+    final second = GatewayClient(
+      baseUrl: 'http://gw.test',
+      client: _fake(tokenValid: false),
+    );
     expect(await second.restoreSession(), isNull);
-    expect(await sessionFile.exists(), isFalse, reason: '过期令牌必须清掉，不能每次刷新都试一遍');
+    expect(secrets.data, isEmpty, reason: '过期令牌必须清掉，不能每次刷新都试一遍');
     expect(second.token, isNull);
   });
 
@@ -115,12 +141,15 @@ void main() {
     await first.login('13800000000', '123456');
     await first.bindDevice('macos');
 
-    final second = GatewayClient(baseUrl: 'http://gw.test', client: _fake(offline: true));
+    final second = GatewayClient(
+      baseUrl: 'http://gw.test',
+      client: _fake(offline: true),
+    );
     final restored = await second.restoreSession();
     expect(restored, isNotNull, reason: '服务端没起也要能进主界面');
     expect(restored!.id, 'dev-1');
     expect(restored.online, isFalse);
-    expect(await sessionFile.exists(), isTrue);
+    expect(secrets.data, isNotEmpty);
   });
 
   // 回归：内存库重启/设备被清后，本地 device_id 在服务端已经不存在。
@@ -170,7 +199,7 @@ void main() {
     expect(restored.platform, 'macos', reason: '平台取服务端回显，不是本机入参');
     expect(second.deviceToken, 'dtok-new');
 
-    final raw = jsonDecode(await sessionFile.readAsString()) as Map<String, dynamic>;
+    final raw = jsonDecode(secrets.data.values.single) as Map<String, dynamic>;
     expect(raw['device_id'], 'dev-new', reason: '重绑结果必须写回快照，否则每次启动都重绑');
   });
 
@@ -186,6 +215,6 @@ void main() {
     await client.logout();
     expect(client.token, isNull);
     expect(client.deviceToken, isNull);
-    expect(await sessionFile.exists(), isFalse);
+    expect(secrets.data, isEmpty);
   });
 }

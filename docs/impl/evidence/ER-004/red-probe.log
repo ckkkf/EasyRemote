@@ -1,0 +1,4 @@
+新增违规（迁移完成前不许再扩散）：
+  hardcoded-endpoint:client/lib/red_probe.dart 新增 1 处（基线 0）
+  fixed-sleep:client/lib/red_probe.dart 新增 1 处（基线 0）
+EXIT=1

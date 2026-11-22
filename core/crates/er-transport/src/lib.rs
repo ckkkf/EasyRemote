@@ -3,6 +3,7 @@
 //! 约束（PRD §7.2.2）：上层只能依赖本 crate 的 trait 与类型，
 //! 不得直接依赖 quinn / wtransport 的具体类型，以便 V2 替换实现。
 
+pub mod p2p;
 pub mod quic;
 
 use er_common::protocol::MediaHeader;

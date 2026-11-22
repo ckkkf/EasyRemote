@@ -8,8 +8,8 @@ use er_abr::{AbrController, LinkFeedback};
 
 fn main() {
     println!(
-        "{:<8} {:<10} {:>10} {:>8} {:>10} {}",
-        "loss%", "rtt(ms)", "queue(ms)", "level", "bitrate", "changed/reason"
+        "{:<8} {:<10} {:>10} {:>8} {:>10} changed/reason",
+        "loss%", "rtt(ms)", "queue(ms)", "level", "bitrate"
     );
     for &(loss, rtt, queue) in &[
         (0.0f32, 70u32, 0u32),
@@ -27,6 +27,9 @@ fn main() {
                 loss_pct: loss,
                 rtt_ms: rtt,
                 queue_ms: queue,
+                throughput_kbps: 0,
+                buffer_ms: queue,
+                encode_queue: 0,
             });
             if d.changed {
                 changed_any = true;

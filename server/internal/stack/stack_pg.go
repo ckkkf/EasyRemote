@@ -36,7 +36,7 @@ func LoadMigration() (string, error) {
 
 // NewWithStoreAndSessions 用给定存储与会话后端组装 handler。
 // NewWithStoreAndSessions 组装 handler；hub 非空时网关会把建会话事件推给信令。
-func NewWithStoreAndSessions(st store.Store, sessions *adminsession.Service, limiter ratelimit.Limiter, replay adminapi.ReplayGuard) (http.Handler, error) {
+func NewWithStoreAndSessions(st store.Store, sessions *adminsession.Service, limiter ratelimit.Limiter, replay adminapi.ReplayGuard, notifier gateway.ConsentNotifier, presence gateway.Presence, closer adminapi.SessionCloser) (http.Handler, error) {
 	// 二次验证开关先判定：生产环境配了这个变量必须直接失败，不能静默降级。
 	mfaOff, err := adminMFADisabled()
 	if err != nil {
@@ -51,16 +51,30 @@ func NewWithStoreAndSessions(st store.Store, sessions *adminsession.Service, lim
 		return nil, err
 	}
 	sessSvc := session.New(st)
-	gw := &gateway.App{
-		Notifier: NotifierFromEnv(),
-		Limiter:  limiter,
-		Auth:     authSvc,
-		Device:   device.New(st, secret),
-		Session:  sessSvc,
-		Relay:    relaymgr.New(secret, time.Hour),
-		Store:    st,
+	// 僵尸 active 清理：参与者双方在线租约都有效才保留；一方离线则关闭并传播。
+	if presence != nil && closer != nil {
+		jan := &session.Janitor{Sessions: sessSvc, Presence: presence, Closer: closer, Interval: 30 * time.Second}
+		go jan.Run(context.Background())
 	}
-	adminSvc := adminapi.NewWithReplay(st, sessSvc, replay)
+	var epochs gateway.TicketEpochs
+	if e, ok := notifier.(gateway.TicketEpochs); ok {
+		epochs = e
+	}
+	gw := &gateway.App{
+		Notifier:     notifier,
+		Presence:     presence,
+		Closer:       closer,
+		TicketEpochs: epochs,
+		Limiter:      limiter,
+		Auth:         authSvc,
+		Device:       device.New(st, secret),
+		Session:      sessSvc,
+		Relay:        relaymgr.New(secret, time.Hour),
+		Store:        st,
+	}
+	adminSvc := adminapi.NewWithReplay(st, sessSvc, replay).
+		SetSessionCloser(closer).
+		SetPresence(presence)
 	if mfaOff {
 		adminSvc.SetDevSkipTOTP(true)
 	}
@@ -104,13 +118,22 @@ func SeedDevAdmin(ctx context.Context, st store.Store) error {
 	})
 }
 
+// seedDevAdminIfNotProduction 只在非生产环境写入开发管理员。
+// 生产启动绝不创建已知账号（A-07）；开户走独立运维流程。
+func seedDevAdminIfNotProduction(ctx context.Context, st store.Store) error {
+	if config.IsProduction() {
+		return nil
+	}
+	return SeedDevAdmin(ctx, st)
+}
+
 // NewDev 内存环境（本地联调、集成测试）。
 func NewDev() (*store.Memory, http.Handler, error) {
 	mem := store.NewMemory()
 	if err := SeedDevAdmin(context.Background(), mem); err != nil {
 		return nil, nil, err
 	}
-	h, err := NewWithStoreAndSessions(mem, adminsession.New(nil, 8*time.Hour), ratelimit.NewMemory(), adminapi.NewMemoryReplayGuard())
+	h, err := NewWithStoreAndSessions(mem, adminsession.New(nil, 8*time.Hour), ratelimit.NewMemory(), adminapi.NewMemoryReplayGuard(), NotifierFromEnv(), nil, NotifierFromEnv())
 	return mem, h, err
 }
 
@@ -127,10 +150,10 @@ func NewPostgres(ctx context.Context, dsn string) (store.Store, http.Handler, er
 	if err := pg.Migrate(ctx, ddl); err != nil {
 		return nil, nil, err
 	}
-	if err := SeedDevAdmin(ctx, pg); err != nil {
+	if err := seedDevAdminIfNotProduction(ctx, pg); err != nil {
 		return nil, nil, err
 	}
-	h, err := NewWithStoreAndSessions(pg, adminsession.New(nil, 8*time.Hour), ratelimit.NewMemory(), adminapi.NewMemoryReplayGuard())
+	h, err := NewWithStoreAndSessions(pg, adminsession.New(nil, 8*time.Hour), ratelimit.NewMemory(), adminapi.NewMemoryReplayGuard(), nil, nil, nil)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -138,7 +161,7 @@ func NewPostgres(ctx context.Context, dsn string) (store.Store, http.Handler, er
 }
 
 // NewPostgresWithRedis 生产形态：PG 存储 + Redis 会话（支持多实例）。
-func NewPostgresWithRedis(ctx context.Context, dsn, redisURL string) (store.Store, http.Handler, error) {
+func NewPostgresWithRedis(ctx context.Context, dsn, redisURL string, notifier gateway.ConsentNotifier, presence gateway.Presence, closer adminapi.SessionCloser) (store.Store, http.Handler, error) {
 	pg, err := store.NewPG(ctx, dsn)
 	if err != nil {
 		return nil, nil, err
@@ -150,14 +173,14 @@ func NewPostgresWithRedis(ctx context.Context, dsn, redisURL string) (store.Stor
 	if err := pg.Migrate(ctx, ddl); err != nil {
 		return nil, nil, err
 	}
-	if err := SeedDevAdmin(ctx, pg); err != nil {
+	if err := seedDevAdminIfNotProduction(ctx, pg); err != nil {
 		return nil, nil, err
 	}
 	sessStore, err := adminsession.NewRedisStoreFromURL(ctx, redisURL, 8*time.Hour)
 	if err != nil {
 		return nil, nil, err
 	}
-	h, err := NewWithStoreAndSessions(pg, adminsession.New(sessStore, 8*time.Hour), ratelimit.NewMemory(), adminapi.NewMemoryReplayGuard())
+	h, err := NewWithStoreAndSessions(pg, adminsession.New(sessStore, 8*time.Hour), ratelimit.NewMemory(), adminapi.NewMemoryReplayGuard(), notifier, presence, closer)
 	if err != nil {
 		return nil, nil, err
 	}

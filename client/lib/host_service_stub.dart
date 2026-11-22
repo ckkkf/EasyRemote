@@ -17,8 +17,13 @@ class HostStatus {
   final int injected;
   final String error;
 
-  static const idle =
-      HostStatus(running: false, sessionId: '', frames: 0, injected: 0, error: '');
+  static const idle = HostStatus(
+    running: false,
+    sessionId: '',
+    frames: 0,
+    injected: 0,
+    error: '',
+  );
 
   bool get hasSession => sessionId.isNotEmpty;
 }
@@ -30,6 +35,8 @@ class HostService {
   String? get password => null;
   String? get hostId => null;
   bool get active => false;
+
+  bool closeSession(String sessionId) => false;
 
   /// 浏览器没有原生采集/注入能力。
   static bool get supported => false;
@@ -43,13 +50,16 @@ class HostService {
     required String deviceId,
     required String deviceCode,
     required String deviceToken,
-  }) =>
-      _unsupported();
+  }) => _unsupported();
 
   String ensurePassword() => _unsupported();
 
-  void start({required String signalBase, int fps = 30, int idleTimeoutSecs = 1800}) =>
-      _unsupported();
+  void start({
+    required String signalBase,
+    int fps = 30,
+    int idleTimeoutSecs = 1800,
+    bool keepAwake = false,
+  }) => _unsupported();
 
   HostStatus status() => HostStatus.idle;
 

@@ -1,0 +1,24 @@
+00:00 +0: loading /Users/ckkk/dev/code/Go/EasyRemote/client/test/e2e_services_test.dart
+00:00 +0: /Users/ckkk/dev/code/Go/EasyRemote/client/test/e2e_services_test.dart: TestE2EHarnessStartsAndStopsServices
+00:04 +1: /Users/ckkk/dev/code/Go/EasyRemote/client/test/e2e_services_test.dart: TestE2EHarnessUsesExternalServicesWhenProvided
+00:04 +2: loading /Users/ckkk/dev/code/Go/EasyRemote/client/test/host_link_test.dart
+00:05 +2: /Users/ckkk/dev/code/Go/EasyRemote/client/test/host_link_test.dart: (setUpAll)
+00:06 +2: /Users/ckkk/dev/code/Go/EasyRemote/client/test/host_link_test.dart: 设备码 + 验证码 的完整会话
+Shell: CODEC: init kind=Software 1920x1080
+Shell: CODEC: prime_frame=false
+Shell: [OpenH264] this = 0x0xbcced61c0, Warning:ParamValidation(), AdaptiveQuant(1) is not supported yet for screen content, auto turned off
+Shell: [OpenH264] this = 0x0xbcced61c0, Warning:ParamValidation(), BackgroundDetection(1) is not supported yet for screen content, auto turned off
+Shell: [OpenH264] this = 0x0xbcced61c0, Warning:bEnableFrameSkip = 0,bitrate can't be controlled for RC_QUALITY_MODE,RC_BITRATE_MODE and RC_TIMESTAMP_MODE without enabling skip frame.
+Shell: CODEC: backend_final=cpu
+00:08 +3: /Users/ckkk/dev/code/Go/EasyRemote/client/test/host_link_test.dart: 错误验证码被拒绝
+00:08 +4: /Users/ckkk/dev/code/Go/EasyRemote/client/test/host_link_test.dart: (tearDownAll)
+00:08 +4: loading /Users/ckkk/dev/code/Go/EasyRemote/client/test/session_e2e_test.dart
+00:09 +4: /Users/ckkk/dev/code/Go/EasyRemote/client/test/session_e2e_test.dart: (setUpAll)
+00:10 +4: /Users/ckkk/dev/code/Go/EasyRemote/client/test/session_e2e_test.dart: 完整会话：登录→建会话→握手→加密→解码
+Shell: [OpenH264] this = 0x0xa510c7690, Warning:ParamValidation(), AdaptiveQuant(1) is not supported yet for screen content, auto turned off
+Shell: [OpenH264] this = 0x0xa510c7690, Warning:ParamValidation(), BackgroundDetection(1) is not supported yet for screen content, auto turned off
+Shell: [OpenH264] this = 0x0xa510c7690, Warning:bEnableFrameSkip = 0,bitrate can't be controlled for RC_QUALITY_MODE,RC_BITRATE_MODE and RC_TIMESTAMP_MODE without enabling skip frame.
+00:11 +5: /Users/ckkk/dev/code/Go/EasyRemote/client/test/session_e2e_test.dart: 扁平 JSON 解析正确
+00:11 +6: /Users/ckkk/dev/code/Go/EasyRemote/client/test/session_e2e_test.dart: (tearDownAll)
+00:11 +6: All tests passed!
+E2E_EXIT=0

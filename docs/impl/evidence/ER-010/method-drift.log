@@ -1,0 +1,5 @@
+路由与契约不一致（2 项）：
+  method-drift      GW-01 /v1/auth/sms：代码 GET 不在契约（POST）
+  missing-spec      GW-01 /v1/auth/sms POST：代码没有对应 method 的声明
+严格模式：判红
+EXIT=1

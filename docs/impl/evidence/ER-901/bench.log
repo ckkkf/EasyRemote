@@ -1,0 +1,108 @@
+== build release examples ==
+   Compiling libc v0.2.191
+   Compiling rand_core v0.10.1
+   Compiling untrusted v0.9.0
+   Compiling syn v3.0.10
+   Compiling ring v0.17.14
+   Compiling zeroize v1.9.2
+   Compiling once_cell v1.21.4
+   Compiling cfg_aliases v0.2.2
+   Compiling getrandom v0.4.3
+   Compiling pin-project-lite v0.2.18
+   Compiling rustls v0.23.46
+   Compiling quinn-udp v0.5.16
+   Compiling bytes v1.12.2
+   Compiling rustls-pki-types v1.16.0
+   Compiling chacha20 v0.10.2
+   Compiling tracing-core v0.1.36
+   Compiling powerfmt v0.2.1
+   Compiling subtle v2.6.1
+   Compiling deranged v0.5.9
+   Compiling time-core v0.1.9
+   Compiling num-conv v0.2.2
+   Compiling rand_pcg v0.10.3
+   Compiling tracing v0.1.44
+   Compiling quinn v0.11.12
+   Compiling objc2-core-foundation v0.3.2
+   Compiling getrandom v0.2.17
+   Compiling socket2 v0.6.5
+   Compiling mio v1.2.5
+   Compiling dispatch2 v0.2.0
+   Compiling rand v0.10.4
+   Compiling slab v0.4.12
+   Compiling rustc-hash v2.1.3
+   Compiling lru-slab v0.1.3
+   Compiling base64 v0.22.1
+   Compiling time v0.3.55
+   Compiling tinyvec v1.13.3
+   Compiling pem v3.0.6
+   Compiling yasna v0.5.2
+   Compiling thiserror-impl v2.0.21
+   Compiling serde_derive v1.0.229
+   Compiling tokio-macros v2.7.2
+   Compiling objc2-foundation v0.3.2
+   Compiling objc2-core-text v0.3.2
+   Compiling objc2-core-audio v0.3.2
+   Compiling objc2-media-toolbox v0.3.2
+   Compiling objc2-image-io v0.3.2
+   Compiling tokio v1.54.1
+   Compiling thiserror v2.0.21
+   Compiling serde v1.0.229
+   Compiling rustls-webpki v0.103.17
+   Compiling rcgen v0.13.2
+   Compiling er-common v0.2.8 (/Users/ckkk/dev/code/Go/EasyRemote/core/crates/er-common)
+   Compiling er-codec v0.2.8 (/Users/ckkk/dev/code/Go/EasyRemote/core/crates/er-codec)
+   Compiling quinn-proto v0.11.19
+   Compiling er-transport v0.2.8 (/Users/ckkk/dev/code/Go/EasyRemote/core/crates/er-transport)
+warning: stripping debug info with `rust-objcopy` failed: signal: 6 (SIGABRT)
+  |
+  = note: dyld[34595]: Library not loaded: @rpath/libLLVM.dylib
+            Referenced from: <0CD2A5EB-71C0-36E9-A5D6-21645D10A1A1> /Users/ckkk/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/rust-objcopy
+            Reason: tried: '/Users/ckkk/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/../lib/libLLVM.dylib' (no such file), '/Users/ckkk/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/../lib/libLLVM.dylib' (no such file), '/Users/ckkk/lib/libLLVM.dylib' (no such file), '/usr/local/lib/libLLVM.dylib' (no such file), '/usr/lib/libLLVM.dylib' (no such file, not in dyld cache)
+          
+
+warning: `er-transport` (example "transport_spike") generated 1 warning
+   Compiling objc2-metal v0.3.2
+   Compiling objc2-core-image v0.3.2
+   Compiling objc2-quartz-core v0.3.2
+   Compiling objc2-core-data v0.3.2
+   Compiling objc2-cloud-kit v0.3.2
+   Compiling objc2-avf-audio v0.3.2
+   Compiling objc2-core-graphics v0.3.2
+   Compiling objc2-core-video v0.3.2
+   Compiling objc2-app-kit v0.3.2
+   Compiling objc2-core-media v0.3.2
+   Compiling objc2-av-foundation v0.3.2
+   Compiling xcap v0.4.1
+   Compiling er-capture v0.2.8 (/Users/ckkk/dev/code/Go/EasyRemote/core/crates/er-capture)
+warning: stripping debug info with `rust-objcopy` failed: signal: 6 (SIGABRT)
+  |
+  = note: dyld[34647]: Library not loaded: @rpath/libLLVM.dylib
+            Referenced from: <0CD2A5EB-71C0-36E9-A5D6-21645D10A1A1> /Users/ckkk/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/rust-objcopy
+            Reason: tried: '/Users/ckkk/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/../lib/libLLVM.dylib' (no such file), '/Users/ckkk/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/../lib/libLLVM.dylib' (no such file), '/Users/ckkk/lib/libLLVM.dylib' (no such file), '/usr/local/lib/libLLVM.dylib' (no such file), '/usr/lib/libLLVM.dylib' (no such file, not in dyld cache)
+          
+
+warning: `er-codec` (example "bench_media") generated 1 warning
+warning: stripping debug info with `rust-objcopy` failed: signal: 6 (SIGABRT)
+  |
+  = note: dyld[34648]: Library not loaded: @rpath/libLLVM.dylib
+            Referenced from: <0CD2A5EB-71C0-36E9-A5D6-21645D10A1A1> /Users/ckkk/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/rust-objcopy
+            Reason: tried: '/Users/ckkk/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/../lib/libLLVM.dylib' (no such file), '/Users/ckkk/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/../lib/libLLVM.dylib' (no such file), '/Users/ckkk/lib/libLLVM.dylib' (no such file), '/usr/local/lib/libLLVM.dylib' (no such file), '/usr/lib/libLLVM.dylib' (no such file, not in dyld cache)
+          
+
+warning: `er-codec` (example "media_capability") generated 1 warning
+    Finished `release` profile [optimized] target(s) in 25.12s
+== media capability ==
+[OpenH264] this = 0x0x104a8c140, Warning:ParamValidation(), AdaptiveQuant(1) is not supported yet for screen content, auto turned off
+[OpenH264] this = 0x0x104a8c140, Warning:ParamValidation(), BackgroundDetection(1) is not supported yet for screen content, auto turned off
+[OpenH264] this = 0x0x104a8c140, Warning:bEnableFrameSkip = 0,bitrate can't be controlled for RC_QUALITY_MODE,RC_BITRATE_MODE and RC_TIMESTAMP_MODE without enabling skip frame.
+{"backend":"Software","width":1920,"height":1080,"requested_fps":60,"encoded":120,"elapsed_ms":4830.6,"fps":24.8,"mbps":0.4}
+== media benchmark (SOAK=5s) ==
+[OpenH264] this = 0x0x105185aa0, Warning:ParamValidation(), AdaptiveQuant(1) is not supported yet for screen content, auto turned off
+[OpenH264] this = 0x0x105185aa0, Warning:ParamValidation(), BackgroundDetection(1) is not supported yet for screen content, auto turned off
+[OpenH264] this = 0x0x105185aa0, Warning:bEnableFrameSkip = 0,bitrate can't be controlled for RC_QUALITY_MODE,RC_BITRATE_MODE and RC_TIMESTAMP_MODE without enabling skip frame.
+{"frames":255,"seconds":5.01,"fps":50.9,"bitrate_kbps":105,"encode_p50_ms":15.47,"encode_p95_ms":24.13,"decode_p50_ms":2.36,"decode_p95_ms":3.88}
+== transport handshake/rtt ==
+{"handshake_ms":1.680,"sent":4000,"received":3060,"bytes":3390480,"mbps":50.5,"rtt_us":2596,"elapsed_ms":537.1}
+== raw saved to docs/impl/evidence/ER-901/raw ==
+EXIT=0

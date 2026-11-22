@@ -5,14 +5,36 @@ import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show ValueNotifier;
 import 'package:http/http.dart' as http;
 
+import 'contract.dart';
 import 'models.dart';
 import 'session_store.dart';
 
 /// 网关客户端。错误统一抛 [ApiException]，由 UI 决定呈现方式。
+///
+/// 字段与服务端错误信封一一对应：code(名称)/name/message/retryable/trace_id。
+/// 之前只保留 code+message，trace_id 无法反馈给客服，retryable 也无从驱动重试按钮。
 class ApiException implements Exception {
-  ApiException(this.code, this.message);
+  const ApiException(
+    this.code,
+    this.message, {
+    this.name,
+    this.retryable = false,
+    this.traceId = '',
+    this.statusCode = 0,
+  });
+
+  /// 兼容旧调用：错误码名称（如 AUTH_TOKEN_EXPIRED）。
   final String code;
+
+  /// 服务端信封里的 name；缺省与 [code] 相同。
+  final String? name;
   final String message;
+  final bool retryable;
+  final String traceId;
+  final int statusCode;
+
+  String get displayName => name ?? code;
+
   @override
   String toString() => message;
 }
@@ -26,6 +48,31 @@ class GatewayClient {
 
   final String baseUrl;
   final http.Client _client;
+  RuntimeEndpoints? _runtime;
+
+  /// 服务端下发的统一运行时端点（登录/启动时加载）。
+  RuntimeEndpoints? get runtime => _runtime;
+
+  /// 业务使用的网关地址：运行时配置优先，其次构建期 baseUrl。
+  String get gatewayURL {
+    final url = _runtime?.gatewayURL ?? '';
+    return url.isNotEmpty ? url : baseUrl;
+  }
+
+  /// 信令地址（WebSocket base）。
+  String get signalURL {
+    final url = _runtime?.signalURL ?? '';
+    return url.isNotEmpty ? url : baseUrl;
+  }
+
+  /// 中继 UDP 地址；未配置时为空（调用方必须拒绝启动相关能力）。
+  String get relayAddr => _runtime?.relayAddr ?? '';
+
+  /// 拉取运行时配置（/v1/config 无需登录）。
+  Future<void> loadRuntimeConfig() async {
+    final data = await _get('/v1/config');
+    _runtime = ClientRuntimeConfig.fromJson(data).endpoints;
+  }
 
   /// 单次请求超时。
   ///
@@ -72,6 +119,8 @@ class GatewayClient {
       throw ApiException(
         'NET_TIMEOUT',
         '服务端 ' + requestTimeout.inSeconds.toString() + ' 秒没有响应：请检查网关/反代是否可达',
+        name: 'NET_TIMEOUT',
+        retryable: true,
       );
     }
   }
@@ -116,12 +165,18 @@ class GatewayClient {
         throw ApiException(
           'SRV_INTERNAL',
           _nonJsonMessage(res.statusCode, raw),
+          name: 'SRV_INTERNAL',
+          retryable: res.statusCode >= 500,
+          statusCode: res.statusCode,
         );
       }
       if (decoded is! Map<String, dynamic>) {
         throw ApiException(
           'SRV_INTERNAL',
           _nonJsonMessage(res.statusCode, raw),
+          name: 'SRV_INTERNAL',
+          retryable: res.statusCode >= 500,
+          statusCode: res.statusCode,
         );
       }
       body = decoded;
@@ -136,11 +191,24 @@ class GatewayClient {
       throw ApiException(
         code,
         err['message'] as String? ?? '请求失败（HTTP ${res.statusCode}）',
+        name: err['name'] as String?,
+        retryable: err['retryable'] == true,
+        traceId: err['trace_id'] as String? ?? '',
+        statusCode: res.statusCode,
       );
     }
     // 成功信封：{code:0, name:"OK", data, trace_id}，业务体在 data 里。
     final data = body['data'];
-    return data is Map<String, dynamic> ? data : <String, dynamic>{};
+    if (data == null) return <String, dynamic>{};
+    if (data is Map<String, dynamic>) return data;
+    // 契约要求 data 是对象；非对象时静默返回 {} 会让 UI 显示“成功但没数据”。
+    throw ApiException(
+      'SRV_INTERNAL',
+      '服务端返回了非对象 data（${data.runtimeType}），请上报 trace_id',
+      name: 'SRV_INTERNAL',
+      traceId: body['trace_id'] as String? ?? '',
+      statusCode: res.statusCode,
+    );
   }
 
   /// 非 JSON 响应（网关/反代错误页）转成人话。
@@ -390,11 +458,7 @@ class GatewayClient {
       );
     }
     // 缺 code/token 时补一次绑定；把现有身份一起带上，能复用就复用。
-    return bindDevice(
-      platform,
-      deviceId: id,
-      deviceToken: deviceToken,
-    );
+    return bindDevice(platform, deviceId: id, deviceToken: deviceToken);
   }
 
   // ---------- 运行时配置（P1-1 / P1-4） ----------
@@ -498,7 +562,13 @@ class GatewayClient {
     );
     if (res.statusCode >= 400) {
       _decode(res); // 统一走错误信封解析后抛出
-      throw ApiException('UNKNOWN', '下载失败（HTTP ${res.statusCode}）');
+      throw ApiException(
+        'UNKNOWN',
+        '下载失败（HTTP ${res.statusCode}）',
+        name: 'UNKNOWN',
+        retryable: res.statusCode >= 500,
+        statusCode: res.statusCode,
+      );
     }
     return res.bodyBytes;
   }

@@ -4,7 +4,7 @@
 use std::time::Instant;
 
 use er_capture::{Capture, ScreenCapture};
-use er_codec::{EncodeConfig, Encoder, OpenH264Codec};
+use er_codec::{EncodeConfig, OpenH264Codec};
 
 fn main() {
     let mut cap = match ScreenCapture::open_primary() {

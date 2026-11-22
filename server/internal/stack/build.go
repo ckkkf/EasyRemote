@@ -20,7 +20,7 @@ import (
 )
 
 // BuildGateway 组装客户端 API handler。cmd/gateway 与 stack 共用。
-func BuildGateway(st store.Store, secret []byte, limiter ratelimit.Limiter, sms auth.SMSProvider) (http.Handler, error) {
+func BuildGateway(st store.Store, secret []byte, limiter ratelimit.Limiter, sms auth.SMSProvider, notifier gateway.ConsentNotifier, presence gateway.Presence, closer gateway.SessionCloser, epochs gateway.TicketEpochs) (http.Handler, error) {
 	if sms == nil {
 		return nil, errors.New("stack: SMS provider is required")
 	}
@@ -29,13 +29,17 @@ func BuildGateway(st store.Store, secret []byte, limiter ratelimit.Limiter, sms 
 		return nil, err
 	}
 	app := &gateway.App{
-		Limiter: limiter,
-		Auth:    authSvc,
-		Device:  device.New(st, secret),
-		Session: session.New(st),
-		Relay:   relaymgr.New(secret, time.Hour),
-		Store:   st,
-		Config:  appconfig.New(st),
+		Notifier:     notifier,
+		Presence:     presence,
+		Closer:       closer,
+		TicketEpochs: epochs,
+		Limiter:      limiter,
+		Auth:         authSvc,
+		Device:       device.New(st, secret),
+		Session:      session.New(st),
+		Relay:        relaymgr.New(secret, time.Hour),
+		Store:        st,
+		Config:       appconfig.New(st),
 		// 落盘目录可用 ER_FILES_DIR 覆盖（容器里通常挂卷）；默认 os.TempDir()/easyremote-files。
 		FilesDir: os.Getenv("ER_FILES_DIR"),
 	}
@@ -43,11 +47,13 @@ func BuildGateway(st store.Store, secret []byte, limiter ratelimit.Limiter, sms 
 }
 
 // BuildAdmin 组装管理后台 API handler。
-func BuildAdmin(st store.Store, sessions *adminsession.Service, limiter ratelimit.Limiter, replay adminapi.ReplayGuard) (http.Handler, error) {
+func BuildAdmin(st store.Store, sessions *adminsession.Service, limiter ratelimit.Limiter, replay adminapi.ReplayGuard, closer adminapi.SessionCloser, presence adminapi.Presence) (http.Handler, error) {
 	return (&adminhttp.App{
 		Limiter: limiter,
 		Service: adminapi.NewWithReplay(st, session.New(st), replay).
-			SetConfig(appconfig.New(st)),
+			SetConfig(appconfig.New(st)).
+			SetSessionCloser(closer).
+			SetPresence(presence),
 		Sessions: sessions,
 	}).Routes(), nil
 }

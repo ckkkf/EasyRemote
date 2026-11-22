@@ -105,7 +105,8 @@ const GO_BASE = { string: 'string', int: 'int', bool: 'bool', time: 'time.Time',
 const goType = (spec) => {
   const p = parseType(spec);
   const base = GO_BASE[p.base] || p.base;
-  if (p.map) return 'map[' + base + ']string';
+  // map<X> 表示「字符串键 → X」，与 JSON object 对齐。
+  if (p.map) return 'map[string]' + base;
   return p.list ? '[]' + base : base;
 };
 
@@ -157,7 +158,7 @@ const TS_BASE = { string: 'string', int: 'number', bool: 'boolean', time: 'strin
 const tsType = (spec) => {
   const p = parseType(spec);
   const base = TS_BASE[p.base] || p.base;
-  if (p.map) return 'Record<' + base + ', string>';
+  if (p.map) return 'Record<string, ' + base + '>';
   return p.list ? base + '[]' : base;
 };
 
@@ -213,7 +214,7 @@ const dartType = (spec) => {
   const p = parseType(spec);
   const base = DART_BASE[p.base] || p.base;
   let t = base;
-  if (p.map) t = 'Map<' + base + ', String>';
+  if (p.map) t = 'Map<String, ' + base + '>';
   else if (p.list) t = 'List<' + base + '>';
   return p.optional ? t + '?' : t;
 };
@@ -251,7 +252,7 @@ function emitDart(types, endpoints) {
       const base = DART_BASE[p.base] || p.base;
       const key = "'" + field + "'";
       let cast = 'json[' + key + ']';
-      if (p.map) cast = 'Map<String, String>.from(json[' + key + '] as Map? ?? const {})';
+      if (p.map) cast = 'Map<String, ' + base + '>.from(json[' + key + '] as Map? ?? const {})';
       else if (p.list) cast = '(json[' + key + '] as List<dynamic>? ?? const []).map((e) => e as ' + base + ').toList()';
       else if (base !== 'dynamic') cast = 'json[' + key + '] as ' + base + (p.optional ? '?' : '');
       L.push('    ' + dartField(field) + ': ' + cast + ',');

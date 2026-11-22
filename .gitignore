@@ -70,3 +70,6 @@ scripts/__pycache__/
 .ralph/
 *.log
 !docs/impl/evidence/**/*.log
+
+# 仓库根 flutter 测试临时目录
+.dart_tool/

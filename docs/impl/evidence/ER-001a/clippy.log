@@ -1,0 +1,11 @@
+    Checking er-winapp v0.2.8 (/Users/ckkk/dev/code/Go/EasyRemote/core/crates/er-winapp)
+warning: unused dependency `er-features`
+  --> crates/er-ffi/Cargo.toml:15:1
+   |
+15 | er-features = { path = "../er-features" }
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `cargo::unused_dependencies` is set to `warn` by default
+help: consider removing the dependency on `er-features`
+warning: `er-ffi` (manifest) generated 1 warning
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.22s

@@ -1,0 +1,89 @@
+
+== 1/1 flutter: flutter test ==
+00:00 +0: loading /Users/ckkk/dev/code/Go/EasyRemote/client/test/connect_code_input_test.dart
+00:00 +0: /Users/ckkk/dev/code/Go/EasyRemote/client/test/red_probe_test.dart: deliberate red probe
+00:00 +0 -1: /Users/ckkk/dev/code/Go/EasyRemote/client/test/red_probe_test.dart: deliberate red probe [E]
+  Expected: <2>
+    Actual: <1>
+  
+  package:matcher                                     expect
+  package:flutter_test/src/widget_tester.dart 473:18  expect
+  test/red_probe_test.dart 5:5                        main.<fn>
+  
+00:00 +0 -1: /Users/ckkk/dev/code/Go/EasyRemote/client/test/connect_code_input_test.dart: 每格都是真 TextField，且光标可见
+00:01 +0 -1: /Users/ckkk/dev/code/Go/EasyRemote/client/test/session_e2e_test.dart: 完整会话：登录→建会话→握手→加密→解码
+skip: ER_GATEWAY_URL / ER_RELAY_ADDR not set
+00:01 +1 -1: /Users/ckkk/dev/code/Go/EasyRemote/client/test/connect_code_input_test.dart: 每格都是真 TextField，且光标可见
+00:01 +2 -1: /Users/ckkk/dev/code/Go/EasyRemote/client/test/connect_code_input_test.dart: 每格都是真 TextField，且光标可见
+00:01 +3 -1: /Users/ckkk/dev/code/Go/EasyRemote/client/test/settings_prefs_test.dart: 隐私屏/防休眠未接入：没有开关，点了也不改偏好
+00:01 +4 -1: /Users/ckkk/dev/code/Go/EasyRemote/client/test/connect_pending_test.dart: 请求中显示等待条与取消，取消后回到可操作状态
+00:02 +5 -1: /Users/ckkk/dev/code/Go/EasyRemote/client/test/connect_code_input_test.dart: 鼠标划过格子不再出现 Material 的灰色悬停块
+00:02 +6 -1: /Users/ckkk/dev/code/Go/EasyRemote/client/test/settings_prefs_test.dart: 同账号免密直连默认关，打开后写进偏好总线
+00:02 +7 -1: /Users/ckkk/dev/code/Go/EasyRemote/client/test/settings_prefs_test.dart: 同账号免密直连默认关，打开后写进偏好总线
+00:02 +8 -1: /Users/ckkk/dev/code/Go/EasyRemote/client/test/p2_login_files_test.dart: 登录页是原型单表单：没有手机号/邮箱大 Tab，邮箱入口可点开弹窗
+00:02 +9 -1: /Users/ckkk/dev/code/Go/EasyRemote/client/test/p2_login_files_test.dart: 登录页是原型单表单：没有手机号/邮箱大 Tab，邮箱入口可点开弹窗
+00:02 +10 -1: /Users/ckkk/dev/code/Go/EasyRemote/client/test/p2_login_files_test.dart: 登录页是原型单表单：没有手机号/邮箱大 Tab，邮箱入口可点开弹窗
+00:02 +11 -1: /Users/ckkk/dev/code/Go/EasyRemote/client/test/p2_login_files_test.dart: 登录页是原型单表单：没有手机号/邮箱大 Tab，邮箱入口可点开弹窗
+00:02 +12 -1: /Users/ckkk/dev/code/Go/EasyRemote/client/test/p2_login_files_test.dart: 登录页是原型单表单：没有手机号/邮箱大 Tab，邮箱入口可点开弹窗
+00:02 +13 -1: /Users/ckkk/dev/code/Go/EasyRemote/client/test/p2_login_files_test.dart: 登录页是原型单表单：没有手机号/邮箱大 Tab，邮箱入口可点开弹窗
+00:02 +14 -1: /Users/ckkk/dev/code/Go/EasyRemote/client/test/widget_test.dart: 设置页展示隐私屏与防睡眠（未接入，只读）
+00:02 +15 -1: /Users/ckkk/dev/code/Go/EasyRemote/client/test/widget_test.dart: 设置页展示隐私屏与防睡眠（未接入，只读）
+00:03 +16 -1: /Users/ckkk/dev/code/Go/EasyRemote/client/test/widget_test.dart: 设置页展示隐私屏与防睡眠（未接入，只读）
+00:03 +17 -1: /Users/ckkk/dev/code/Go/EasyRemote/client/test/widget_test.dart: 设置页展示隐私屏与防睡眠（未接入，只读）
+00:03 +18 -1: /Users/ckkk/dev/code/Go/EasyRemote/client/test/widget_test.dart: 设置页展示隐私屏与防睡眠（未接入，只读）
+00:03 +19 -1: /Users/ckkk/dev/code/Go/EasyRemote/client/test/widget_test.dart: 设置页展示隐私屏与防睡眠（未接入，只读）
+00:03 +20 -1: /Users/ckkk/dev/code/Go/EasyRemote/client/test/widget_test.dart: 设置页展示隐私屏与防睡眠（未接入，只读）
+00:03 +21 -1: /Users/ckkk/dev/code/Go/EasyRemote/client/test/widget_test.dart: 设置页展示隐私屏与防睡眠（未接入，只读）
+00:03 +22 -1: /Users/ckkk/dev/code/Go/EasyRemote/client/test/p2_login_files_test.dart: 邮箱弹窗真的调 /v1/auth/email/code 与 /v1/auth/email/login
+00:03 +23 -1: /Users/ckkk/dev/code/Go/EasyRemote/client/test/p2_login_files_test.dart: 邮箱弹窗真的调 /v1/auth/email/code 与 /v1/auth/email/login
+00:03 +24 -1: /Users/ckkk/dev/code/Go/EasyRemote/client/test/p2_login_files_test.dart: 邮箱弹窗真的调 /v1/auth/email/code 与 /v1/auth/email/login
+00:03 +25 -1: /Users/ckkk/dev/code/Go/EasyRemote/client/test/p2_login_files_test.dart: 邮箱弹窗真的调 /v1/auth/email/code 与 /v1/auth/email/login
+00:03 +26 -1: /Users/ckkk/dev/code/Go/EasyRemote/client/test/connect_code_input_test.dart: 外部带入设备码会铺进格子
+00:03 +27 -1: /Users/ckkk/dev/code/Go/EasyRemote/client/test/connect_code_input_test.dart: 外部带入设备码会铺进格子
+00:03 +28 -1: /Users/ckkk/dev/code/Go/EasyRemote/client/test/connect_code_input_test.dart: 外部带入设备码会铺进格子
+00:03 +29 -1: /Users/ckkk/dev/code/Go/EasyRemote/client/test/widget_test.dart: 设备页显示本机设备码与已绑定设备
+00:03 +30 -1: /Users/ckkk/dev/code/Go/EasyRemote/client/test/widget_test.dart: 设备页显示本机设备码与已绑定设备
+00:03 +31 -1: /Users/ckkk/dev/code/Go/EasyRemote/client/test/widget_test.dart: 设备页显示本机设备码与已绑定设备
+00:03 +32 -1: /Users/ckkk/dev/code/Go/EasyRemote/client/test/widget_test.dart: 设备页显示本机设备码与已绑定设备
+00:03 +33 -1: /Users/ckkk/dev/code/Go/EasyRemote/client/test/widget_test.dart: 设备页显示本机设备码与已绑定设备
+00:03 +34 -1: /Users/ckkk/dev/code/Go/EasyRemote/client/test/widget_test.dart: 设备页显示本机设备码与已绑定设备
+00:03 +35 -1: /Users/ckkk/dev/code/Go/EasyRemote/client/test/p2_login_files_test.dart: 文件页复刻原型：队列 + 本机/远端双栏 + 真实上传到 100%
+00:04 +36 -1: /Users/ckkk/dev/code/Go/EasyRemote/client/test/native_test.dart: 抓帧字节数与尺寸一致
+00:04 +37 -1: /Users/ckkk/dev/code/Go/EasyRemote/client/test/native_test.dart: 抓帧字节数与尺寸一致
+00:04 +38 -1: /Users/ckkk/dev/code/Go/EasyRemote/client/test/native_test.dart: 隐私屏开启后整帧被抹平
+00:04 +39 -1: /Users/ckkk/dev/code/Go/EasyRemote/client/test/native_test.dart: 隐私屏开启后整帧被抹平
+00:04 +40 -1: /Users/ckkk/dev/code/Go/EasyRemote/client/test/native_test.dart: 隐私屏开启后整帧被抹平
+00:04 +41 -1: /Users/ckkk/dev/code/Go/EasyRemote/client/test/native_test.dart: 隐私屏开启后整帧被抹平
+00:04 +42 -1: /Users/ckkk/dev/code/Go/EasyRemote/client/test/native_test.dart: 隐私屏开启后整帧被抹平
+00:04 +43 -1: /Users/ckkk/dev/code/Go/EasyRemote/client/test/native_test.dart: 隐私屏开启后整帧被抹平
+00:05 +44 -1: /Users/ckkk/dev/code/Go/EasyRemote/client/test/native_test.dart: 编码产出的 H.264 以 Annex-B 起始码开头
+Shell: [OpenH264] this = 0x0x70ea79b00, Warning:ParamValidation(), AdaptiveQuant(1) is not supported yet for screen content, auto turned off
+Shell: [OpenH264] this = 0x0x70ea79b00, Warning:ParamValidation(), BackgroundDetection(1) is not supported yet for screen content, auto turned off
+Shell: [OpenH264] this = 0x0x70ea79b00, Warning:bEnableFrameSkip = 0,bitrate can't be controlled for RC_QUALITY_MODE,RC_BITRATE_MODE and RC_TIMESTAMP_MODE without enabling skip frame.
+00:06 +45 -1: /Users/ckkk/dev/code/Go/EasyRemote/client/test/native_test.dart: ABR 决策可跨边界返回
+00:06 +46 -1: /Users/ckkk/dev/code/Go/EasyRemote/client/test/native_test.dart: 重复 close 安全
+00:06 +47 -1: /Users/ckkk/dev/code/Go/EasyRemote/client/test/native_test.dart: (tearDownAll)
+00:06 +47 -1: /Users/ckkk/dev/code/Go/EasyRemote/client/test/capability_gate_test.dart: TestIncompleteCapabilityIsDisabled
+00:06 +48 -1: /Users/ckkk/dev/code/Go/EasyRemote/client/test/capability_gate_test.dart: TestUnknownCapabilityFailsClosed
+00:06 +49 -1: /Users/ckkk/dev/code/Go/EasyRemote/client/test/capability_gate_test.dart: TestPreferenceCannotUnlockExperimentalInRelease
+00:06 +50 -1: /Users/ckkk/dev/code/Go/EasyRemote/client/test/capability_gate_test.dart: 默认通道来自构建类型：测试环境是 debug
+00:06 +51 -1: /Users/ckkk/dev/code/Go/EasyRemote/client/test/host_link_test.dart: 设备码 + 验证码 的完整会话
+skip: ER_GATEWAY_URL / ER_RELAY_ADDR not set
+00:07 +52 -1: /Users/ckkk/dev/code/Go/EasyRemote/client/test/host_link_test.dart: 错误验证码被拒绝
+00:07 +53 -1: /Users/ckkk/dev/code/Go/EasyRemote/client/test/shell_nav_test.dart: 设置导航固定在侧边栏最下方；切页保留页面状态
+00:07 +54 -1: /Users/ckkk/dev/code/Go/EasyRemote/client/test/shell_nav_test.dart: 设置导航固定在侧边栏最下方；切页保留页面状态
+00:07 +55 -1: /Users/ckkk/dev/code/Go/EasyRemote/client/test/shell_nav_test.dart: 设置导航固定在侧边栏最下方；切页保留页面状态
+00:07 +56 -1: /Users/ckkk/dev/code/Go/EasyRemote/client/test/shell_nav_test.dart: 设置导航固定在侧边栏最下方；切页保留页面状态
+00:07 +57 -1: /Users/ckkk/dev/code/Go/EasyRemote/client/test/shell_nav_test.dart: 设置导航固定在侧边栏最下方；切页保留页面状态
+00:07 +58 -1: /Users/ckkk/dev/code/Go/EasyRemote/client/test/shell_nav_test.dart: 设置导航固定在侧边栏最下方；切页保留页面状态
+00:08 +59 -1: /Users/ckkk/dev/code/Go/EasyRemote/client/test/shell_nav_test.dart: 导航项底色不透明、悬停交回 InkWell，移出时不再闪
+00:08 +60 -1: Some tests failed.
+
+Failing tests:
+  /Users/ckkk/dev/code/Go/EasyRemote/client/test/red_probe_test.dart: deliberate red probe
+  FAIL (exit 1)
+
+== 汇总 ==
+  flutter   FAIL (flutter-test)
+
+GATE: FAIL

@@ -14,7 +14,7 @@ use std::net::SocketAddr;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use er_client::agent::ControllerAgent;
-use er_codec::{create_encoder, EncodeConfig, Encoder};
+use er_codec::{create_encoder, EncodeConfig};
 
 const MSG_VIDEO: u8 = 1;
 const MSG_PING: u8 = 0x10;
@@ -122,24 +122,21 @@ fn main() {
         }
         let wait_until = Instant::now() + Duration::from_secs(2);
         while Instant::now() < wait_until {
-            match relay.recv_timeout(Duration::from_millis(300)) {
-                Ok(Some(s)) => {
-                    let Ok(plain) = crypto.open(&s) else { continue };
-                    if plain.first() != Some(&MSG_PONG) || plain.len() < 17 {
-                        continue;
-                    }
-                    let echo = u64::from_le_bytes(plain[1..9].try_into().unwrap());
-                    if echo != t0 {
-                        continue;
-                    }
-                    let t1 = u64::from_le_bytes(plain[9..17].try_into().unwrap());
-                    let t2 = now_ms();
-                    rtt_ms = t2.saturating_sub(t0);
-                    offset = t1 as i64 - (t0 as i64 + (rtt_ms as i64) / 2);
-                    ping_ok = true;
-                    break;
+            if let Ok(Some(s)) = relay.recv_timeout(Duration::from_millis(300)) {
+                let Ok(plain) = crypto.open(&s) else { continue };
+                if plain.first() != Some(&MSG_PONG) || plain.len() < 17 {
+                    continue;
                 }
-                _ => {}
+                let echo = u64::from_le_bytes(plain[1..9].try_into().unwrap());
+                if echo != t0 {
+                    continue;
+                }
+                let t1 = u64::from_le_bytes(plain[9..17].try_into().unwrap());
+                let t2 = now_ms();
+                rtt_ms = t2.saturating_sub(t0);
+                offset = t1 as i64 - (t0 as i64 + (rtt_ms as i64) / 2);
+                ping_ok = true;
+                break;
             }
         }
         if ping_ok {

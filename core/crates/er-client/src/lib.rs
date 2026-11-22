@@ -5,6 +5,7 @@ pub mod conductor;
 pub mod ctrl_session;
 pub mod encoder;
 pub mod gpu_policy;
+pub mod host_consent;
 pub mod host_stream;
 pub mod link;
 
@@ -135,10 +136,17 @@ impl Gateway {
                 }
                 Ok(v)
             }
-            Err(ureq::Error::Status(_, r)) => {
-                let err = r.into_json::<ErrorBody>().unwrap_or(ErrorBody {
+            Err(ureq::Error::Status(status, r)) => {
+                let raw = r.into_string().unwrap_or_default();
+                let err = serde_json::from_str::<ErrorBody>(&raw).unwrap_or(ErrorBody {
                     code: "HTTP".into(),
-                    message: "request failed".into(),
+                    // 带上状态码/方法/路径/原始体：只有 "request failed" 时无法定位
+                    // 是哪个接口、哪个中间层返回的，只能靠猜。
+                    message: format!(
+                        "request failed: HTTP {status} {method} {url} body={body:?}",
+                        url = self.url(path),
+                        body = raw.chars().take(200).collect::<String>()
+                    ),
                 });
                 Err(ServiceError {
                     code: err.code,
@@ -150,6 +158,36 @@ impl Gateway {
                 message: e.to_string(),
             }),
         }
+    }
+
+    /// 任一端主动关闭会话（设备凭证）。
+    pub fn close_session(&self, session_id: &str) -> Result<serde_json::Value, ServiceError> {
+        self.call(
+            "POST",
+            "/v1/sessions/close",
+            Some(serde_json::json!({"session_id": session_id, "reason": "local_disconnect"})),
+            true,
+        )
+    }
+
+    /// 数据面就绪上报：双方各自在握手完成后调用，两端都 ready 才进入 active。
+    pub fn mark_ready(&self, session_id: &str) -> Result<serde_json::Value, ServiceError> {
+        self.call(
+            "POST",
+            "/v1/sessions/ready",
+            Some(serde_json::json!({"session_id": session_id})),
+            true,
+        )
+    }
+
+    /// 会话状态（只对会话双方可见；调用方必须带设备凭证）。
+    pub fn connect_status(&self, session_id: &str) -> Result<serde_json::Value, ServiceError> {
+        self.call(
+            "GET",
+            &format!("/v1/connect/status?session_id={session_id}"),
+            None,
+            true,
+        )
     }
 
     /// 发送短信验证码（开发环境固定 123456）。
@@ -304,10 +342,10 @@ pub fn decode_pubkey(hex_str: &str) -> Option<[u8; 32]> {
         return None;
     }
     let mut out = [0u8; 32];
-    for i in 0..32 {
+    for (i, byte) in out.iter_mut().enumerate() {
         let hi = hex_val(hex_str.as_bytes()[i * 2])?;
         let lo = hex_val(hex_str.as_bytes()[i * 2 + 1])?;
-        out[i] = (hi << 4) | lo;
+        *byte = (hi << 4) | lo;
     }
     Some(out)
 }

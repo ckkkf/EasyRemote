@@ -35,8 +35,10 @@ Widget _page({String initialCode = ''}) => MaterialApp(
   ),
 );
 
-String _digit(WidgetTester tester, int i) =>
-    tester.widget<TextField>(find.byKey(Key('device-code-digit-$i'))).controller!.text;
+String _digit(WidgetTester tester, int i) => tester
+    .widget<TextField>(find.byKey(Key('device-code-digit-$i')))
+    .controller!
+    .text;
 
 void main() {
   testWidgets('每格都是真 TextField，且光标可见', (tester) async {
@@ -69,7 +71,10 @@ void main() {
   testWidgets('逐格输入自动前移，输满 9 位后按钮可用', (tester) async {
     await tester.pumpWidget(_page());
     for (var i = 0; i < 9; i++) {
-      await tester.enterText(find.byKey(Key('device-code-digit-$i')), '${i + 1}');
+      await tester.enterText(
+        find.byKey(Key('device-code-digit-$i')),
+        '${i + 1}',
+      );
       await tester.pump();
     }
     expect(_digit(tester, 0), '1');
@@ -88,10 +93,7 @@ void main() {
       '361285400',
     );
     await tester.pump();
-    expect(
-      [for (var i = 0; i < 9; i++) _digit(tester, i)].join(),
-      '361285400',
-    );
+    expect([for (var i = 0; i < 9; i++) _digit(tester, i)].join(), '361285400');
   });
 
   testWidgets('空格子上退格会回到上一格并删掉它', (tester) async {

@@ -37,10 +37,16 @@ void main() {
     await tester.tap(find.byKey(const Key('connect-button')));
     await tester.pump();
 
-    expect(find.byKey(const Key('connect-pending')), findsOneWidget,
-        reason: '请求中必须有显式等待条');
-    expect(find.byKey(const Key('connect-cancel')), findsOneWidget,
-        reason: '请求中必须能取消');
+    expect(
+      find.byKey(const Key('connect-pending')),
+      findsOneWidget,
+      reason: '请求中必须有显式等待条',
+    );
+    expect(
+      find.byKey(const Key('connect-cancel')),
+      findsOneWidget,
+      reason: '请求中必须能取消',
+    );
     expect(find.textContaining('已等待'), findsOneWidget);
 
     await tester.pump(const Duration(seconds: 2));
@@ -50,8 +56,11 @@ void main() {
     await tester.pump();
 
     expect(find.byKey(const Key('connect-pending')), findsNothing);
-    expect(find.byKey(const Key('connect-button')), findsOneWidget,
-        reason: '取消后必须回到可再次点击的状态');
+    expect(
+      find.byKey(const Key('connect-button')),
+      findsOneWidget,
+      reason: '取消后必须回到可再次点击的状态',
+    );
 
     // 让在途请求收尾，避免测试结束时留下未完成的 timer/Future。
     if (!hang.isCompleted) hang.complete(http.Response('{}', 200));
@@ -72,9 +81,7 @@ void main() {
 
     await expectLater(
       client.requestConnect('123456789'),
-      throwsA(
-        isA<ApiException>().having((e) => e.code, 'code', 'NET_TIMEOUT'),
-      ),
+      throwsA(isA<ApiException>().having((e) => e.code, 'code', 'NET_TIMEOUT')),
     );
   });
 }

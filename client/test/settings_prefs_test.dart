@@ -48,30 +48,26 @@ void main() {
     await tester.pump(const Duration(milliseconds: 200));
   }
 
-  testWidgets('点隐私屏开关 → 偏好总线立即变（UI 接线正确）', (tester) async {
+  testWidgets('隐私屏/防休眠未接入：没有开关，点了也不改偏好', (tester) async {
     await pumpSettings(tester);
     expect(appPrefs.value.privacyScreen, isFalse);
-
-    final privacy = find.widgetWithText(SwitchListTile, '隐私屏');
-    await tester.ensureVisible(privacy);
-    await tester.pumpAndSettle();
-    await tester.tap(privacy);
-    await tester.pump(const Duration(milliseconds: 200));
-
-    expect(appPrefs.value.privacyScreen, isTrue);
-  });
-
-  testWidgets('点防睡眠开关 → 偏好总线立即变', (tester) async {
-    await pumpSettings(tester);
     expect(appPrefs.value.preventSleep, isTrue);
 
-    final sleep = find.widgetWithText(SwitchListTile, '会话期间阻止睡眠');
-    await tester.ensureVisible(sleep);
+    expect(find.widgetWithText(SwitchListTile, '隐私屏'), findsNothing);
+    expect(find.widgetWithText(SwitchListTile, '会话期间阻止睡眠'), findsNothing);
+
+    final privacy = find.byKey(const Key('capability-privacy_screen'));
+    await tester.scrollUntilVisible(privacy, 200);
     await tester.pumpAndSettle();
-    await tester.tap(sleep);
+    await tester.tap(privacy, warnIfMissed: false);
     await tester.pump(const Duration(milliseconds: 200));
 
-    expect(appPrefs.value.preventSleep, isFalse);
+    expect(
+      appPrefs.value.privacyScreen,
+      isFalse,
+      reason: '未接入能力不得通过 UI 改写偏好，避免给人「已经生效」的错觉',
+    );
+    expect(appPrefs.value.preventSleep, isTrue);
   });
 
   testWidgets('同账号免密直连默认关，打开后写进偏好总线', (tester) async {
@@ -122,15 +118,12 @@ void main() {
     await pumpSettings(tester);
     await tester.pump(const Duration(milliseconds: 200));
 
-    final values = tester
-        .widgetList<SwitchListTile>(find.byType(SwitchListTile))
-        .map((e) => e.value)
-        .toList();
     expect(
-      values,
-      containsAll(<bool>[true, false]),
-      reason: '隐私屏=true / 防睡眠=false 必须从本地偏好读回来',
+      appPrefs.value.privacyScreen,
+      isTrue,
+      reason: '历史偏好仍要读回，等 ER-701 接入真实隐私屏后再恢复开关',
     );
+    expect(appPrefs.value.preventSleep, isFalse);
     expect(appPrefs.value.sameAccountDirect, isTrue);
     final direct = find.widgetWithText(SwitchListTile, '同账号设备免密直连');
     expect(tester.widget<SwitchListTile>(direct).value, isTrue);

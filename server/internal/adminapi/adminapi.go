@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/base32"
 	"encoding/base64"
+	"sort"
 	"strings"
 	"time"
 
@@ -47,9 +48,21 @@ type Service struct {
 	sessions *session.Service
 	replay   ReplayGuard
 	config   *appconfig.Service
+	closer   SessionCloser
+	presence Presence
 	now      func() time.Time
 	// devSkipTOTP 为真时跳过二次验证，仅供本地联调；生产装配会拒绝打开。
 	devSkipTOTP bool
+}
+
+// SessionCloser 把后台强制中断传播给会话双方。
+type SessionCloser interface {
+	NotifySessionClosed(sessionID, from, to, reason string) error
+}
+
+// Presence 是权威在线判定（生产为 signal.Presence）。
+type Presence interface {
+	Online(ctx context.Context, deviceID string) (bool, error)
 }
 
 // ReplayGuard 记录已用过的 TOTP 时间步，防止同一验证码被重复使用。
@@ -80,6 +93,29 @@ func (s *Service) SetDevSkipTOTP(on bool) *Service {
 	return s
 }
 
+// SetSessionCloser 注入关闭传播器（生产为 Bus notifier）。
+func (s *Service) SetSessionCloser(c SessionCloser) *Service {
+	s.closer = c
+	return s
+}
+
+// SetPresence 注入权威在线判定；未注入时回落设备表字段（仅开发）。
+func (s *Service) SetPresence(p Presence) *Service {
+	s.presence = p
+	return s
+}
+
+func (s *Service) online(ctx context.Context, d *store.Device) bool {
+	if s.presence == nil {
+		return d.Online
+	}
+	ok, err := s.presence.Online(ctx, d.ID)
+	if err != nil {
+		return false
+	}
+	return ok
+}
+
 // SetConfig 注入配置中心（P1-1）。未注入时按需用 store 构造。
 func (s *Service) SetConfig(c *appconfig.Service) *Service {
 	s.config = c
@@ -95,6 +131,21 @@ func (s *Service) configService() *appconfig.Service {
 }
 
 // Can 判断角色是否有权执行动作。
+// Permissions 返回该角色可执行的动作清单（用于登录响应与前端只读控制）。
+func Permissions(role string) []string {
+	out := []string{}
+	for action, roles := range permission {
+		for _, r := range roles {
+			if r == role {
+				out = append(out, action)
+				break
+			}
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
 func Can(role, action string) bool {
 	allowed, ok := permission[action]
 	if !ok {
@@ -143,7 +194,7 @@ func (s *Service) Overview(ctx context.Context, a Actor) (contract.Overview, err
 	devices := len(all)
 	online := 0
 	for _, d := range all {
-		if d.Online {
+		if s.online(ctx, d) {
 			online++
 		}
 	}
@@ -165,11 +216,11 @@ func (s *Service) Overview(ctx context.Context, a Actor) (contract.Overview, err
 }
 
 // ListUsers 返回脱敏账号信息。
-func (s *Service) ListUsers(ctx context.Context, a Actor) ([]contract.UserRow, error) {
+func (s *Service) ListUsers(ctx context.Context, a Actor, page store.Page) ([]contract.UserRow, error) {
 	if !Can(a.Role, "user.read") {
 		return nil, errcode.New(errcode.AdminForbidden, "user.read")
 	}
-	accounts, err := s.collectAccounts(ctx)
+	accounts, err := s.store.ListAccounts(ctx, page)
 	if err != nil {
 		return nil, errcode.New(errcode.SrvInternal, err.Error())
 	}
@@ -224,11 +275,11 @@ func (s *Service) BanUser(ctx context.Context, a Actor, accountID, reason string
 }
 
 // ListDevices 返回设备列表。
-func (s *Service) ListDevices(ctx context.Context, a Actor) ([]contract.DeviceRow, error) {
+func (s *Service) ListDevices(ctx context.Context, a Actor, page store.Page) ([]contract.DeviceRow, error) {
 	if !Can(a.Role, "device.read") {
 		return nil, errcode.New(errcode.AdminForbidden, "device.read")
 	}
-	list, err := s.collectDevices(ctx)
+	list, err := s.store.ListDevices(ctx, page)
 	if err != nil {
 		return nil, errcode.New(errcode.SrvInternal, err.Error())
 	}
@@ -239,7 +290,7 @@ func (s *Service) ListDevices(ctx context.Context, a Actor) ([]contract.DeviceRo
 			DeviceCode: d.DeviceCode,
 			AccountID:  d.AccountID,
 			Platform:   d.Platform,
-			Online:     d.Online,
+			Online:     s.online(ctx, d),
 			LastSeen:   d.LastSeenAt,
 		})
 	}
@@ -251,11 +302,11 @@ func (s *Service) collectDevices(ctx context.Context) ([]*store.Device, error) {
 }
 
 // ListSessions 返回会话列表。
-func (s *Service) ListSessions(ctx context.Context, a Actor, state string) ([]contract.SessionRow, error) {
+func (s *Service) ListSessions(ctx context.Context, a Actor, state string, page store.Page) ([]contract.SessionRow, error) {
 	if !Can(a.Role, "session.read") {
 		return nil, errcode.New(errcode.AdminForbidden, "session.read")
 	}
-	list, err := s.sessions.List(ctx, state)
+	list, err := s.store.ListSessions(ctx, state, page)
 	if err != nil {
 		return nil, errcode.New(errcode.SrvInternal, err.Error())
 	}
@@ -275,37 +326,60 @@ func (s *Service) ListSessions(ctx context.Context, a Actor, state string) ([]co
 }
 
 // KillSession 强制中断，必须带原因。
-func (s *Service) KillSession(ctx context.Context, a Actor, sessionID, reason string) error {
+func (s *Service) KillSession(ctx context.Context, a Actor, sessionID, reason string) (contract.KillSessionResult, error) {
+	var res contract.KillSessionResult
 	if !Can(a.Role, "session.kill") {
 		_ = s.audit(ctx, a, "session.kill", sessionID, "", "", "denied")
-		return errcode.New(errcode.AdminForbidden, "session.kill")
+		return res, errcode.New(errcode.AdminForbidden, "session.kill")
 	}
 	if strings.TrimSpace(reason) == "" {
 		_ = s.audit(ctx, a, "session.kill", sessionID, "", "", "missing_reason")
-		return errcode.New(errcode.AdminReasonRequired, "reason required")
+		return res, errcode.New(errcode.AdminReasonRequired, "reason required")
 	}
 	sess, err := s.sessions.Get(ctx, sessionID)
 	if err != nil {
 		_ = s.audit(ctx, a, "session.kill", sessionID, "", "", "not_found")
-		return err
+		return res, err
 	}
 	before := sess.State
 	if _, err := s.sessions.Kill(ctx, sessionID, "admin: "+reason); err != nil {
 		_ = s.audit(ctx, a, "session.kill", sessionID, before, "", "error")
-		return err
+		return res, err
 	}
-	if err := s.audit(ctx, a, "session.kill", sessionID, before, "closed | "+reason, "ok"); err != nil {
-		return errcode.New(errcode.SrvInternal, "audit write failed")
+	res.Closed = true
+
+	// 先等传播结果，再写审计：审计必须记录实际发生的结果，而不是“已中断”。
+	if s.closer != nil {
+		if nerr := s.closer.NotifySessionClosed(sessionID, sess.ControllerID, sess.TargetID, "admin: "+reason); nerr != nil {
+			res.Warning = "会话已关闭，但关闭事件传播失败：" + nerr.Error()
+		} else {
+			res.Propagated = true
+		}
+	} else {
+		res.Propagated = true
 	}
-	return nil
+
+	result := "ok"
+	if !res.Propagated {
+		result = "partial: propagate_failed"
+	}
+	if aerr := s.audit(ctx, a, "session.kill", sessionID, before, "closed | "+reason, result); aerr != nil {
+		res.Audited = false
+		if res.Warning == "" {
+			res.Warning = "会话已关闭，但审计写入失败"
+		}
+	} else {
+		res.Audited = true
+	}
+	return res, nil
 }
 
 // Audit 返回审计日志。
-func (s *Service) Audit(ctx context.Context, a Actor, limit int) ([]*store.AuditLog, error) {
+func (s *Service) Audit(ctx context.Context, a Actor, page store.Page) ([]*store.AuditLog, error) {
 	if !Can(a.Role, "audit.read") {
 		return nil, errcode.New(errcode.AdminForbidden, "audit.read")
 	}
-	return s.store.ListAudit(ctx, limit)
+	return s.store.ListAuditPage(ctx, page)
 }
 
 // Authenticate 校验后台账号身份，不签发任何令牌（令牌由 adminsession 负责）。
@@ -448,4 +522,33 @@ func itoa(n int) string {
 		n /= 10
 	}
 	return string(b)
+}
+
+// CountUsers/CountDevices/CountSessions/CountAudit 返回与列表同过滤条件的总数。
+func (s *Service) CountUsers(ctx context.Context, a Actor, page store.Page) (int, error) {
+	if !Can(a.Role, "user.read") {
+		return 0, errcode.New(errcode.AdminForbidden, "user.read")
+	}
+	return s.store.CountAccounts(ctx, page)
+}
+
+func (s *Service) CountDevices(ctx context.Context, a Actor, page store.Page) (int, error) {
+	if !Can(a.Role, "device.read") {
+		return 0, errcode.New(errcode.AdminForbidden, "device.read")
+	}
+	return s.store.CountDevices(ctx, page)
+}
+
+func (s *Service) CountSessions(ctx context.Context, a Actor, state string, page store.Page) (int, error) {
+	if !Can(a.Role, "session.read") {
+		return 0, errcode.New(errcode.AdminForbidden, "session.read")
+	}
+	return s.store.CountSessions(ctx, state, page)
+}
+
+func (s *Service) CountAudit(ctx context.Context, a Actor, page store.Page) (int, error) {
+	if !Can(a.Role, "audit.read") {
+		return 0, errcode.New(errcode.AdminForbidden, "audit.read")
+	}
+	return s.store.CountAudit(ctx, page)
 }

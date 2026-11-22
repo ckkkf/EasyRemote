@@ -10,6 +10,10 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
+use er_session::relay_client::{p2p_token, P2PConfig};
+
+use crate::host_consent::{ConsentBroker, ConsentSnapshot};
+
 /// 被控流的运行状态（供 UI 轮询）。
 #[derive(Default, Clone)]
 pub struct HostStreamStats {
@@ -17,12 +21,14 @@ pub struct HostStreamStats {
     pub session_id: String,
     pub frames: u64,
     pub injected: u64,
+    pub link: String,
     pub last_error: String,
 }
 
 struct HostStreamHandle {
     stop: Arc<AtomicBool>,
     stats: Arc<std::sync::Mutex<HostStreamStats>>,
+    consent: Arc<ConsentBroker>,
 }
 
 fn streams() -> &'static std::sync::Mutex<std::collections::HashMap<String, HostStreamHandle>> {
@@ -55,6 +61,7 @@ pub fn start_host_stream(
     signal_base: &str,
     fps: u32,
     idle_timeout_secs: u64,
+    keep_awake: bool,
 ) -> Result<(), String> {
     let (target, _relay_addr) = crate::conductor::host_target(host_id)?;
 
@@ -68,6 +75,7 @@ pub fn start_host_stream(
 
     let stop = Arc::new(AtomicBool::new(false));
     let stats = Arc::new(std::sync::Mutex::new(HostStreamStats::default()));
+    let consent = Arc::new(ConsentBroker::new());
     if let Ok(mut s) = stats.lock() {
         s.running = true;
     }
@@ -79,20 +87,24 @@ pub fn start_host_stream(
             HostStreamHandle {
                 stop: stop.clone(),
                 stats: stats.clone(),
+                consent: consent.clone(),
             },
         );
 
     let signal = signal_base.to_string();
     let stats_thread = stats.clone();
     let stop_thread = stop.clone();
+    let consent_thread = consent.clone();
     std::thread::spawn(move || {
         if let Err(e) = run_host_stream(
             &target,
             &signal,
             fps,
             idle_timeout_secs,
+            keep_awake,
             &stop_thread,
             &stats_thread,
+            &consent_thread,
         ) {
             if let Ok(mut s) = stats_thread.lock() {
                 s.last_error = e;
@@ -106,30 +118,56 @@ pub fn start_host_stream(
 
     Ok(())
 }
+#[allow(clippy::too_many_arguments)]
 fn run_host_stream(
     target: &crate::agent::TargetAgent,
     signal: &str,
     fps: u32,
     idle_timeout_secs: u64,
+    keep_awake: bool,
     stop: &Arc<AtomicBool>,
     stats: &Arc<std::sync::Mutex<HostStreamStats>>,
+    consent: &Arc<ConsentBroker>,
 ) -> Result<(), String> {
     let mut cap = er_capture::ScreenCapture::open_primary().map_err(|e| format!("capture: {e}"))?;
     let info = er_capture::Capture::info(&cap);
-    let fps = fps.clamp(5, 60);
-    let cfg = er_codec::EncodeConfig {
+    let requested = er_codec::EncodeConfig {
         width: info.width & !1,
         height: info.height & !1,
-        fps,
+        fps: fps.clamp(5, 60),
         bitrate_kbps: 4000,
-        gop: fps,
+        gop: fps.clamp(5, 60),
         bframes: 0,
     };
+    let resolved = er_codec::resolve_config(requested, er_codec::host_capability());
+    let cfg = resolved.config;
+    let fps = cfg.fps;
+    if resolved.downgraded {
+        if let Ok(mut st) = stats.lock() {
+            st.last_error = format!("encode downgraded: {}", resolved.reason);
+        }
+    }
     let mut enc = crate::encoder::HybridEncoder::new(cfg)?;
     let mut injector = input_injector();
     let budget = std::time::Duration::from_millis((1000 / fps.max(1)) as u64);
     let idle = std::time::Duration::from_secs(idle_timeout_secs.max(60));
     let mut seq: u32 = 0;
+
+    // D2 防睡眠：只在设置开启时持有 OS 抑制；guard 在函数退出/panic 时释放。
+    let mut power = er_features::d2_power::PlatformInhibitor::new();
+    let _power_guard = if keep_awake {
+        match er_features::d2_power::SleepGuard::new(&mut power, true) {
+            Ok(g) => Some(g),
+            Err(e) => {
+                if let Ok(mut st) = stats.lock() {
+                    st.last_error = format!("prevent_sleep failed: {e}");
+                }
+                None
+            }
+        }
+    } else {
+        None
+    };
 
     loop {
         if stop.load(Ordering::Relaxed) {
@@ -149,7 +187,18 @@ fn run_host_stream(
         if let Ok(mut st) = stats.lock() {
             st.session_id = session_id.clone();
         }
-        // ② 授权 + 握手：失败只丢这一轮，回到等待（不能把线程带走）
+        // ② 本地授权：只有本机 UI 的 decision 才能通过；超时=拒绝。
+        // 之前这里直接 target.consent()，等于任何知道设备码的人都能连。
+        let label = format!("远程设备（{}）", &session_id[..session_id.len().min(8)]);
+        consent.request(&session_id, &label, std::time::Duration::from_secs(30));
+        let accepted = match consent.wait(stop, std::time::Duration::from_secs(30)) {
+            Ok(v) => v,
+            Err(_) => break,
+        };
+        if !accepted {
+            let _ = target.reject(&session_id);
+            continue;
+        }
         if target.consent(&session_id).is_err() {
             continue;
         }
@@ -158,11 +207,23 @@ fn run_host_stream(
             Ok(v) => v,
             Err(_) => continue,
         };
+        // 生产 P2P：双方独立进程按同一顺序协商；失败保持 Relay。
+        let peer_p2p = relay.negotiate_p2p(&P2PConfig::new(
+            &session_id,
+            p2p_token(&session_id),
+            std::time::Duration::from_secs(2),
+        ));
+        if let Ok(mut st) = stats.lock() {
+            st.link = if peer_p2p { "p2p" } else { "relay" }.to_string();
+        }
         std::thread::sleep(std::time::Duration::from_millis(2500));
         if target.announce(&mut relay, &msg).is_err() {
             continue;
         }
         if target.finish(&mut relay, &mut crypto, &session_id).is_err() {
+            continue;
+        }
+        if target.mark_ready(&session_id).is_err() {
             continue;
         }
 
@@ -171,7 +232,28 @@ fn run_host_stream(
         // 心跳超时 = 主控真的走了。比 idle 可靠：主控一动不动但还连着时不会误伤。
         let mut last_beat = std::time::Instant::now();
         let beat_timeout = std::time::Duration::from_secs(10);
+        let mut last_state_check = std::time::Instant::now();
+        let mut input_seq = er_input::InputSequencer::new();
+        let mut clipboard = if std::env::var("ER_CLIPBOARD_SYNC").ok().as_deref() == Some("1") {
+            Some(er_channels::clipboard::ClipboardService::new(
+                er_channels::clipboard::CommandClipboard,
+                true,
+            ))
+        } else {
+            None
+        };
+        let mut last_clip_poll = std::time::Instant::now();
+        let mut file_rx: Option<er_channels::file_stream::StreamReceiver> = None;
         while !stop.load(Ordering::Relaxed) {
+            // 关闭传播兜底：对端/后台关闭后 1s 内停止采集与输入，不依赖心跳超时。
+            if last_state_check.elapsed() >= std::time::Duration::from_secs(1) {
+                last_state_check = std::time::Instant::now();
+                if let Ok(state) = target.session_state(&session_id) {
+                    if state == "closed" || state == "failed" || state == "ended" {
+                        break;
+                    }
+                }
+            }
             if last_beat.elapsed() > beat_timeout {
                 break;
             }
@@ -186,14 +268,101 @@ fn run_host_stream(
                             if !plain.is_empty() && plain[0] == crate::agent::MSG_HEARTBEAT {
                                 last_beat = std::time::Instant::now();
                             }
-                            if !plain.is_empty() && plain[0] == crate::agent::MSG_INPUT {
-                                if let Some(ev) = er_input::InputEvent::decode(&plain[1..]) {
-                                    if injector.inject(&ev).is_ok() {
-                                        if let Ok(mut st) = stats.lock() {
-                                            st.injected += 1;
+                            if !plain.is_empty()
+                                && plain[0] == er_channels::file_stream::MSG_FILE_META
+                                && std::env::var("ER_FILE_RECV_DIR").is_ok()
+                            {
+                                file_rx =
+                                    er_channels::file_stream::StreamReceiver::from_meta(&plain);
+                            }
+                            if !plain.is_empty()
+                                && plain[0] == er_channels::file_stream::MSG_FILE_CHUNK
+                            {
+                                if let Some(rx) = file_rx.as_mut() {
+                                    let id = rx.id();
+                                    if let Ok((index, _)) = rx.on_chunk(&plain) {
+                                        let complete = rx.missing().is_empty();
+                                        let name = rx.name().to_string();
+                                        if !complete {
+                                            let ack = er_channels::file_stream::StreamReceiver::ack(
+                                                index, id,
+                                            );
+                                            let sealed = crypto.seal(&ack);
+                                            let _ = relay.send(&sealed);
+                                        } else {
+                                            // 最后一块：先落盘/校验成功，再 ACK，避免发送端误判完成。
+                                            let dir = std::env::var("ER_FILE_RECV_DIR")
+                                                .unwrap_or_else(|_| ".".into());
+                                            let file_name = std::path::Path::new(&name)
+                                                .file_name()
+                                                .and_then(|s| s.to_str())
+                                                .unwrap_or("file.bin");
+                                            let path = std::path::Path::new(&dir).join(file_name);
+                                            let stored = file_rx.take().is_some_and(|done| {
+                                                done.finish().ok().is_some_and(|bytes| {
+                                                    let ok = std::fs::write(&path, &bytes).is_ok();
+                                                    if ok {
+                                                        if let Ok(mut st) = stats.lock() {
+                                                            st.last_error = format!(
+                                                                "file received: {} ({} bytes)",
+                                                                path.display(),
+                                                                bytes.len()
+                                                            );
+                                                        }
+                                                    }
+                                                    ok
+                                                })
+                                            });
+                                            if stored {
+                                                let ack =
+                                                    er_channels::file_stream::StreamReceiver::ack(
+                                                        index, id,
+                                                    );
+                                                let sealed = crypto.seal(&ack);
+                                                let _ = relay.send(&sealed);
+                                            } else if let Ok(mut st) = stats.lock() {
+                                                st.last_error =
+                                                    "file receive failed: finish/write error"
+                                                        .into();
+                                            }
                                         }
                                     }
-                                    last_input = std::time::Instant::now();
+                                }
+                            }
+                            if !plain.is_empty() && plain[0] == er_channels::clipboard::MSG_CLIP {
+                                if let Some(svc) = clipboard.as_mut() {
+                                    if let Some(update) =
+                                        er_channels::clipboard::decode_clip(&plain)
+                                    {
+                                        let _ = svc.apply_remote(&update);
+                                    }
+                                }
+                            }
+                            if !plain.is_empty() && plain[0] == crate::agent::MSG_KEYFRAME {
+                                enc.request_keyframe();
+                            }
+                            if !plain.is_empty()
+                                && plain[0] == crate::agent::MSG_INPUT
+                                && plain.len() >= 5
+                            {
+                                {
+                                    let seq = u32::from_be_bytes([
+                                        plain[1], plain[2], plain[3], plain[4],
+                                    ]);
+                                    if let Some(ev) = er_input::InputEvent::decode(&plain[5..]) {
+                                        for ordered in input_seq.push(seq, ev) {
+                                            if injector.inject(&ordered).is_ok() {
+                                                if let Ok(mut st) = stats.lock() {
+                                                    st.injected += 1;
+                                                }
+                                            }
+                                        }
+                                        last_input = std::time::Instant::now();
+                                    }
+                                    let mut ack = vec![crate::agent::MSG_INPUT_ACK];
+                                    ack.extend_from_slice(&seq.to_be_bytes());
+                                    let sealed = crypto.seal(&ack);
+                                    let _ = relay.send(&sealed);
                                 }
                             }
                         }
@@ -201,6 +370,17 @@ fn run_host_stream(
                     _ => break,
                 }
                 drained += 1;
+            }
+            if let Some(svc) = clipboard.as_mut() {
+                if last_clip_poll.elapsed() >= std::time::Duration::from_secs(1) {
+                    last_clip_poll = std::time::Instant::now();
+                    if let Ok(Some(update)) = svc.poll_local() {
+                        if let Ok(msg) = er_channels::clipboard::encode_clip(&update) {
+                            let sealed = crypto.seal(&msg);
+                            let _ = relay.send(&sealed);
+                        }
+                    }
+                }
             }
             let t0 = std::time::Instant::now();
             if let Ok(Some(encoded)) = enc.capture_and_encode(&mut cap) {
@@ -251,6 +431,24 @@ pub fn stop_host_stream(host_id: &str) {
     if let Ok(mut map) = streams().lock() {
         if let Some(h) = map.remove(host_id) {
             h.stop.store(true, Ordering::Relaxed);
+            h.consent.clear();
         }
     }
+}
+
+/// UI 轮询：当前等待本机决策的会话。
+pub fn pending_consent(host_id: &str) -> Option<ConsentSnapshot> {
+    let map = streams().lock().ok()?;
+    map.get(host_id)?.consent.pending()
+}
+
+/// 本机 UI 的决策入口（FFI）。session 不匹配返回 false。
+pub fn decide_consent(host_id: &str, session_id: &str, accepted: bool) -> bool {
+    let Ok(map) = streams().lock() else {
+        return false;
+    };
+    let Some(h) = map.get(host_id) else {
+        return false;
+    };
+    h.consent.decide(session_id, accepted)
 }

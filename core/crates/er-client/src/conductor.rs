@@ -100,7 +100,10 @@ pub fn serve_host(
         .announce(&mut t_relay, &t_msg)
         .map_err(|e| e.to_string())?;
     host.target
-        .finish(&mut t_relay, &mut t_crypto, &session_id)
+        .finish_with_resend(&mut t_relay, &mut t_crypto, &session_id, Some(&t_msg))
+        .map_err(|e| e.to_string())?;
+    host.target
+        .mark_ready(&session_id)
         .map_err(|e| e.to_string())?;
 
     let frames_got = host
@@ -129,17 +132,79 @@ pub fn connect_device(
     let session_id = ctrl
         .request_session(device_code, captcha)
         .map_err(|e| e.to_string())?;
+    // 请求成功 ≠ 对端已同意：等 authorized 再取票据，避免 403 竞态。
+    ctrl.wait_authorized(&session_id, std::time::Duration::from_secs(10))
+        .map_err(|e| e.to_string())?;
 
     let (mut c_relay, mut c_crypto, c_keys, c_msg) =
         ctrl.begin(&session_id).map_err(|e| e.to_string())?;
     ctrl.announce(&mut c_relay, &c_msg)
         .map_err(|e| e.to_string())?;
-    ctrl.finish(&mut c_relay, &mut c_crypto, &c_keys, &session_id)
-        .map_err(|e| e.to_string())?;
+    ctrl.finish_with_resend(
+        &mut c_relay,
+        &mut c_crypto,
+        &c_keys,
+        &session_id,
+        Some(&c_msg),
+    )
+    .map_err(|e| e.to_string())?;
+    ctrl.mark_ready(&session_id).map_err(|e| e.to_string())?;
 
+    // ER-711d：opt-in 文件传输（同一加密会话，单未 ACK 块背压）。
+    if let Ok(path) = std::env::var("ER_FILE_SEND_PATH") {
+        if let Ok(data) = std::fs::read(&path) {
+            let name = std::path::Path::new(&path)
+                .file_name()
+                .and_then(|s| s.to_str())
+                .unwrap_or("file.bin");
+            let id = nanos_hex().len() as u32 ^ (data.len() as u32);
+            if let Ok(mut tx) = er_channels::file_stream::StreamSender::new(
+                id,
+                name,
+                data,
+                er_channels::file_transfer::DEFAULT_CHUNK,
+            ) {
+                let meta = c_crypto.seal(&tx.meta());
+                let _ = c_relay.send(&meta);
+                let deadline = std::time::Instant::now() + std::time::Duration::from_secs(15);
+                while !tx.done() && std::time::Instant::now() < deadline {
+                    if let Some(chunk) = tx.next_chunk() {
+                        let sealed = c_crypto.seal(&chunk);
+                        let _ = c_relay.send(&sealed);
+                    }
+                    match c_relay.recv_timeout(std::time::Duration::from_millis(200)) {
+                        Ok(Some(sealed)) => {
+                            if let Ok(plain) = c_crypto.open(&sealed) {
+                                if plain.len() >= 9
+                                    && plain[0] == er_channels::file_stream::MSG_FILE_ACK
+                                {
+                                    let rid = u32::from_be_bytes([
+                                        plain[1], plain[2], plain[3], plain[4],
+                                    ]);
+                                    let index = u32::from_be_bytes([
+                                        plain[5], plain[6], plain[7], plain[8],
+                                    ]);
+                                    if rid == tx.id() {
+                                        let _ = tx.ack(index);
+                                    }
+                                }
+                            }
+                        }
+                        _ => {
+                            if let Some(chunk) = tx.retransmit() {
+                                let sealed = c_crypto.seal(&chunk);
+                                let _ = c_relay.send(&sealed);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
     let _ = ctrl
         .send_frames(&mut c_relay, &mut c_crypto, frames)
         .map_err(|e| e.to_string())?;
+
     Ok(HostResult {
         session_id,
         frames: Vec::new(),
@@ -191,17 +256,11 @@ pub fn ensure_host_password() -> String {
             return s;
         }
     }
-    let mut seed = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_nanos() as u64)
-        .unwrap_or(12345);
-    seed ^= (std::process::id() as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15);
-    let mut pw = String::with_capacity(8);
-    for _ in 0..8 {
-        seed = seed
-            .wrapping_mul(6364136223846793005)
-            .wrapping_add(1442695040888963407);
-        pw.push(char::from(b'0' + ((seed >> 33) % 10) as u8));
+    // 必须使用 CSPRNG：时间戳/PID/LCG 可预测，等于固定密码。
+    let pw = generate_password();
+    if pw.is_empty() {
+        // 随机源不可用时返回空串（上层会因长度校验失败），绝不退回可预测密码。
+        return String::new();
     }
     let _ = std::fs::create_dir_all(&dir);
     let _ = std::fs::write(&path, &pw);
@@ -211,6 +270,24 @@ pub fn ensure_host_password() -> String {
         let _ = std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600));
     }
     pw
+}
+
+/// 生成 8 位数字临时密码（CSPRNG）。
+fn generate_password() -> String {
+    let mut out = String::with_capacity(8);
+    let mut buf = [0u8; 16];
+    while out.len() < 8 {
+        if getrandom::getrandom(&mut buf).is_err() {
+            return String::new();
+        }
+        for b in buf {
+            if out.len() == 8 {
+                break;
+            }
+            out.push(char::from(b'0' + (b % 10)));
+        }
+    }
+    out
 }
 
 /// 用已登录会话准备主机（不重复登录、不重复绑设备）。
@@ -242,4 +319,18 @@ pub fn prepare_host_from_session(
             },
         );
     Ok((host_id, device_code.to_string()))
+}
+#[cfg(test)]
+mod tests {
+    use super::generate_password;
+
+    // ER-403：临时密码必须是 CSPRNG 生成的 8 位数字，且不能两次相同。
+    #[test]
+    fn host_password_is_random_digits() {
+        let a = generate_password();
+        let b = generate_password();
+        assert_eq!(a.len(), 8);
+        assert!(a.chars().all(|c| c.is_ascii_digit()));
+        assert_ne!(a, b, "两次生成不应相同（LCG/时间/PID 会可预测）");
+    }
 }

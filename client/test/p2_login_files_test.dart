@@ -10,7 +10,8 @@ import 'package:easyremote_client/pages/files_page.dart';
 import 'package:easyremote_client/pages/login_page.dart';
 import 'package:easyremote_client/theme.dart';
 
-Widget wrap(Widget child) => MaterialApp(theme: buildTheme(Brightness.light), home: child);
+Widget wrap(Widget child) =>
+    MaterialApp(theme: buildTheme(Brightness.light), home: child);
 
 /// 统一把视口设成桌面宽度：原型是 1280×800，窄屏会切成移动版式。
 void useDesktopViewport(WidgetTester tester) {
@@ -21,10 +22,10 @@ void useDesktopViewport(WidgetTester tester) {
 }
 
 http.Response ok(Map<String, dynamic> data) => http.Response(
-      '{"code":0,"name":"OK","data":${_json(data)},"trace_id":"test"}',
-      200,
-      headers: {'content-type': 'application/json'},
-    );
+  '{"code":0,"name":"OK","data":${_json(data)},"trace_id":"test"}',
+  200,
+  headers: {'content-type': 'application/json'},
+);
 
 String _json(Object value) => const JsonEncoder().convert(value);
 
@@ -64,7 +65,9 @@ void main() {
     expect(find.byKey(const Key('send-email-code')), findsOneWidget);
   });
 
-  testWidgets('邮箱弹窗真的调 /v1/auth/email/code 与 /v1/auth/email/login', (tester) async {
+  testWidgets('邮箱弹窗真的调 /v1/auth/email/code 与 /v1/auth/email/login', (
+    tester,
+  ) async {
     useDesktopViewport(tester);
     final calls = <String>[];
     final client = GatewayClient(
@@ -75,7 +78,11 @@ void main() {
           return ok(const {'token': 'tok', 'account_id': 'acc-1'});
         }
         if (req.url.path == '/v1/devices/bind') {
-          return ok(const {'device_id': 'dev-1', 'raw_code': '842615037', 'device_token': 'dt'});
+          return ok(const {
+            'device_id': 'dev-1',
+            'raw_code': '842615037',
+            'device_token': 'dt',
+          });
         }
         if (req.url.path == '/v1/devices') return ok(const {'devices': []});
         if (req.url.path == '/v1/config') return ok(const {'config': {}});
@@ -86,7 +93,10 @@ void main() {
     await tester.tap(find.byKey(const Key('email-provider')));
     await tester.pumpAndSettle();
 
-    await tester.enterText(find.byKey(const Key('email-field')), 'demo@example.com');
+    await tester.enterText(
+      find.byKey(const Key('email-field')),
+      'demo@example.com',
+    );
     await tester.tap(find.byKey(const Key('send-email-code')));
     await tester.pumpAndSettle();
     expect(find.text('邮件验证码已发送（开发环境固定 654321）'), findsOneWidget);
@@ -122,7 +132,7 @@ void main() {
                 'size': 1300000,
                 'sha256': 'aabbccddeeff',
                 'created_at': '2026-11-20T10:00:00Z',
-              }
+              },
             ],
           });
         }

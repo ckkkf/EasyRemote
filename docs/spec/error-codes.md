@@ -177,6 +177,7 @@
 | 700009 | ADMIN_REASON_REQUIRED | 必填原因未填 | 请填写操作原因 | 阻止提交 |
 | 700010 | ADMIN_CONFIG_INVALID | 配置值不合法 | 配置值不合法 | 校验白名单与取值域 |
 | 700011 | SRV_ROUTE_NOT_FOUND | 路由不存在 | 请求的接口不存在 | 404，检查路径 |
+| 700012 | SRV_METHOD_NOT_ALLOWED | 请求方法不被允许 | 请求方式不正确 | 405，检查 method 与 Allow 头 |
 
 ## 11. 兜底（9xxxxx）
 

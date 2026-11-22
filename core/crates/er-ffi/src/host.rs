@@ -184,12 +184,19 @@ pub unsafe extern "C" fn er_host_start_stream(
     signal_base: *const c_char,
     fps: u32,
     idle_timeout_secs: u64,
+    keep_awake: i32,
 ) -> *mut c_char {
     let (Some(hid), Some(sig)) = (cstr(host_id), cstr(signal_base)) else {
         return into_c_string("{\"ok\":false,\"error\":\"null argument\"}");
     };
     let r = catch_unwind(AssertUnwindSafe(
-        || match er_client::host_stream::start_host_stream(&hid, &sig, fps, idle_timeout_secs) {
+        || match er_client::host_stream::start_host_stream(
+            &hid,
+            &sig,
+            fps,
+            idle_timeout_secs,
+            keep_awake != 0,
+        ) {
             Ok(()) => into_c_string("{\"ok\":true}"),
             Err(e) => into_c_string(&format!(
                 "{{\"ok\":false,\"error\":\"{}\"}}",
@@ -211,11 +218,12 @@ pub unsafe extern "C" fn er_host_stream_status(host_id: *const c_char) -> *mut c
     };
     let st = er_client::host_stream::host_stream_status(&hid);
     into_c_string(&format!(
-        "{{\"running\":{},\"session_id\":\"{}\",\"frames\":{},\"injected\":{},\"error\":\"{}\"}}",
+        "{{\"running\":{},\"session_id\":\"{}\",\"frames\":{},\"injected\":{},\"link\":\"{}\",\"error\":\"{}\"}}",
         st.running,
         escape_json(&st.session_id),
         st.frames,
         st.injected,
+        escape_json(&st.link),
         escape_json(&st.last_error)
     ))
 }
@@ -232,6 +240,74 @@ pub unsafe extern "C" fn er_host_stop_stream(host_id: *const c_char) -> i32 {
             1
         }
         None => 0,
+    }
+}
+
+/// 查询当前等待本机授权的会话：{"ok":true,"session_id":..,"controller_label":..,"seconds_left":n}
+/// 没有 pending 时返回 {"ok":false}。
+///
+/// # Safety
+/// host_id 必须是以 NUL 结尾的 UTF-8 字符串。
+#[no_mangle]
+pub unsafe extern "C" fn er_host_pending_consent(host_id: *const c_char) -> *mut c_char {
+    let Some(hid) = cstr(host_id) else {
+        return into_c_string("{\"ok\":false}");
+    };
+    match er_client::host_stream::pending_consent(&hid) {
+        Some(p) => into_c_string(&format!(
+            "{{\"ok\":true,\"session_id\":\"{}\",\"controller_label\":\"{}\",\"seconds_left\":{}}}",
+            escape_json(&p.session_id),
+            escape_json(&p.controller_label),
+            p.seconds_left
+        )),
+        None => into_c_string("{\"ok\":false}"),
+    }
+}
+
+/// 本机授权决策（只有本机 UI 可调用）：accepted=1 接受，0 拒绝。
+///
+/// # Safety
+/// 字符串参数必须是以 NUL 结尾的 UTF-8 字符串。
+#[no_mangle]
+pub unsafe extern "C" fn er_host_decide_consent(
+    host_id: *const c_char,
+    session_id: *const c_char,
+    accepted: i32,
+) -> *mut c_char {
+    let (Some(hid), Some(sid)) = (cstr(host_id), cstr(session_id)) else {
+        return into_c_string("{\"ok\":false,\"error\":\"null argument\"}");
+    };
+    if er_client::host_stream::decide_consent(&hid, &sid, accepted != 0) {
+        into_c_string("{\"ok\":true}")
+    } else {
+        into_c_string("{\"ok\":false,\"error\":\"no matching pending consent\"}")
+    }
+}
+
+/// 本机断开指定会话：{"ok":true} 或 {"ok":false,"error":..}。
+///
+/// # Safety
+/// 字符串参数必须是以 NUL 结尾的 UTF-8 字符串。
+#[no_mangle]
+pub unsafe extern "C" fn er_host_close_session(
+    host_id: *const c_char,
+    session_id: *const c_char,
+) -> *mut c_char {
+    let (Some(hid), Some(sid)) = (cstr(host_id), cstr(session_id)) else {
+        return into_c_string("{\"ok\":false,\"error\":\"null argument\"}");
+    };
+    match er_client::conductor::host_target(&hid) {
+        Ok((target, _)) => match target.close_session(&sid) {
+            Ok(()) => into_c_string("{\"ok\":true}"),
+            Err(e) => into_c_string(&format!(
+                "{{\"ok\":false,\"error\":\"{}\"}}",
+                escape_json(&e.to_string())
+            )),
+        },
+        Err(e) => into_c_string(&format!(
+            "{{\"ok\":false,\"error\":\"{}\"}}",
+            escape_json(&e)
+        )),
     }
 }
 

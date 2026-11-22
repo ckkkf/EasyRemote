@@ -4,6 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../api.dart';
+import '../capabilities.dart';
+import '../capability_view.dart';
+import '../error_view.dart';
 import '../prefs.dart';
 import '../shell.dart';
 import '../theme.dart';
@@ -40,6 +43,7 @@ enum _ConnectMode { device, assist }
 
 class _ConnectPageState extends State<ConnectPage> {
   final _codeCtl = TextEditingController();
+
   /// 9 格输入的句柄：粘贴后把焦点放到第一个空格。
   final _codeEntryKey = GlobalKey<_CodeEntryState>();
   final _captcha = TextEditingController();
@@ -48,6 +52,7 @@ class _ConnectPageState extends State<ConnectPage> {
   _ConnectMode _mode = _ConnectMode.device;
   bool _busy = false;
   String? _error;
+  ApiException? _apiError;
 
   /// 请求期间每秒 +1：把「卡住」变成「看得见的等待」。
   int _elapsed = 0;
@@ -65,7 +70,8 @@ class _ConnectPageState extends State<ConnectPage> {
   @override
   void didUpdateWidget(covariant ConnectPage oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.initialCode != oldWidget.initialCode) _applyCode(widget.initialCode);
+    if (widget.initialCode != oldWidget.initialCode)
+      _applyCode(widget.initialCode);
   }
 
   void _applyCode(String code) {
@@ -103,6 +109,8 @@ class _ConnectPageState extends State<ConnectPage> {
     setState(() {
       _busy = true;
       _error = null;
+      _apiError = null;
+      _apiError = null;
       _elapsed = 0;
     });
     _busyTick = Timer.periodic(const Duration(seconds: 1), (_) {
@@ -130,6 +138,7 @@ class _ConnectPageState extends State<ConnectPage> {
       _busy = false;
       _elapsed = 0;
       _error = null;
+      _apiError = null;
     });
   }
 
@@ -137,7 +146,11 @@ class _ConnectPageState extends State<ConnectPage> {
   String get _codePretty {
     final d = _code;
     if (d.length != 9) return d;
-    return d.substring(0, 3) + ' ' + d.substring(3, 6) + ' ' + d.substring(6, 9);
+    return d.substring(0, 3) +
+        ' ' +
+        d.substring(3, 6) +
+        ' ' +
+        d.substring(6, 9);
   }
 
   Future<void> _connect() async {
@@ -156,11 +169,17 @@ class _ConnectPageState extends State<ConnectPage> {
       widget.onSessionStarted(sid, code.replaceAll(RegExp(r'[^0-9]'), ''));
     } on ApiException catch (e) {
       if (mounted && attempt == _attempt) {
-        setState(() => _error = _friendlyConnectError(e));
+        setState(() {
+          _apiError = e;
+          _error = _friendlyConnectError(e);
+        });
       }
     } catch (e) {
       if (mounted && attempt == _attempt) {
-        setState(() => _error = e.toString());
+        setState(() {
+          _apiError = null;
+          _error = e.toString();
+        });
       }
     } finally {
       _stopBusy(attempt);
@@ -171,7 +190,10 @@ class _ConnectPageState extends State<ConnectPage> {
   Future<void> _redeemAssist() async {
     final code = _assistCtl.text.trim();
     if (code.length != 6) {
-      setState(() => _error = '协助码是 6 位数字');
+      setState(() {
+        _apiError = null;
+        _error = '协助码是 6 位数字';
+      });
       return;
     }
     final attempt = ++_attempt;
@@ -182,9 +204,19 @@ class _ConnectPageState extends State<ConnectPage> {
       _assistCtl.clear();
       widget.onSessionStarted(sid, '');
     } on ApiException catch (e) {
-      if (mounted && attempt == _attempt) setState(() => _error = e.message);
+      if (mounted && attempt == _attempt) {
+        setState(() {
+          _apiError = e;
+          _error = e.message;
+        });
+      }
     } catch (e) {
-      if (mounted && attempt == _attempt) setState(() => _error = e.toString());
+      if (mounted && attempt == _attempt) {
+        setState(() {
+          _apiError = null;
+          _error = e.toString();
+        });
+      }
     } finally {
       _stopBusy(attempt);
     }
@@ -198,6 +230,23 @@ class _ConnectPageState extends State<ConnectPage> {
     final ready = _code.length == 9;
     final assistReady = _assistCtl.text.trim().length == 6;
 
+    // 能力门：发布构建里实验能力直接给空态，不渲染可点的假入口。
+    final controlGate = CapabilityGate.instance.stateOf('remote_control');
+    if (!controlGate.available) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const PageHeader(title: '连接设备', subtitle: '远程控制能力未开放'),
+          Expanded(
+            child: CapabilityUnavailableView(
+              title: '远程控制尚未开放',
+              state: controlGate,
+            ),
+          ),
+        ],
+      );
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -205,9 +254,16 @@ class _ConnectPageState extends State<ConnectPage> {
         Expanded(
           child: LayoutBuilder(
             builder: (context, constraints) => SingleChildScrollView(
-              padding: EdgeInsets.fromLTRB(wide ? 32 : 16, 0, wide ? 32 : 16, 32),
+              padding: EdgeInsets.fromLTRB(
+                wide ? 32 : 16,
+                0,
+                wide ? 32 : 16,
+                32,
+              ),
               child: ConstrainedBox(
-                constraints: BoxConstraints(minHeight: constraints.maxHeight - 8),
+                constraints: BoxConstraints(
+                  minHeight: constraints.maxHeight - 8,
+                ),
                 child: Center(
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 560),
@@ -216,7 +272,9 @@ class _ConnectPageState extends State<ConnectPage> {
                       decoration: BoxDecoration(
                         color: scheme.surfaceContainerLow,
                         borderRadius: BorderRadius.circular(ErTokens.radiusXl),
-                        border: Border.all(color: scheme.outlineVariant.withValues(alpha: 0.7)),
+                        border: Border.all(
+                          color: scheme.outlineVariant.withValues(alpha: 0.7),
+                        ),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -227,21 +285,33 @@ class _ConnectPageState extends State<ConnectPage> {
                                 width: 40,
                                 height: 40,
                                 decoration: BoxDecoration(
-                                    color: scheme.primaryContainer, borderRadius: BorderRadius.circular(11)),
-                                child: Icon(Icons.pin_rounded, size: 21, color: scheme.onPrimaryContainer),
+                                  color: scheme.primaryContainer,
+                                  borderRadius: BorderRadius.circular(11),
+                                ),
+                                child: Icon(
+                                  Icons.pin_rounded,
+                                  size: 21,
+                                  color: scheme.onPrimaryContainer,
+                                ),
                               ),
                               const SizedBox(width: 12),
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text(_mode == _ConnectMode.device ? '输入设备码' : '输入协助码',
-                                        style: text.titleLarge),
+                                    Text(
+                                      _mode == _ConnectMode.device
+                                          ? '输入设备码'
+                                          : '输入协助码',
+                                      style: text.titleLarge,
+                                    ),
                                     Text(
                                       _mode == _ConnectMode.device
                                           ? '9 位数字，输满后即可请求连接'
                                           : '6 位数字，一次一码，10 分钟内有效',
-                                      style: text.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+                                      style: text.bodySmall?.copyWith(
+                                        color: scheme.onSurfaceVariant,
+                                      ),
                                     ),
                                   ],
                                 ),
@@ -254,38 +324,46 @@ class _ConnectPageState extends State<ConnectPage> {
                             onChanged: (m) => setState(() {
                               _mode = m;
                               _error = null;
+                              _apiError = null;
+                              _apiError = null;
                             }),
                           ),
                           const SizedBox(height: 18),
                           if (_mode == _ConnectMode.device) ...[
-                          _CodeEntry(
-                            key: _codeEntryKey,
-                            controller: _codeCtl,
-                            onChanged: () => setState(() {}),
-                          ),
-                          // 粘贴入口：透明输入层的光标与格子对不上，
-                          // 与其纠结光标位置，不如给一个显式的「粘贴设备码」。
-                          Align(
-                            alignment: Alignment.centerRight,
-                            child: TextButton.icon(
-                              onPressed: _pasteCodeFromClipboard,
-                              icon: const Icon(Icons.content_paste_rounded, size: 16),
-                              label: const Text("粘贴设备码"),
+                            _CodeEntry(
+                              key: _codeEntryKey,
+                              controller: _codeCtl,
+                              onChanged: () => setState(() {}),
                             ),
-                          ),
-                          const SizedBox(height: 6),
-                          TextField(
-                            key: const Key('captcha-field'),
-                            controller: _captcha,
-                            keyboardType: TextInputType.number,
-                            decoration: InputDecoration(
-                              labelText: '临时密码',
-                              hintText: appPrefs.value.sameAccountDirect
-                                  ? '同账号设备可留空（免密直连已开启）'
-                                  : '被控端窗口里显示的 8 位数字（可长期复用）',
-                              prefixIcon: const Icon(Icons.verified_user_outlined, size: 18),
+                            // 粘贴入口：透明输入层的光标与格子对不上，
+                            // 与其纠结光标位置，不如给一个显式的「粘贴设备码」。
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: TextButton.icon(
+                                onPressed: _pasteCodeFromClipboard,
+                                icon: const Icon(
+                                  Icons.content_paste_rounded,
+                                  size: 16,
+                                ),
+                                label: const Text("粘贴设备码"),
+                              ),
                             ),
-                          ),
+                            const SizedBox(height: 6),
+                            TextField(
+                              key: const Key('captcha-field'),
+                              controller: _captcha,
+                              keyboardType: TextInputType.number,
+                              decoration: InputDecoration(
+                                labelText: '临时密码',
+                                hintText: appPrefs.value.sameAccountDirect
+                                    ? '同账号设备可留空（免密直连已开启）'
+                                    : '被控端窗口里显示的 8 位数字（可长期复用）',
+                                prefixIcon: const Icon(
+                                  Icons.verified_user_outlined,
+                                  size: 18,
+                                ),
+                              ),
+                            ),
                           ] else ...[
                             TextField(
                               key: const Key('assist-code-field'),
@@ -293,7 +371,10 @@ class _ConnectPageState extends State<ConnectPage> {
                               focusNode: _assistFocus,
                               keyboardType: TextInputType.number,
                               maxLength: 6,
-                              onChanged: (_) => setState(() => _error = null),
+                              onChanged: (_) => setState(() {
+                                _error = null;
+                                _apiError = null;
+                              }),
                               inputFormatters: [
                                 FilteringTextInputFormatter.digitsOnly,
                                 LengthLimitingTextInputFormatter(6),
@@ -306,24 +387,50 @@ class _ConnectPageState extends State<ConnectPage> {
                               ),
                             ),
                             const SizedBox(height: 8),
-                            Text('协助码 10 分钟内有效、只能用一次；兑换成功即建立会话，无需验证码。',
-                                style: text.labelSmall?.copyWith(color: scheme.onSurfaceVariant)),
+                            Text(
+                              '协助码 10 分钟内有效、只能用一次；兑换成功即建立会话，无需验证码。',
+                              style: text.labelSmall?.copyWith(
+                                color: scheme.onSurfaceVariant,
+                              ),
+                            ),
                           ],
-                          if (_error != null) ...[
+                          if (_apiError != null) ...[
+                            const SizedBox(height: 12),
+                            ApiErrorView(
+                              error: _apiError!,
+                              onRetry: _mode == _ConnectMode.device
+                                  ? _connect
+                                  : _redeemAssist,
+                            ),
+                          ],
+                          if (_error != null && _apiError == null) ...[
                             const SizedBox(height: 12),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 10,
+                              ),
                               decoration: BoxDecoration(
                                 color: scheme.errorContainer,
-                                borderRadius: BorderRadius.circular(ErTokens.radiusMd),
+                                borderRadius: BorderRadius.circular(
+                                  ErTokens.radiusMd,
+                                ),
                               ),
                               child: Row(
                                 children: [
-                                  Icon(Icons.error_outline_rounded, size: 16, color: scheme.onErrorContainer),
+                                  Icon(
+                                    Icons.error_outline_rounded,
+                                    size: 16,
+                                    color: scheme.onErrorContainer,
+                                  ),
                                   const SizedBox(width: 8),
                                   Expanded(
-                                    child: Text(_error!,
-                                        style: text.bodySmall?.copyWith(color: scheme.onErrorContainer)),
+                                    child: Text(
+                                      _error!,
+                                      style: text.bodySmall?.copyWith(
+                                        color: scheme.onErrorContainer,
+                                      ),
+                                    ),
                                   ),
                                 ],
                               ),
@@ -343,22 +450,37 @@ class _ConnectPageState extends State<ConnectPage> {
                           else
                             FilledButton(
                               key: const Key('connect-button'),
-                              onPressed: (_mode == _ConnectMode.device ? !ready : !assistReady)
+                              onPressed:
+                                  (_mode == _ConnectMode.device
+                                      ? !ready
+                                      : !assistReady)
                                   ? null
-                                  : (_mode == _ConnectMode.device ? _connect : _redeemAssist),
-                              child: Text(_mode == _ConnectMode.device ? '请求连接' : '兑换协助码'),
+                                  : (_mode == _ConnectMode.device
+                                        ? _connect
+                                        : _redeemAssist),
+                              child: Text(
+                                _mode == _ConnectMode.device ? '请求连接' : '兑换协助码',
+                              ),
                             ),
                           const SizedBox(height: 10),
                           Text(
                             _mode == _ConnectMode.device
                                 ? '首次连接需要对方在弹出的授权框里同意；建立信任后可直接连接。'
                                 : '协助码是被控端给出的临时授权，兑换即建立请求，不需对方再点同意。',
-                            style: text.labelSmall?.copyWith(color: scheme.onSurfaceVariant),
+                            style: text.labelSmall?.copyWith(
+                              color: scheme.onSurfaceVariant,
+                            ),
                             textAlign: TextAlign.center,
                           ),
-                          if (_mode == _ConnectMode.device && widget.recents.isNotEmpty) ...[
+                          if (_mode == _ConnectMode.device &&
+                              widget.recents.isNotEmpty) ...[
                             const SizedBox(height: 20),
-                            Text('最近连接', style: text.labelSmall?.copyWith(color: scheme.onSurfaceVariant)),
+                            Text(
+                              '最近连接',
+                              style: text.labelSmall?.copyWith(
+                                color: scheme.onSurfaceVariant,
+                              ),
+                            ),
                             const SizedBox(height: 8),
                             Wrap(
                               spacing: 8,
@@ -402,7 +524,9 @@ class _ModeSwitch extends StatelessWidget {
       final on = mode == value;
       return Expanded(
         child: InkWell(
-          key: Key(value == _ConnectMode.device ? 'mode-device' : 'mode-assist'),
+          key: Key(
+            value == _ConnectMode.device ? 'mode-device' : 'mode-assist',
+          ),
           onTap: () => onChanged(value),
           borderRadius: BorderRadius.circular(ErTokens.radiusMd),
           child: AnimatedContainer(
@@ -412,17 +536,29 @@ class _ModeSwitch extends StatelessWidget {
             decoration: BoxDecoration(
               color: on ? scheme.primaryContainer : Colors.transparent,
               borderRadius: BorderRadius.circular(ErTokens.radiusMd),
-              border: Border.all(color: on ? scheme.primary.withValues(alpha: 0.5) : Colors.transparent),
+              border: Border.all(
+                color: on
+                    ? scheme.primary.withValues(alpha: 0.5)
+                    : Colors.transparent,
+              ),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(icon, size: 16, color: on ? scheme.onPrimaryContainer : scheme.onSurfaceVariant),
+                Icon(
+                  icon,
+                  size: 16,
+                  color: on
+                      ? scheme.onPrimaryContainer
+                      : scheme.onSurfaceVariant,
+                ),
                 const SizedBox(width: 6),
                 Text(
                   label,
                   style: text.labelMedium?.copyWith(
-                    color: on ? scheme.onPrimaryContainer : scheme.onSurfaceVariant,
+                    color: on
+                        ? scheme.onPrimaryContainer
+                        : scheme.onSurfaceVariant,
                     fontWeight: on ? FontWeight.w600 : FontWeight.w400,
                   ),
                 ),
@@ -456,7 +592,11 @@ class _ModeSwitch extends StatelessWidget {
 /// 光标位置永远和格子对不上，选区也看不见，结果就是「没光标、选不中数字」。
 /// 这里换成 9 个真输入框：光标、选区、输入法、退格全部走系统原生行为。
 class _CodeEntry extends StatefulWidget {
-  const _CodeEntry({super.key, required this.controller, required this.onChanged});
+  const _CodeEntry({
+    super.key,
+    required this.controller,
+    required this.onChanged,
+  });
 
   /// 聚合值：恒为 0–9 位纯数字。页面其它入口（粘贴按钮、最近连接）只改这里。
   final TextEditingController controller;

@@ -28,10 +28,7 @@ enum NetCmd {
 /// 网络线程 → UI
 enum NetEvent {
     Status(String),
-    Ready {
-        width: usize,
-        height: usize,
-    },
+    Ready,
     Frame {
         width: usize,
         height: usize,
@@ -167,7 +164,7 @@ impl App {
         loop {
             match rx.try_recv() {
                 Ok(NetEvent::Status(s)) => self.status = s,
-                Ok(NetEvent::Ready { .. }) => {
+                Ok(NetEvent::Ready) => {
                     self.connected = true;
                     self.connecting = false;
                     self.status = "已连接 · 等待画面…".to_string();
@@ -458,7 +455,7 @@ fn install_cjk_font(ctx: &egui::Context) {
         let mut fonts = egui::FontDefinitions::default();
         fonts
             .font_data
-            .insert("cjk".to_owned(), egui::FontData::from_owned(bytes).into());
+            .insert("cjk".to_owned(), egui::FontData::from_owned(bytes));
         for family in [egui::FontFamily::Proportional, egui::FontFamily::Monospace] {
             fonts
                 .families
@@ -600,6 +597,8 @@ fn key_to_scancode(key: egui::Key) -> Option<u16> {
 }
 
 /// 网络线程：登录 → 建会话 → 握手 → 收发循环。
+// 参数多但都是一次性线程入口的显式依赖；拆 struct 只会让调用点更难读。
+#[allow(clippy::too_many_arguments)]
 fn net_thread(
     gateway: String,
     relay: String,
@@ -614,7 +613,7 @@ fn net_thread(
         match &e {
             NetEvent::Status(s) => eprintln!("NET: status={s}"),
             NetEvent::Failed(msg) => eprintln!("NET: FAILED {msg}"),
-            NetEvent::Ready { .. } => eprintln!("NET: handshake_ok"),
+            NetEvent::Ready => eprintln!("NET: handshake_ok"),
             _ => {}
         }
         let _ = evt_tx.send(e);
@@ -665,10 +664,7 @@ fn net_thread(
         send(NetEvent::Failed(format!("握手校验失败: {e}")));
         return;
     }
-    send(NetEvent::Ready {
-        width: 0,
-        height: 0,
-    });
+    send(NetEvent::Ready);
 
     let mut dec = match H264Decoder::new() {
         Ok(d) => d,
@@ -765,7 +761,7 @@ fn downsample(w: usize, h: usize, rgb: &[u8], max_w: usize) -> (usize, usize, Ve
     if w <= max_w || w == 0 || h == 0 {
         return (w, h, rgb.to_vec());
     }
-    let factor = (w + max_w - 1) / max_w;
+    let factor = w.div_ceil(max_w);
     let nw = w / factor;
     let nh = h / factor;
     let mut out = Vec::with_capacity(nw * nh * 3);

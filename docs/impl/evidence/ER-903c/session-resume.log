@@ -1,0 +1,14 @@
+session ses-885d78ee576a87a6 established
+CODEC: init kind=Software 1920x1080
+CODEC: prime_frame=false
+CODEC: backend_final=cpu
+before restart: sent 2 received 2
+CODEC: init kind=Software 1920x1080
+CODEC: prime_frame=false
+CODEC: backend_final=cpu
+session resumed after 0 retries (same keys, same session id)
+CODEC: init kind=Software 1920x1080
+CODEC: prime_frame=false
+CODEC: backend_final=cpu
+after resume: sent 2 received 2
+SESSION RESUME PASSED (crypto session survived relay restart)

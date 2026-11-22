@@ -4,6 +4,7 @@ package adminhttp
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -13,6 +14,7 @@ import (
 	"github.com/easyremote/server/internal/errcode"
 	"github.com/easyremote/server/internal/httpx"
 	"github.com/easyremote/server/internal/ratelimit"
+	"github.com/easyremote/server/internal/store"
 )
 
 // App 是后台 HTTP 依赖。
@@ -47,6 +49,15 @@ func clientIP(r *http.Request) string {
 }
 
 // Routes 返回后台路由。所有响应只走 httpx.OK / OKPage / Err。
+func securityHeaders(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'; base-uri 'none'")
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("Referrer-Policy", "no-referrer")
+		next.ServeHTTP(w, r)
+	})
+}
+
 func (a *App) Routes() http.Handler {
 	mux := http.NewServeMux()
 
@@ -82,10 +93,11 @@ func (a *App) Routes() http.Handler {
 			return
 		}
 		httpx.OK(w, r, contract.AdminSession{
-			Token:     tok,
-			Username:  sess.Username,
-			Role:      sess.Role,
-			ExpiresAt: sess.ExpiresAt,
+			Token:       tok,
+			Username:    sess.Username,
+			Role:        sess.Role,
+			Permissions: adminapi.Permissions(sess.Role),
+			ExpiresAt:   sess.ExpiresAt,
 		})
 	})
 
@@ -120,12 +132,13 @@ func (a *App) Routes() http.Handler {
 			writeErr(w, r, errcode.New(errcode.AdminSessionExpired, "unauthorized"))
 			return
 		}
-		list, err := a.Service.ListUsers(r.Context(), act)
+		list, err := a.Service.ListUsers(r.Context(), act, parsePage(r))
 		if err != nil {
 			writeErr(w, r, err)
 			return
 		}
-		httpx.OKPage(w, r, httpx.Page[contract.UserRow]{Items: list, Total: len(list)})
+		total, _ := a.Service.CountUsers(r.Context(), act, parsePage(r))
+		httpx.OKPage(w, r, httpx.Page[contract.UserRow]{Items: list, Total: total})
 	})
 
 	mux.HandleFunc("/admin/v1/users/ban", func(w http.ResponseWriter, r *http.Request) {
@@ -155,12 +168,13 @@ func (a *App) Routes() http.Handler {
 			writeErr(w, r, errcode.New(errcode.AdminSessionExpired, "unauthorized"))
 			return
 		}
-		list, err := a.Service.ListDevices(r.Context(), act)
+		list, err := a.Service.ListDevices(r.Context(), act, parsePage(r))
 		if err != nil {
 			writeErr(w, r, err)
 			return
 		}
-		httpx.OKPage(w, r, httpx.Page[contract.DeviceRow]{Items: list, Total: len(list)})
+		total, _ := a.Service.CountDevices(r.Context(), act, parsePage(r))
+		httpx.OKPage(w, r, httpx.Page[contract.DeviceRow]{Items: list, Total: total})
 	})
 
 	mux.HandleFunc("/admin/v1/sessions", func(w http.ResponseWriter, r *http.Request) {
@@ -169,12 +183,13 @@ func (a *App) Routes() http.Handler {
 			writeErr(w, r, errcode.New(errcode.AdminSessionExpired, "unauthorized"))
 			return
 		}
-		list, err := a.Service.ListSessions(r.Context(), act, r.URL.Query().Get("state"))
+		list, err := a.Service.ListSessions(r.Context(), act, r.URL.Query().Get("state"), parsePage(r))
 		if err != nil {
 			writeErr(w, r, err)
 			return
 		}
-		httpx.OKPage(w, r, httpx.Page[contract.SessionRow]{Items: list, Total: len(list)})
+		total, _ := a.Service.CountSessions(r.Context(), act, r.URL.Query().Get("state"), parsePage(r))
+		httpx.OKPage(w, r, httpx.Page[contract.SessionRow]{Items: list, Total: total})
 	})
 
 	mux.HandleFunc("/admin/v1/sessions/kill", func(w http.ResponseWriter, r *http.Request) {
@@ -191,11 +206,12 @@ func (a *App) Routes() http.Handler {
 			writeErr(w, r, errcode.New(errcode.SrvInternal, "bad body"))
 			return
 		}
-		if err := a.Service.KillSession(r.Context(), act, req.SessionID, req.Reason); err != nil {
+		result, err := a.Service.KillSession(r.Context(), act, req.SessionID, req.Reason)
+		if err != nil {
 			writeErr(w, r, err)
 			return
 		}
-		httpx.OK(w, r, contract.OkResult{OK: true})
+		httpx.OK(w, r, result)
 	})
 
 	mux.HandleFunc("/admin/v1/config", func(w http.ResponseWriter, r *http.Request) {
@@ -248,7 +264,7 @@ func (a *App) Routes() http.Handler {
 			writeErr(w, r, errcode.New(errcode.AdminSessionExpired, "unauthorized"))
 			return
 		}
-		logs, err := a.Service.Audit(r.Context(), act, 100)
+		logs, err := a.Service.Audit(r.Context(), act, parsePage(r))
 		if err != nil {
 			writeErr(w, r, err)
 			return
@@ -260,8 +276,33 @@ func (a *App) Routes() http.Handler {
 				Before: l.Before, After: l.After, IP: l.IP, Result: l.Result, TS: l.TS,
 			})
 		}
-		httpx.OKPage(w, r, httpx.Page[contract.AuditRow]{Items: rows, Total: len(rows)})
+		total, _ := a.Service.CountAudit(r.Context(), act, parsePage(r))
+		httpx.OKPage(w, r, httpx.Page[contract.AuditRow]{Items: rows, Total: total})
 	})
 
-	return httpx.Middleware(httpx.JSONMux(mux))
+	return securityHeaders(httpx.Middleware(httpx.MethodGuard(routeSpecs, httpx.JSONMux(mux))))
+}
+
+// parsePage 解析后台列表的 limit/offset/q/sort/desc；上限 500，防止无限拉取。
+func parsePage(r *http.Request) store.Page {
+	q := r.URL.Query()
+	limit, _ := strconv.Atoi(q.Get("limit"))
+	if limit <= 0 || limit > 500 {
+		limit = 100
+	}
+	offset, _ := strconv.Atoi(q.Get("offset"))
+	if offset < 0 {
+		offset = 0
+	}
+	return store.Page{
+		Limit:    limit,
+		Offset:   offset,
+		Query:    strings.TrimSpace(q.Get("q")),
+		Sort:     strings.TrimSpace(q.Get("sort")),
+		Desc:     q.Get("desc") == "1" || q.Get("desc") == "true",
+		Status:   strings.TrimSpace(q.Get("status")),
+		Platform: strings.TrimSpace(q.Get("platform")),
+		Action:   strings.TrimSpace(q.Get("action")),
+		Result:   strings.TrimSpace(q.Get("result")),
+	}
 }

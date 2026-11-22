@@ -6,7 +6,8 @@ import 'package:flutter/services.dart';
 
 import '../api.dart';
 import '../file_io.dart' if (dart.library.js_interop) '../file_stub.dart';
-import '../file_pick_stub.dart' if (dart.library.js_interop) '../file_pick_web.dart';
+import '../file_pick_stub.dart'
+    if (dart.library.js_interop) '../file_pick_web.dart';
 import '../models.dart';
 import '../shell.dart';
 import '../theme.dart';
@@ -102,11 +103,14 @@ class _FilesPageState extends State<FilesPage> {
   int get _maxBytes => widget.config?.fileMaxBytes ?? 32 * 1024 * 1024;
 
   int get _doneCount => _tasks.where((t) => t.state == _TaskState.done).length;
-  int get _activeCount => _tasks.where((t) => t.state == _TaskState.uploading).length;
-  int get _queuedCount => _tasks.where((t) => t.state == _TaskState.queued).length;
+  int get _activeCount =>
+      _tasks.where((t) => t.state == _TaskState.uploading).length;
+  int get _queuedCount =>
+      _tasks.where((t) => t.state == _TaskState.queued).length;
 
-  double get _totalRate =>
-      _tasks.where((t) => t.state == _TaskState.uploading).fold<double>(0, (sum, t) => sum + t.bytesPerSecond);
+  double get _totalRate => _tasks
+      .where((t) => t.state == _TaskState.uploading)
+      .fold<double>(0, (sum, t) => sum + t.bytesPerSecond);
 
   Future<void> _load() async {
     setState(() {
@@ -201,7 +205,9 @@ class _FilesPageState extends State<FilesPage> {
     _pumping = true;
     try {
       while (mounted && !_pausedAll) {
-        final pending = _tasks.where((t) => t.state == _TaskState.queued).toList();
+        final pending = _tasks
+            .where((t) => t.state == _TaskState.queued)
+            .toList();
         if (pending.isEmpty) break;
         await _runTask(pending.last);
       }
@@ -218,20 +224,28 @@ class _FilesPageState extends State<FilesPage> {
       task.total = task.bytes.length;
       task.error = null;
     });
-    task.control = UploadControl(onProgress: (sent, total) {
-      task.sent = sent;
-      task.total = total;
-      if (mounted) setState(() {});
-    });
+    task.control = UploadControl(
+      onProgress: (sent, total) {
+        task.sent = sent;
+        task.total = total;
+        if (mounted) setState(() {});
+      },
+    );
     if (_pausedAll) task.control.pause();
     try {
-      final info = await widget.client.uploadFile(task.name, task.bytes, control: task.control);
+      final info = await widget.client.uploadFile(
+        task.name,
+        task.bytes,
+        control: task.control,
+      );
       if (!mounted) return;
       setState(() {
         task.state = _TaskState.done;
         task.fileId = info.id;
         task.sent = task.total;
-        task.elapsed = DateTime.now().difference(task.startedAt ?? DateTime.now());
+        task.elapsed = DateTime.now().difference(
+          task.startedAt ?? DateTime.now(),
+        );
         _notice = '已上传 ${info.name}（${info.prettySize}）';
       });
       await _load();
@@ -355,8 +369,14 @@ class _FilesPageState extends State<FilesPage> {
         title: const Text('删除文件'),
         content: Text('确定删除「${f.name}」？删除后无法恢复。'),
         actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('取消')),
-          FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('删除')),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('删除'),
+          ),
         ],
       ),
     );
@@ -394,7 +414,10 @@ class _FilesPageState extends State<FilesPage> {
         OutlinedButton.icon(
           key: const Key('pause-all'),
           onPressed: _tasks.isEmpty ? null : _togglePauseAll,
-          icon: Icon(_pausedAll ? Icons.play_arrow_rounded : Icons.pause_rounded, size: 18),
+          icon: Icon(
+            _pausedAll ? Icons.play_arrow_rounded : Icons.pause_rounded,
+            size: 18,
+          ),
           label: Text(_pausedAll ? '继续全部' : '暂停全部'),
         ),
       ],
@@ -439,7 +462,12 @@ class _FilesPageState extends State<FilesPage> {
         header,
         Expanded(
           child: Padding(
-            padding: EdgeInsets.fromLTRB(wide ? 32 : 16, 0, wide ? 32 : 16, wide ? 24 : 16),
+            padding: EdgeInsets.fromLTRB(
+              wide ? 32 : 16,
+              0,
+              wide ? 32 : 16,
+              wide ? 24 : 16,
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -459,7 +487,8 @@ class _FilesPageState extends State<FilesPage> {
                     text: _error!,
                     onClose: () => setState(() => _error = null),
                   ),
-                if (_notice != null || _error != null) const SizedBox(height: 12),
+                if (_notice != null || _error != null)
+                  const SizedBox(height: 12),
                 queue,
                 const SizedBox(height: 16),
                 Expanded(
@@ -540,7 +569,10 @@ class _QueuePanel extends StatelessWidget {
                 if (rate > 0)
                   Text(
                     '总速率 ${_rate(rate)}',
-                    style: text.labelSmall?.copyWith(color: scheme.onSurfaceVariant, fontFamily: 'monospace'),
+                    style: text.labelSmall?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                      fontFamily: 'monospace',
+                    ),
                   ),
                 const SizedBox(width: 10),
                 TextButton(
@@ -551,18 +583,27 @@ class _QueuePanel extends StatelessWidget {
               ],
             ),
           ),
-          Divider(height: 1, color: scheme.outlineVariant.withValues(alpha: 0.5)),
+          Divider(
+            height: 1,
+            color: scheme.outlineVariant.withValues(alpha: 0.5),
+          ),
           if (tasks.isEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 22),
               child: Row(
                 children: [
-                  Icon(Icons.swap_vert_rounded, size: 18, color: scheme.onSurfaceVariant),
+                  Icon(
+                    Icons.swap_vert_rounded,
+                    size: 18,
+                    color: scheme.onSurfaceVariant,
+                  ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       '还没有传输任务：在左侧「本机」栏选择文件后点上传，这里会显示真实进度。',
-                      style: text.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+                      style: text.bodySmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
                     ),
                   ),
                 ],
@@ -575,7 +616,10 @@ class _QueuePanel extends StatelessWidget {
                 shrinkWrap: true,
                 padding: EdgeInsets.zero,
                 itemCount: tasks.length,
-                separatorBuilder: (_, _) => Divider(height: 1, color: scheme.outlineVariant.withValues(alpha: 0.4)),
+                separatorBuilder: (_, _) => Divider(
+                  height: 1,
+                  color: scheme.outlineVariant.withValues(alpha: 0.4),
+                ),
                 itemBuilder: (context, i) => _QueueRow(
                   task: tasks[i],
                   onPause: () => onPause(tasks[i]),
@@ -611,18 +655,34 @@ class _QueueRow extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final text = Theme.of(context).textTheme;
 
-    final (Color barColor, Color stateColor, String stateText) = switch (task.state) {
-      _TaskState.done => (const Color(0xFF1E7B45), const Color(0xFF1E7B45), '已完成'),
+    final (
+      Color barColor,
+      Color stateColor,
+      String stateText,
+    ) = switch (task.state) {
+      _TaskState.done => (
+        const Color(0xFF1E7B45),
+        const Color(0xFF1E7B45),
+        '已完成',
+      ),
       _TaskState.failed => (scheme.error, scheme.error, '失败'),
-      _TaskState.paused => (const Color(0xFFB4BCC8), scheme.onSurfaceVariant, '已暂停'),
-      _TaskState.queued => (scheme.outlineVariant, scheme.onSurfaceVariant, '排队中'),
+      _TaskState.paused => (
+        const Color(0xFFB4BCC8),
+        scheme.onSurfaceVariant,
+        '已暂停',
+      ),
+      _TaskState.queued => (
+        scheme.outlineVariant,
+        scheme.onSurfaceVariant,
+        '排队中',
+      ),
       _TaskState.uploading => (scheme.primary, scheme.primary, '上传中'),
     };
 
     final sentText = task.state == _TaskState.done
         ? '${_pretty(task.size)} · 平均 ${_rate(task.bytesPerSecond)}'
         : '${_pretty(task.sent)} / ${_pretty(task.total == 0 ? task.size : task.total)}'
-            '${task.state == _TaskState.uploading ? ' · ${_rate(task.bytesPerSecond)}' : ''}';
+              '${task.state == _TaskState.uploading ? ' · ${_rate(task.bytesPerSecond)}' : ''}';
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 10, 10, 10),
@@ -632,13 +692,19 @@ class _QueueRow extends StatelessWidget {
             width: 30,
             height: 30,
             decoration: BoxDecoration(
-              color: task.state == _TaskState.done ? const Color(0xFFDDF1E4) : scheme.primaryContainer,
+              color: task.state == _TaskState.done
+                  ? const Color(0xFFDDF1E4)
+                  : scheme.primaryContainer,
               borderRadius: BorderRadius.circular(ErTokens.radiusSm),
             ),
             child: Icon(
-              task.state == _TaskState.done ? Icons.check_rounded : Icons.upload_rounded,
+              task.state == _TaskState.done
+                  ? Icons.check_rounded
+                  : Icons.upload_rounded,
               size: 16,
-              color: task.state == _TaskState.done ? const Color(0xFF1E7B45) : scheme.onPrimaryContainer,
+              color: task.state == _TaskState.done
+                  ? const Color(0xFF1E7B45)
+                  : scheme.onPrimaryContainer,
             ),
           ),
           const SizedBox(width: 10),
@@ -656,7 +722,9 @@ class _QueueRow extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   '本机 → 远端（网关存储）',
-                  style: text.labelSmall?.copyWith(color: scheme.onSurfaceVariant),
+                  style: text.labelSmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
                   overflow: TextOverflow.ellipsis,
                 ),
               ],
@@ -680,12 +748,17 @@ class _QueueRow extends StatelessWidget {
                 const SizedBox(height: 4),
                 Row(
                   children: [
-                    Text('${task.percent}%', style: text.labelSmall?.copyWith(color: scheme.onSurface)),
+                    Text(
+                      '${task.percent}%',
+                      style: text.labelSmall?.copyWith(color: scheme.onSurface),
+                    ),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
                         task.error ?? sentText,
-                        style: text.labelSmall?.copyWith(color: scheme.onSurfaceVariant),
+                        style: text.labelSmall?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                        ),
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
@@ -700,12 +773,16 @@ class _QueueRow extends StatelessWidget {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                if (task.state == _TaskState.done) Icon(Icons.check_circle_rounded, size: 14, color: stateColor),
+                if (task.state == _TaskState.done)
+                  Icon(Icons.check_circle_rounded, size: 14, color: stateColor),
                 const SizedBox(width: 4),
                 Flexible(
                   child: Text(
                     stateText,
-                    style: text.labelSmall?.copyWith(color: stateColor, fontWeight: FontWeight.w600),
+                    style: text.labelSmall?.copyWith(
+                      color: stateColor,
+                      fontWeight: FontWeight.w600,
+                    ),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
@@ -721,7 +798,11 @@ class _QueueRow extends StatelessWidget {
   Widget _taskAction() {
     return switch (task.state) {
       _TaskState.uploading => _iconButton(Icons.pause_rounded, '暂停传输', onPause),
-      _TaskState.paused => _iconButton(Icons.play_arrow_rounded, '继续传输', onResume),
+      _TaskState.paused => _iconButton(
+        Icons.play_arrow_rounded,
+        '继续传输',
+        onResume,
+      ),
       _TaskState.queued => _iconButton(Icons.close_rounded, '移出队列', onRemove),
       _TaskState.done => _iconButton(Icons.close_rounded, '从队列移除', onRemove),
       _TaskState.failed => _iconButton(Icons.refresh_rounded, '重试', onRetry),
@@ -768,7 +849,12 @@ class _LocalPane extends StatelessWidget {
           TextButton.icon(
             key: const Key('pick-file'),
             onPressed: onPick,
-            icon: Icon(pickerSupported ? Icons.upload_rounded : Icons.drive_file_rename_outline_rounded, size: 16),
+            icon: Icon(
+              pickerSupported
+                  ? Icons.upload_rounded
+                  : Icons.drive_file_rename_outline_rounded,
+              size: 16,
+            ),
             label: Text(pickerSupported ? '选择文件' : '按路径选择'),
           ),
           TextButton(
@@ -793,14 +879,19 @@ class _LocalPane extends StatelessWidget {
                             ? '点「选择文件」挑一个本机文件；浏览器不允许枚举目录，所以这里只列你选中的文件。文本文件也可以走「文本内容」入口。'
                             : '点「按路径选择」填写本机路径；桌面端才能读本机文件。',
                         textAlign: TextAlign.center,
-                        style: text.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+                        style: text.bodySmall?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                        ),
                       ),
                     ),
                   )
                 : ListView.separated(
                     padding: EdgeInsets.zero,
                     itemCount: files.length,
-                    separatorBuilder: (_, _) => Divider(height: 1, color: scheme.outlineVariant.withValues(alpha: 0.4)),
+                    separatorBuilder: (_, _) => Divider(
+                      height: 1,
+                      color: scheme.outlineVariant.withValues(alpha: 0.4),
+                    ),
                     itemBuilder: (context, i) {
                       final f = files[i];
                       return _FRow(
@@ -812,7 +903,11 @@ class _LocalPane extends StatelessWidget {
                           _rowIconButton(
                             tooltip: '上传',
                             onPressed: () => onUpload(f),
-                            icon: Icon(Icons.upload_rounded, size: 18, color: scheme.primary),
+                            icon: Icon(
+                              Icons.upload_rounded,
+                              size: 18,
+                              color: scheme.primary,
+                            ),
                           ),
                           _rowIconButton(
                             tooltip: '移除',
@@ -826,7 +921,10 @@ class _LocalPane extends StatelessWidget {
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 6, 12, 8),
-            child: Text(notice, style: text.labelSmall?.copyWith(color: scheme.onSurfaceVariant)),
+            child: Text(
+              notice,
+              style: text.labelSmall?.copyWith(color: scheme.onSurfaceVariant),
+            ),
           ),
         ],
       ),
@@ -877,63 +975,90 @@ class _RemotePane extends StatelessWidget {
           const _FTableHeader(columns: ['名称', '大小', '时间']),
           Expanded(
             child: loading && list == null
-                ? const Center(child: SizedBox(height: 22, width: 22, child: CircularProgressIndicator(strokeWidth: 2)))
+                ? const Center(
+                    child: SizedBox(
+                      height: 22,
+                      width: 22,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  )
                 : (list == null || list.isEmpty)
-                    ? Center(
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 20),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
+                ? Center(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.folder_open_rounded,
+                            size: 26,
+                            color: scheme.onSurfaceVariant,
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            error != null ? '加载失败：$error' : '远端还没有文件',
+                            textAlign: TextAlign.center,
+                            style: text.bodySmall?.copyWith(
+                              color: scheme.onSurfaceVariant,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          Wrap(
+                            spacing: 8,
                             children: [
-                              Icon(Icons.folder_open_rounded, size: 26, color: scheme.onSurfaceVariant),
-                              const SizedBox(height: 8),
-                              Text(
-                                error != null ? '加载失败：$error' : '远端还没有文件',
-                                textAlign: TextAlign.center,
-                                style: text.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+                              OutlinedButton(
+                                onPressed: onRefresh,
+                                child: const Text('刷新'),
                               ),
-                              const SizedBox(height: 10),
-                              Wrap(
-                                spacing: 8,
-                                children: [
-                                  OutlinedButton(onPressed: onRefresh, child: const Text('刷新')),
-                                  TextButton(onPressed: onUploadEntry, child: const Text('上传文本文件')),
-                                ],
+                              TextButton(
+                                onPressed: onUploadEntry,
+                                child: const Text('上传文本文件'),
                               ),
                             ],
                           ),
-                        ),
-                      )
-                    : ListView.separated(
-                        padding: EdgeInsets.zero,
-                        itemCount: list.length,
-                        separatorBuilder: (_, _) => Divider(height: 1, color: scheme.outlineVariant.withValues(alpha: 0.4)),
-                        itemBuilder: (context, i) {
-                          final f = list[i];
-                          return _FRow(
-                            leading: Icons.description_outlined,
-                            name: f.name,
-                            size: f.prettySize,
-                            meta: _ago(f.createdAt),
-                            actions: [
-                              _rowIconButton(
-                                tooltip: localFileAccessSupported ? '下载' : '复制下载票据',
-                                onPressed: () => onDownload(f),
-                                icon: Icon(
-                                  localFileAccessSupported ? Icons.download_rounded : Icons.link_rounded,
-                                  size: 18,
-                                  color: scheme.primary,
-                                ),
-                              ),
-                              _rowIconButton(
-                                tooltip: '删除',
-                                onPressed: () => onDelete(f),
-                                icon: Icon(Icons.delete_outline_rounded, size: 18, color: scheme.error),
-                              ),
-                            ],
-                          );
-                        },
+                        ],
                       ),
+                    ),
+                  )
+                : ListView.separated(
+                    padding: EdgeInsets.zero,
+                    itemCount: list.length,
+                    separatorBuilder: (_, _) => Divider(
+                      height: 1,
+                      color: scheme.outlineVariant.withValues(alpha: 0.4),
+                    ),
+                    itemBuilder: (context, i) {
+                      final f = list[i];
+                      return _FRow(
+                        leading: Icons.description_outlined,
+                        name: f.name,
+                        size: f.prettySize,
+                        meta: _ago(f.createdAt),
+                        actions: [
+                          _rowIconButton(
+                            tooltip: localFileAccessSupported ? '下载' : '复制下载票据',
+                            onPressed: () => onDownload(f),
+                            icon: Icon(
+                              localFileAccessSupported
+                                  ? Icons.download_rounded
+                                  : Icons.link_rounded,
+                              size: 18,
+                              color: scheme.primary,
+                            ),
+                          ),
+                          _rowIconButton(
+                            tooltip: '删除',
+                            onPressed: () => onDelete(f),
+                            icon: Icon(
+                              Icons.delete_outline_rounded,
+                              size: 18,
+                              color: scheme.error,
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
           ),
         ],
       ),
@@ -984,7 +1109,10 @@ class _Pane extends StatelessWidget {
                 Expanded(
                   child: Text(
                     path,
-                    style: text.labelSmall?.copyWith(color: scheme.onSurfaceVariant, fontFamily: 'monospace'),
+                    style: text.labelSmall?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                      fontFamily: 'monospace',
+                    ),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
@@ -992,21 +1120,36 @@ class _Pane extends StatelessWidget {
               ],
             ),
           ),
-          Divider(height: 1, color: scheme.outlineVariant.withValues(alpha: 0.5)),
+          Divider(
+            height: 1,
+            color: scheme.outlineVariant.withValues(alpha: 0.5),
+          ),
           Padding(
             padding: const EdgeInsets.fromLTRB(14, 8, 14, 8),
             child: Row(
               children: [
-                Text(crumbs.first, style: text.labelSmall?.copyWith(fontWeight: FontWeight.w600)),
-                Icon(Icons.chevron_right_rounded, size: 14, color: scheme.onSurfaceVariant),
+                Text(
+                  crumbs.first,
+                  style: text.labelSmall?.copyWith(fontWeight: FontWeight.w600),
+                ),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  size: 14,
+                  color: scheme.onSurfaceVariant,
+                ),
                 Text(
                   crumbs.length > 1 ? crumbs[1] : '',
-                  style: text.labelSmall?.copyWith(color: scheme.onSurfaceVariant),
+                  style: text.labelSmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
                 ),
               ],
             ),
           ),
-          Divider(height: 1, color: scheme.outlineVariant.withValues(alpha: 0.45)),
+          Divider(
+            height: 1,
+            color: scheme.outlineVariant.withValues(alpha: 0.45),
+          ),
           Expanded(child: child),
         ],
       ),
@@ -1030,15 +1173,24 @@ class _FTableHeader extends StatelessWidget {
         children: [
           const SizedBox(width: 25),
           Expanded(
-            child: Text(columns[0], style: text.labelSmall?.copyWith(color: scheme.onSurfaceVariant)),
+            child: Text(
+              columns[0],
+              style: text.labelSmall?.copyWith(color: scheme.onSurfaceVariant),
+            ),
           ),
           SizedBox(
             width: 78,
-            child: Text(columns[1], style: text.labelSmall?.copyWith(color: scheme.onSurfaceVariant)),
+            child: Text(
+              columns[1],
+              style: text.labelSmall?.copyWith(color: scheme.onSurfaceVariant),
+            ),
           ),
           SizedBox(
             width: 92,
-            child: Text(columns[2], style: text.labelSmall?.copyWith(color: scheme.onSurfaceVariant)),
+            child: Text(
+              columns[2],
+              style: text.labelSmall?.copyWith(color: scheme.onSurfaceVariant),
+            ),
           ),
           const SizedBox(width: 72),
         ],
@@ -1072,12 +1224,21 @@ class _FRow extends StatelessWidget {
         children: [
           Icon(leading, size: 17, color: scheme.onSurfaceVariant),
           const SizedBox(width: 8),
-          Expanded(child: Text(name, style: text.bodySmall, overflow: TextOverflow.ellipsis)),
+          Expanded(
+            child: Text(
+              name,
+              style: text.bodySmall,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
           SizedBox(
             width: 78,
             child: Text(
               size,
-              style: text.labelSmall?.copyWith(color: scheme.onSurfaceVariant, fontFamily: 'monospace'),
+              style: text.labelSmall?.copyWith(
+                color: scheme.onSurfaceVariant,
+                fontFamily: 'monospace',
+              ),
               overflow: TextOverflow.ellipsis,
             ),
           ),
@@ -1085,13 +1246,19 @@ class _FRow extends StatelessWidget {
             width: 92,
             child: Text(
               meta,
-              style: text.labelSmall?.copyWith(color: scheme.onSurfaceVariant, fontFamily: 'monospace'),
+              style: text.labelSmall?.copyWith(
+                color: scheme.onSurfaceVariant,
+                fontFamily: 'monospace',
+              ),
               overflow: TextOverflow.ellipsis,
             ),
           ),
           SizedBox(
             width: 72,
-            child: Row(mainAxisAlignment: MainAxisAlignment.end, children: actions),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: actions,
+            ),
           ),
         ],
       ),
@@ -1112,7 +1279,9 @@ Widget _rowIconButton({
     padding: EdgeInsets.zero,
     constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
     visualDensity: VisualDensity.compact,
-    style: IconButton.styleFrom(tapTargetSize: MaterialTapTargetSize.shrinkWrap),
+    style: IconButton.styleFrom(
+      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    ),
   );
 }
 
@@ -1131,7 +1300,11 @@ class _CountChip extends StatelessWidget {
         borderRadius: BorderRadius.circular(ErTokens.radiusPill),
         border: Border.all(color: scheme.outlineVariant.withValues(alpha: 0.6)),
       ),
-      child: Text(text, style: Theme.of(context).textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant)),
+      child: Text(
+        text,
+        style: Theme.of(context).textTheme.labelSmall
+            ?.copyWith(color: scheme.onSurfaceVariant),
+      ),
     );
   }
 }
@@ -1156,12 +1329,21 @@ class _Banner extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.fromLTRB(12, 8, 4, 8),
-      decoration: BoxDecoration(color: background, borderRadius: BorderRadius.circular(ErTokens.radiusMd)),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(ErTokens.radiusMd),
+      ),
       child: Row(
         children: [
           Icon(icon, size: 16, color: color),
           const SizedBox(width: 8),
-          Expanded(child: Text(text, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: color))),
+          Expanded(
+            child: Text(
+              text,
+              style: Theme.of(context).textTheme.bodySmall
+                  ?.copyWith(color: color),
+            ),
+          ),
           IconButton(
             onPressed: onClose,
             icon: Icon(Icons.close_rounded, size: 16, color: color),
@@ -1234,17 +1416,26 @@ class _TextFileDialogState extends State<_TextFileDialog> {
               controller: _body,
               minLines: 4,
               maxLines: 8,
-              decoration: const InputDecoration(labelText: '文本内容（UTF-8）', alignLabelWithHint: true),
+              decoration: const InputDecoration(
+                labelText: '文本内容（UTF-8）',
+                alignLabelWithHint: true,
+              ),
             ),
             if (_error != null) ...[
               const SizedBox(height: 10),
-              Text(_error!, style: text.bodySmall?.copyWith(color: scheme.error)),
+              Text(
+                _error!,
+                style: text.bodySmall?.copyWith(color: scheme.error),
+              ),
             ],
           ],
         ),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('取消')),
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('取消'),
+        ),
         FilledButton(
           key: const Key('text-file-submit'),
           onPressed: _submit,
@@ -1265,7 +1456,8 @@ String _pretty(int bytes) {
 String _rate(double bytesPerSecond) {
   if (bytesPerSecond <= 0) return '—';
   if (bytesPerSecond < 1024) return '${bytesPerSecond.toStringAsFixed(0)} B/s';
-  if (bytesPerSecond < 1024 * 1024) return '${(bytesPerSecond / 1024).toStringAsFixed(1)} KiB/s';
+  if (bytesPerSecond < 1024 * 1024)
+    return '${(bytesPerSecond / 1024).toStringAsFixed(1)} KiB/s';
   return '${(bytesPerSecond / (1024 * 1024)).toStringAsFixed(1)} MiB/s';
 }
 

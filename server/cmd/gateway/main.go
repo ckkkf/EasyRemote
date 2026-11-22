@@ -6,9 +6,12 @@ import (
 	"context"
 	"flag"
 	"log"
+	"os"
 
 	"github.com/easyremote/server/internal/config"
+	"github.com/easyremote/server/internal/gateway"
 	"github.com/easyremote/server/internal/serve"
+	"github.com/easyremote/server/internal/signal"
 	"github.com/easyremote/server/internal/stack"
 )
 
@@ -18,6 +21,9 @@ func main() {
 
 	ctx := context.Background()
 
+	if err := config.ValidateDeployment(os.Getenv); err != nil {
+		log.Fatalf("gateway: %v", err)
+	}
 	secret, err := config.Secret()
 	if err != nil {
 		log.Fatalf("gateway: %v", err)
@@ -32,7 +38,29 @@ func main() {
 	if err != nil {
 		log.Fatalf("gateway: open limiter: %v", err)
 	}
-	app, err := stack.BuildGateway(st, secret, limiter, stack.DevSMSProvider())
+	// 多实例通知：REDIS_URL 注入共享 Bus；进程内 Hub 只用于一体化开发。
+	var notifier gateway.ConsentNotifier
+	var presence gateway.Presence
+	var closer gateway.SessionCloser
+	if url := os.Getenv("REDIS_URL"); url != "" {
+		bus, busErr := signal.NewRedisBus(ctx, url, "gateway")
+		if busErr != nil {
+			log.Fatalf("gateway: signal bus: %v", busErr)
+		}
+		defer bus.Close()
+		n := signal.ConsentNotifier{Bus: bus}
+		notifier = n
+		presence = signal.Presence{Bus: bus}
+		closer = n
+	} else if config.IsProduction() {
+		// 生产没有共享 Bus 时，建会话无法送达被控端，必须拒绝启动。
+		log.Fatal("gateway: REDIS_URL is required in production (consent delivery)")
+	}
+	var epochs gateway.TicketEpochs
+	if e, ok := notifier.(gateway.TicketEpochs); ok {
+		epochs = e
+	}
+	app, err := stack.BuildGateway(st, secret, limiter, stack.DevSMSProvider(), notifier, presence, closer, epochs)
 	if err != nil {
 		log.Fatalf("gateway: %v", err)
 	}

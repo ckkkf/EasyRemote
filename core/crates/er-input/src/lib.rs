@@ -334,3 +334,90 @@ mod tests {
         assert!(x <= 1920 && y <= 1080);
     }
 }
+
+/// 输入顺序器：UDP 可能乱序/重复；按 seq 缓冲并有序交付。
+///
+/// 硬约束：最多缓存 64 个乱序事件；超限丢弃最旧，避免内存无限增长。
+pub struct InputSequencer {
+    next: u32,
+    pending: std::collections::BTreeMap<u32, InputEvent>,
+}
+
+pub const INPUT_SEQ_WINDOW: usize = 64;
+
+impl Default for InputSequencer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl InputSequencer {
+    pub fn new() -> Self {
+        Self {
+            next: 0,
+            pending: std::collections::BTreeMap::new(),
+        }
+    }
+
+    /// 推入一个带序号事件，返回当前可交付的有序事件。
+    pub fn push(&mut self, seq: u32, event: InputEvent) -> Vec<InputEvent> {
+        if seq < self.next {
+            return Vec::new(); // 重复/过期
+        }
+        self.pending.insert(seq, event);
+        while self.pending.len() > INPUT_SEQ_WINDOW {
+            if let Some((&oldest, _)) = self.pending.iter().next() {
+                self.pending.remove(&oldest);
+            } else {
+                break;
+            }
+        }
+        let mut out = Vec::new();
+        while let Some(ev) = self.pending.remove(&self.next) {
+            out.push(ev);
+            self.next = self.next.wrapping_add(1);
+        }
+        out
+    }
+
+    pub fn pending_len(&self) -> usize {
+        self.pending.len()
+    }
+}
+
+#[cfg(test)]
+mod sequencer_tests {
+    use super::*;
+
+    fn key(code: u16) -> InputEvent {
+        InputEvent::Key {
+            scancode: code,
+            pressed: true,
+        }
+    }
+
+    #[test]
+    fn out_of_order_is_delivered_in_order() {
+        let mut s = InputSequencer::new();
+        assert!(s.push(1, key(1)).is_empty());
+        let out = s.push(0, key(0));
+        assert_eq!(out, vec![key(0), key(1)]);
+        assert_eq!(s.pending_len(), 0);
+    }
+
+    #[test]
+    fn duplicates_are_dropped() {
+        let mut s = InputSequencer::new();
+        assert_eq!(s.push(0, key(0)), vec![key(0)]);
+        assert!(s.push(0, key(9)).is_empty());
+    }
+
+    #[test]
+    fn pending_is_bounded() {
+        let mut s = InputSequencer::new();
+        for seq in 1..=(INPUT_SEQ_WINDOW as u32 + 20) {
+            s.push(seq, key(seq as u16));
+        }
+        assert!(s.pending_len() <= INPUT_SEQ_WINDOW);
+    }
+}

@@ -29,14 +29,35 @@ type ConsentNotifier interface {
 	NotifyConsentRequired(sessionID, from, to string) error
 }
 
+// Presence 是网关侧的在线判定接口（signal.Presence 实现）。
+type Presence interface {
+	Online(ctx context.Context, deviceID string) (bool, error)
+}
+
+// SessionCloser 把关闭事件传播给会话双方（signal.ConsentNotifier 实现）。
+type SessionCloser interface {
+	NotifySessionClosed(sessionID, from, to, reason string) error
+}
+
+// TicketEpochs 分配/读取票据代号（重连换票后旧票失效）。
+type TicketEpochs interface {
+	NextTicketEpoch(ctx context.Context, sessionID, deviceID string) (int64, error)
+}
+
 type App struct {
 	Notifier ConsentNotifier
-	Limiter  ratelimit.Limiter
-	Auth     *auth.Service
-	Device   *device.Service
-	Session  *session.Service
-	Relay    *relaymgr.Service
-	Store    store.Store
+	// Presence 非空时，建会话前必须证明目标设备在线（生产网关强制注入）。
+	Presence Presence
+	// Closer 向双方传播关闭事件（生产注入 Bus）。
+	Closer SessionCloser
+	// TicketEpochs 为票据轮换代号的来源；为空时使用单机模式（epoch=0）。
+	TicketEpochs TicketEpochs
+	Limiter      ratelimit.Limiter
+	Auth         *auth.Service
+	Device       *device.Service
+	Session      *session.Service
+	Relay        *relaymgr.Service
+	Store        store.Store
 	// Config 是运行时配置中心（P1-1）。nil 时全部使用默认值。
 	Config *appconfig.Service
 	// FilesDir 是文件落盘根目录；空则用 os.TempDir()/easyremote-files。
@@ -92,6 +113,10 @@ func (a *App) Routes() http.Handler {
 			Service string `json:"service"`
 		}{Service: "gateway"})
 	})
+	// /readyz 的就绪检查由 stack.MountReady 注入；网关单独运行时退化为存活。
+	mux.HandleFunc("/readyz", func(w http.ResponseWriter, r *http.Request) {
+		httpx.OK(w, r, contract.OkResult{OK: true})
+	})
 
 	mux.HandleFunc("/v1/auth/sms", func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -116,7 +141,7 @@ func (a *App) Routes() http.Handler {
 			WriteErr(w, err)
 			return
 		}
-		httpx.OK(w, r, map[string]any{"ok": true})
+		httpx.OK(w, r, contract.OkResult{OK: true})
 	})
 
 	mux.HandleFunc("/v1/auth/login", func(w http.ResponseWriter, r *http.Request) {
@@ -140,7 +165,7 @@ func (a *App) Routes() http.Handler {
 			WriteErr(w, err)
 			return
 		}
-		httpx.OK(w, r, map[string]any{"token": tok, "account_id": acc.ID})
+		httpx.OK(w, r, contract.LoginResult{Token: tok, AccountID: acc.ID})
 	})
 
 	mux.HandleFunc("/v1/devices", func(w http.ResponseWriter, r *http.Request) {
@@ -155,17 +180,26 @@ func (a *App) Routes() http.Handler {
 			WriteErr(w, errcode.New(errcode.SrvInternal, err.Error()))
 			return
 		}
-		out := make([]map[string]any, 0, len(list))
+		out := make([]contract.DeviceItem, 0, len(list))
 		for _, d := range list {
-			out = append(out, map[string]any{
-				"device_code": device.FormatCode(d.DeviceCode),
-				"raw_code":    d.DeviceCode,
-				"platform":    d.Platform,
-				"online":      d.Online,
-				"last_seen":   d.LastSeenAt,
+			online := d.Online
+			if a.Presence != nil {
+				// 在线状态以信令租约为准，而不是绑定表里的历史布尔值。
+				if v, perr := a.Presence.Online(ctx, d.ID); perr == nil {
+					online = v
+				} else {
+					online = false
+				}
+			}
+			out = append(out, contract.DeviceItem{
+				DeviceCode: device.FormatCode(d.DeviceCode),
+				RawCode:    d.DeviceCode,
+				Platform:   d.Platform,
+				Online:     online,
+				LastSeen:   d.LastSeenAt,
 			})
 		}
-		httpx.OK(w, r, map[string]any{"devices": out})
+		httpx.OK(w, r, contract.DeviceListResult{Devices: out})
 	})
 
 	mux.HandleFunc("/v1/devices/bind", func(w http.ResponseWriter, r *http.Request) {
@@ -230,7 +264,7 @@ func (a *App) Routes() http.Handler {
 			WriteErr(w, err)
 			return
 		}
-		httpx.OK(w, r, map[string]any{"code": code, "expires_at": exp})
+		httpx.OK(w, r, contract.VerifyCodeResult{Code: code, ExpiresAt: exp})
 	})
 
 	// 被控端设置「临时密码」：长期有效、校验不消费、可反复使用。
@@ -260,9 +294,7 @@ func (a *App) Routes() http.Handler {
 			return
 		}
 		// 新路由用具体类型，不再往存量的无类型响应体里加（gate 禁止模式）
-		httpx.OK(w, r, struct {
-			OK bool `json:"ok"`
-		}{OK: true})
+		httpx.OK(w, r, contract.OkResult{OK: true})
 	})
 
 	mux.HandleFunc("/v1/connect/request", func(w http.ResponseWriter, r *http.Request) {
@@ -326,22 +358,34 @@ func (a *App) Routes() http.Handler {
 				}
 			}
 		}
+		// 建会话前证明目标在线：不能返回一个永远没人处理的 requested。
+		if a.Presence != nil {
+			online, perr := a.Presence.Online(ctx, target.ID)
+			if perr != nil || !online {
+				WriteErr(w, errcode.New(errcode.ConnDeviceOffline, "target offline"))
+				return
+			}
+		}
 		sess, err := a.Session.Request(ctx, controllerID, target.ID)
 		if err != nil {
 			WriteErr(w, err)
 			return
 		}
-		// 通知被控端有新的授权请求。
-		// 不通知的话，被控端的信令长连接永远等不到 CONSENT_REQUIRED，
-		// 端到端会卡在「主控已发起、被控毫无反应」。
-		if a.Notifier != nil && sess.State == session.StateRequested {
-			_ = a.Notifier.NotifyConsentRequired(sess.ID, controllerID, target.ID)
+		// 通知被控端有新的授权请求；生产（注入 Presence）下投递失败必须 fail-closed。
+		if sess.State == session.StateRequested {
+			if a.Notifier == nil {
+				if a.Presence != nil {
+					_, _ = a.Session.Close(ctx, sess.ID, "no consent notifier")
+					WriteErr(w, errcode.New(errcode.ConnDeviceOffline, "consent notifier unavailable"))
+					return
+				}
+			} else if nerr := a.Notifier.NotifyConsentRequired(sess.ID, controllerID, target.ID); nerr != nil && a.Presence != nil {
+				_, _ = a.Session.Close(ctx, sess.ID, "consent delivery failed")
+				WriteErr(w, errcode.New(errcode.ConnDeviceOffline, "consent delivery failed"))
+				return
+			}
 		}
-		httpx.OK(w, r, struct {
-			SessionID string `json:"session_id"`
-			State     string `json:"state"`
-			Trusted   bool   `json:"trusted"`
-		}{
+		httpx.OK(w, r, contract.ConnectResult{
 			SessionID: sess.ID,
 			State:     sess.State,
 			Trusted:   trusted || directSameAccount,
@@ -374,22 +418,27 @@ func (a *App) Routes() http.Handler {
 			WriteErr(w, err)
 			return
 		}
-		httpx.OK(w, r, map[string]any{"session_id": sess.ID, "state": sess.State, "auth_expire_at": sess.AuthExpireAt})
+		httpx.OK(w, r, contract.ConsentResult{SessionID: sess.ID, State: sess.State, AuthExpireAt: sess.AuthExpireAt})
 	})
 
 	mux.HandleFunc("/v1/connect/status", func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
+		// 契约 auth: bearer —— 先证明账号身份，再校验该账号拥有会话的一方。
+		acc, err := a.account(ctx, r)
+		if err != nil {
+			WriteErr(w, err)
+			return
+		}
 		sess, err := a.Session.Get(ctx, r.URL.Query().Get("session_id"))
 		if err != nil {
 			WriteErr(w, err)
 			return
 		}
-		// 会话状态同样只对会话双方可见
-		if a.requireDevice(ctx, r, sess.ControllerID) != nil && a.requireDevice(ctx, r, sess.TargetID) != nil {
-			WriteErr(w, errcode.New(errcode.AdminForbidden, "session party credential required"))
+		if !a.ownsDevice(ctx, acc.ID, sess.ControllerID) && !a.ownsDevice(ctx, acc.ID, sess.TargetID) {
+			WriteErr(w, errcode.New(errcode.AdminForbidden, "session party account required"))
 			return
 		}
-		httpx.OK(w, r, map[string]any{"session_id": sess.ID, "state": sess.State, "reason": sess.Reason})
+		httpx.OK(w, r, contract.SessionStateResult{SessionID: sess.ID, State: sess.State, Reason: sess.Reason})
 	})
 
 	// 设备登记长期身份公钥（Ed25519 hex）。
@@ -426,10 +475,91 @@ func (a *App) Routes() http.Handler {
 			WriteErr(w, errcode.New(errcode.SrvInternal, err.Error()))
 			return
 		}
-		httpx.OK(w, r, map[string]any{"ok": true})
+		httpx.OK(w, r, contract.OkResult{OK: true})
 	})
 
 	// 下发会话双方的身份公钥：只有会话两端能读，且只对活跃会话有效。
+	// 会话内任一端主动结束：写 closed，并向双方传播关闭事件（客户端也会轮询状态兜底）。
+	mux.HandleFunc("/v1/sessions/close", func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		var req struct {
+			SessionID string `json:"session_id"`
+			Reason    string `json:"reason"`
+		}
+		if err := httpx.Decode(w, r, &req); err != nil {
+			WriteErr(w, errcode.New(errcode.SrvInternal, "bad body"))
+			return
+		}
+		sess, err := a.Session.Get(ctx, req.SessionID)
+		if err != nil {
+			WriteErr(w, err)
+			return
+		}
+		deviceID := ""
+		if a.requireDevice(ctx, r, sess.ControllerID) == nil {
+			deviceID = sess.ControllerID
+		} else if a.requireDevice(ctx, r, sess.TargetID) == nil {
+			deviceID = sess.TargetID
+		} else {
+			WriteErr(w, errcode.New(errcode.AdminForbidden, "session party credential required"))
+			return
+		}
+		reason := strings.TrimSpace(req.Reason)
+		if reason == "" {
+			reason = "closed by " + deviceID
+		}
+		closed, err := a.Session.Close(ctx, req.SessionID, reason)
+		if err != nil {
+			WriteErr(w, err)
+			return
+		}
+		if a.Closer != nil {
+			// 状态已 closed；传播失败不能回滚，客户端状态轮询仍会收敛。
+			_ = a.Closer.NotifySessionClosed(closed.ID, closed.ControllerID, closed.TargetID, reason)
+		}
+		httpx.OK(w, r, contract.SessionStateResult{
+			SessionID: closed.ID,
+			State:     closed.State,
+			Reason:    closed.Reason,
+		})
+	})
+
+	// 数据面 ready：会话双方各自上报；两端都 ready 且已授权才进入 active。
+	mux.HandleFunc("/v1/sessions/ready", func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		var req struct {
+			SessionID string `json:"session_id"`
+		}
+		if err := httpx.Decode(w, r, &req); err != nil {
+			WriteErr(w, errcode.New(errcode.SrvInternal, "bad body"))
+			return
+		}
+		sess, err := a.Session.Get(ctx, req.SessionID)
+		if err != nil {
+			WriteErr(w, err)
+			return
+		}
+		deviceID := ""
+		if a.requireDevice(ctx, r, sess.ControllerID) == nil {
+			deviceID = sess.ControllerID
+		} else if a.requireDevice(ctx, r, sess.TargetID) == nil {
+			deviceID = sess.TargetID
+		} else {
+			WriteErr(w, errcode.New(errcode.AdminForbidden, "session party credential required"))
+			return
+		}
+		updated, err := a.Session.Ready(ctx, req.SessionID, deviceID)
+		if err != nil {
+			WriteErr(w, err)
+			return
+		}
+		httpx.OK(w, r, contract.SessionStateResult{
+			SessionID: updated.ID,
+			State:     updated.State,
+			Reason:    updated.Reason,
+		})
+	})
+
 	mux.HandleFunc("/v1/connect/keys", func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		acc, err := a.account(ctx, r)
@@ -451,12 +581,12 @@ func (a *App) Routes() http.Handler {
 		}
 		ctrlPub, _ := a.Store.GetDeviceIdentity(ctx, sess.ControllerID)
 		targetPub, _ := a.Store.GetDeviceIdentity(ctx, sess.TargetID)
-		httpx.OK(w, r, map[string]any{
-			"session_id":        sess.ID,
-			"controller_id":     sess.ControllerID,
-			"target_id":         sess.TargetID,
-			"controller_pubkey": ctrlPub,
-			"target_pubkey":     targetPub,
+		httpx.OK(w, r, contract.SessionKeysResult{
+			SessionID:        sess.ID,
+			ControllerID:     sess.ControllerID,
+			TargetID:         sess.TargetID,
+			ControllerPubkey: ctrlPub,
+			TargetPubkey:     targetPub,
 		})
 	})
 	// ---- P0-4 邮箱登录（与手机号登录同构） ----
@@ -505,15 +635,25 @@ func (a *App) Routes() http.Handler {
 			WriteErr(w, errcode.New(errcode.AdminForbidden, "session party credential required"))
 			return
 		}
-		token, _, err := a.Relay.Issue(sess.ID, self, peer)
+		var epoch int64
+		if a.TicketEpochs != nil {
+			var eerr error
+			epoch, eerr = a.TicketEpochs.NextTicketEpoch(ctx, sess.ID, self)
+			if eerr != nil {
+				// 轮换后端不可用时不能签发旧代号票据。
+				WriteErr(w, errcode.New(errcode.SrvInternal, "ticket epoch unavailable"))
+				return
+			}
+		}
+		token, _, err := a.Relay.IssueWithEpoch(sess.ID, self, peer, epoch)
 		if err != nil {
 			WriteErr(w, err)
 			return
 		}
-		httpx.OK(w, r, map[string]any{"ticket": token, "self_device": self})
+		httpx.OK(w, r, contract.RelayTicketResult{Ticket: token, SelfDevice: self})
 	})
 
-	return httpx.Middleware(httpx.JSONMux(mux))
+	return httpx.Middleware(httpx.MethodGuard(routeSpecs, httpx.JSONMux(mux)))
 }
 
 // ownsDevice 判断某个设备是否属于该账号。

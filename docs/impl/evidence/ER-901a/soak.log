@@ -1,0 +1,15 @@
+== build ==
+   Compiling er-codec v0.2.8 (/Users/ckkk/dev/code/Go/EasyRemote/core/crates/er-codec)
+warning: stripping debug info with `rust-objcopy` failed: signal: 6 (SIGABRT)
+  |
+  = note: dyld[44717]: Library not loaded: @rpath/libLLVM.dylib
+            Referenced from: <0CD2A5EB-71C0-36E9-A5D6-21645D10A1A1> /Users/ckkk/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/rust-objcopy
+            Reason: tried: '/Users/ckkk/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/../lib/libLLVM.dylib' (no such file), '/Users/ckkk/.rustup/toolchains/stable-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/../lib/libLLVM.dylib' (no such file), '/Users/ckkk/lib/libLLVM.dylib' (no such file), '/usr/local/lib/libLLVM.dylib' (no such file), '/usr/lib/libLLVM.dylib' (no such file, not in dyld cache)
+          
+
+warning: `er-codec` (example "bench_media") generated 1 warning
+    Finished `release` profile [optimized] target(s) in 0.78s
+== soak 1800s ==
+pid=44718 start=2026-11-22T09:19:51Z
+== done ==
+{"frames":102496,"seconds":1800.01,"fps":56.9,"bitrate_kbps":29,"encode_p50_ms":15.17,"encode_p95_ms":15.81,"decode_p50_ms":2.31,"decode_p95_ms":2.72}

@@ -1,0 +1,12 @@
+login={"code":0,"name":"OK","data":{"token":"9HHvNnZq5KifIlO8M3c6TcWXUDAo8V94yegcEWtgEzo","username":"root","role":"super","permissions":["audit.read","config.read","config.write","device.read","session.kill","session.read","stats.read","user.ban","user.read"],"expires_at":"2026-11-22T18:12:40.911306Z"},"trace_id":"BuMdgov3TicK8JtL"}
+start health=200 config=200
+== kill redis ==
+health after redis kill=200 config=401
+== restart redis ==
+health after redis restart=200 config=401
+relogin config=200
+== kill postgres ==
+health after pg kill=200 config=500
+== restart postgres ==
+health after pg restart=200 config=200
+EXIT=0

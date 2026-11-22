@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/easyremote/server/internal/contract"
 	"github.com/easyremote/server/internal/errcode"
 	"github.com/easyremote/server/internal/httpx"
 	"github.com/easyremote/server/internal/session"
@@ -108,11 +109,11 @@ func (a *App) createAssist(w http.ResponseWriter, r *http.Request) {
 		WriteErr(w, errcode.New(errcode.SrvInternal, err.Error()))
 		return
 	}
-	httpx.OK(w, r, map[string]any{
-		"code":             code,
-		"expires_at":       exp,
-		"target_device_id": target.ID,
-		"ttl_seconds":      int(assistCodeTTL.Seconds()),
+	httpx.OK(w, r, contract.AssistCreateResult{
+		Code:           code,
+		ExpiresAt:      exp,
+		TargetDeviceID: target.ID,
+		TtlSeconds:     int(assistCodeTTL.Seconds()),
 	})
 }
 
@@ -199,10 +200,10 @@ func (a *App) redeemAssist(w http.ResponseWriter, r *http.Request) {
 		_ = a.Notifier.NotifyConsentRequired(sess.ID, controllerID, rec.TargetID)
 	}
 	a.auditAssist(ctx, r, acc.ID, code, "ok")
-	httpx.OK(w, r, map[string]any{
-		"session_id": sess.ID,
-		"state":      sess.State,
-		"target_id":  rec.TargetID,
+	httpx.OK(w, r, contract.AssistRedeemResult{
+		SessionID: sess.ID,
+		State:     sess.State,
+		TargetID:  rec.TargetID,
 	})
 }
 

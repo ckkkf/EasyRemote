@@ -22,6 +22,8 @@ const (
 	TypeConsentGranted  = 0x0A
 	TypeCandidates      = 0x0B
 	TypeDisconnect      = 0x0C
+	// TypeHeartbeat 由客户端在上层读超时后发送；仅用于续租 presence。
+	TypeHeartbeat = 0x7F
 )
 
 // bindingTTL 是共享绑定的存活时间；presenceTTL 是在线标记的存活时间。
@@ -147,6 +149,24 @@ func (h *Hub) Unregister(deviceID string, self Conn) bool {
 		for _, sid := range sids {
 			_ = bus.DeleteBinding(ctx, sid)
 		}
+	}
+	return true
+}
+
+// Touch 续租在线标记。只有当前连接可以续租；心跳丢失后由 TTL 自动过期。
+func (h *Hub) Touch(deviceID string, self Conn) bool {
+	h.mu.RLock()
+	cur, ok := h.devices[deviceID]
+	bus := h.bus
+	token := h.presenceToken()
+	h.mu.RUnlock()
+	if !ok || cur != self {
+		return false
+	}
+	if bus != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+		defer cancel()
+		_ = bus.SetOnline(ctx, deviceID, token, presenceTTL)
 	}
 	return true
 }
@@ -318,6 +338,33 @@ func (h *Hub) Disconnect(sessionID, fromDevice, reason string) error {
 		_ = bus.DeleteBinding(context.Background(), sessionID)
 	}
 	return h.deliver(to, TypeDisconnect, map[string]any{"session_id": sessionID, "reason": reason})
+}
+
+// NotifyClosed 向会话双方投递 DISCONNECT 并清理绑定。
+// 与 Disconnect 不同：它不要求 from 是会话方已在线，用于状态机关闭后的传播。
+func (h *Hub) NotifyClosed(sessionID, from, to, reason string) error {
+	h.mu.Lock()
+	delete(h.sessions, sessionID)
+	bus := h.bus
+	h.mu.Unlock()
+	body := map[string]any{"session_id": sessionID, "reason": reason}
+	var firstErr error
+	for _, dev := range []string{from, to} {
+		if dev == "" {
+			continue
+		}
+		if err := h.deliver(dev, TypeDisconnect, body); err != nil && firstErr == nil {
+			firstErr = err
+		}
+	}
+	if bus != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+		defer cancel()
+		if err := bus.DeleteBinding(ctx, sessionID); err != nil && firstErr == nil {
+			firstErr = err
+		}
+	}
+	return firstErr
 }
 
 // Counts 返回在线设备与会话数，供健康检查使用。

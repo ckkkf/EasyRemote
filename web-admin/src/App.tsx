@@ -1,8 +1,29 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { api, ApiError, getToken, setToken } from './api';
-import type { AuditRow, ConfigField, ConfigView, DeviceRow, Overview, SessionRow, UserRow } from './api';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { api, getIdentity, getToken, setIdentity, setToken } from './api';
+import type {
+  AuditRow,
+  ConfigField,
+  ConfigView,
+  DeviceRow,
+  Overview,
+  SessionRow,
+  UserRow,
+} from './api';
+import { CAPABILITIES } from './capability_gen';
+import { errorMeta } from './errors';
 
 type Page = 'dashboard' | 'users' | 'devices' | 'sessions' | 'audit' | 'config';
+
+const PermissionContext = createContext<string[]>([]);
+const useCan = (action: string) => useContext(PermissionContext).includes(action);
+
+const ROLE_LABEL: Record<string, string> = {
+  super: '超级管理员',
+  ops: '运维',
+  cs: '客服',
+  risk: '风控',
+  readonly: '只读',
+};
 
 const PAGES: { id: Page; label: string; icon: string }[] = [
   { id: 'dashboard', label: '仪表盘', icon: '▦' },
@@ -17,23 +38,40 @@ const PAGE_SIZE = 10;
 
 /* ---------- 基础组件 ---------- */
 
-function ErrorBanner({ error, onClose }: { error: unknown; onClose?: () => void }) {
+function ErrorBanner({
+  error,
+  onClose,
+  onRetry,
+}: {
+  error: unknown;
+  onClose?: () => void;
+  onRetry?: () => void;
+}) {
   if (!error) return null;
-  const body =
-    error instanceof ApiError ? (
-      <>
-        {error.message}
-        <span className="err-meta">
-          {error.code} {error.name}
-          {error.traceId ? ' · trace ' + error.traceId : ''}
-        </span>
-      </>
-    ) : (
-      String(error)
-    );
+  const meta = errorMeta(error, Boolean(onRetry));
+  const copyTrace = () => {
+    if (!meta.traceId) return;
+    void navigator.clipboard?.writeText(meta.traceId);
+  };
   return (
     <div className="banner error">
-      <span>{body}</span>
+      <span>
+        {meta.message}
+        <span className="err-meta">
+          {meta.code} {meta.name}
+          {meta.traceId ? ' · trace ' + meta.traceId : ''}
+        </span>
+      </span>
+      {meta.traceId && (
+        <button className="link" onClick={copyTrace} title="复制 trace_id">
+          复制 trace
+        </button>
+      )}
+      {meta.canRetry && onRetry && (
+        <button className="link" onClick={onRetry}>
+          重试
+        </button>
+      )}
       {onClose && (
         <button className="link" onClick={onClose}>
           关闭
@@ -154,7 +192,7 @@ function duration(s: SessionRow): string {
 /* ---------- 登录 ---------- */
 
 function Login({ onDone }: { onDone: () => void }) {
-  const [username, setUsername] = useState('root');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [totp, setTotp] = useState('');
   const [error, setError] = useState<unknown>(null);
@@ -167,6 +205,7 @@ function Login({ onDone }: { onDone: () => void }) {
     try {
       const res = await api.login(username, password, totp);
       setToken(res.token);
+      setIdentity({ username: res.username, role: res.role, permissions: res.permissions });
       onDone();
     } catch (err) {
       setError(err);
@@ -403,7 +442,9 @@ function Dashboard({ onOpen, refreshKey }: { onOpen: (p: Page) => void; refreshK
 /* ---------- 用户 ---------- */
 
 function Users({ notice }: { notice: (t: string) => void }) {
+  const canBan = useCan('user.ban');
   const [rows, setRows] = useState<UserRow[]>([]);
+  const [total, setTotal] = useState(0);
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState('all');
   const [page, setPage] = useState(1);
@@ -416,30 +457,28 @@ function Users({ notice }: { notice: (t: string) => void }) {
 
   const load = useCallback(async () => {
     try {
-      const res = await api.users();
+      setLoading(true);
+      const offset = (page - 1) * PAGE_SIZE;
+      const res = await api.users({
+        limit: PAGE_SIZE,
+        offset,
+        q: query.trim() || undefined,
+        status: status === 'all' ? undefined : status,
+      });
       setRows(res.items);
+      setTotal(res.total);
       setError(null);
     } catch (err) {
       setError(err);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [page, query, status]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
-  const filtered = useMemo(() => {
-    const q = query.trim();
-    return rows.filter((u) => {
-      if (status !== 'all' && u.status !== status) return false;
-      if (!q) return true;
-      return u.id.includes(q) || u.phone_mask.includes(q);
-    });
-  }, [rows, query, status]);
-
-  const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   async function ban() {
     if (!target) return;
@@ -462,7 +501,7 @@ function Users({ notice }: { notice: (t: string) => void }) {
     <div className="stack">
       <ErrorBanner error={error} />
       <Card
-        title={'用户 (' + rows.length + ')'}
+        title={'用户 (' + total + ')'}
         subtitle={'今日新增 ' + rows.filter((u) => Date.now() - new Date(u.created_at).getTime() < 864e5).length + ' · 受限 ' + rows.filter((u) => u.status !== 'active').length}
         actions={
           <>
@@ -491,7 +530,7 @@ function Users({ notice }: { notice: (t: string) => void }) {
       >
         {loading ? (
           <Loading />
-        ) : paged.length === 0 ? (
+        ) : rows.length === 0 ? (
           <Empty text="没有匹配的用户" />
         ) : (
           <table className="tbl">
@@ -505,7 +544,7 @@ function Users({ notice }: { notice: (t: string) => void }) {
               </tr>
             </thead>
             <tbody>
-              {paged.map((u) => (
+              {rows.map((u) => (
                 <tr key={u.id} className="clickable" onClick={() => setDetail(u)} title="点击查看用户详情">
                   <td className="mono">{u.id}</td>
                   <td>{u.phone_mask}</td>
@@ -514,23 +553,25 @@ function Users({ notice }: { notice: (t: string) => void }) {
                   </td>
                   <td className="muted">{fmtTime(u.created_at)}</td>
                   <td className="right">
-                    <button
-                      className="btn danger sm"
-                      disabled={u.status !== 'active'}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setTarget(u);
-                      }}
-                    >
-                      封禁
-                    </button>
+                    {canBan && (
+                      <button
+                        className="btn danger sm"
+                        disabled={u.status !== 'active'}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setTarget(u);
+                        }}
+                      >
+                        封禁
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
         )}
-        <Pagination page={page} total={filtered.length} onChange={setPage} />
+        <Pagination page={page} total={total} onChange={setPage} />
       </Card>
 
       {detail && <UserDetail user={detail} onClose={() => setDetail(null)} />}
@@ -558,8 +599,8 @@ function Users({ notice }: { notice: (t: string) => void }) {
 
 function Devices({ notice }: { notice: (t: string) => void }) {
   const [rows, setRows] = useState<DeviceRow[]>([]);
+  const [total, setTotal] = useState(0);
   const [query, setQuery] = useState('');
-  const [online, setOnline] = useState('all');
   const [platform, setPlatform] = useState('all');
   const [page, setPage] = useState(1);
   const [error, setError] = useState<unknown>(null);
@@ -568,15 +609,23 @@ function Devices({ notice }: { notice: (t: string) => void }) {
 
   const load = useCallback(async () => {
     try {
-      const res = await api.devices();
+      setLoading(true);
+      const offset = (page - 1) * PAGE_SIZE;
+      const res = await api.devices({
+        limit: PAGE_SIZE,
+        offset,
+        q: query.trim() || undefined,
+        platform: platform === 'all' ? undefined : platform,
+      });
       setRows(res.items);
+      setTotal(res.total);
       setError(null);
     } catch (err) {
       setError(err);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [page, query, platform]);
 
   useEffect(() => {
     void load();
@@ -584,25 +633,13 @@ function Devices({ notice }: { notice: (t: string) => void }) {
 
   const platforms = useMemo(() => [...new Set(rows.map((d) => d.platform))], [rows]);
 
-  const filtered = useMemo(() => {
-    const q = query.trim();
-    return rows.filter((d) => {
-      if (online === 'online' && !d.online) return false;
-      if (online === 'offline' && d.online) return false;
-      if (platform !== 'all' && d.platform !== platform) return false;
-      if (!q) return true;
-      return d.device_code.includes(q) || d.account_id.includes(q) || d.platform.includes(q);
-    });
-  }, [rows, query, online, platform]);
-
-  const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   return (
     <div className="stack">
       <ErrorBanner error={error} />
       <Card
-        title={'设备 (' + rows.length + ')'}
-        subtitle={'在线 ' + rows.filter((d) => d.online).length + ' 台 · 平台 ' + platforms.length + ' 种'}
+        title={'设备 (' + total + ')'}
+        subtitle={'本页在线 ' + rows.filter((d) => d.online).length + ' 台 · 平台 ' + platforms.length + ' 种'}
         actions={
           <>
             <input
@@ -614,11 +651,6 @@ function Devices({ notice }: { notice: (t: string) => void }) {
                 setPage(1);
               }}
             />
-            <select value={online} onChange={(e) => { setOnline(e.target.value); setPage(1); }}>
-              <option value="all">全部状态</option>
-              <option value="online">在线</option>
-              <option value="offline">离线</option>
-            </select>
             <select value={platform} onChange={(e) => { setPlatform(e.target.value); setPage(1); }}>
               <option value="all">全部平台</option>
               {platforms.map((p) => (
@@ -635,7 +667,7 @@ function Devices({ notice }: { notice: (t: string) => void }) {
       >
         {loading ? (
           <Loading />
-        ) : paged.length === 0 ? (
+        ) : rows.length === 0 ? (
           <Empty text="没有匹配的设备" />
         ) : (
           <table className="tbl">
@@ -650,7 +682,7 @@ function Devices({ notice }: { notice: (t: string) => void }) {
               </tr>
             </thead>
             <tbody>
-              {paged.map((d) => (
+              {rows.map((d) => (
                 <tr key={d.id || d.device_code} className="clickable" onClick={() => setDetail(d)} title="点击查看设备详情">
                   <td className="mono big">{fmtCode(d.device_code)}</td>
                   <td className="mono">{d.account_id}</td>
@@ -676,7 +708,7 @@ function Devices({ notice }: { notice: (t: string) => void }) {
             </tbody>
           </table>
         )}
-        <Pagination page={page} total={filtered.length} onChange={setPage} />
+        <Pagination page={page} total={total} onChange={setPage} />
       </Card>
 
       {detail && <DeviceDetail device={detail} onClose={() => setDetail(null)} />}
@@ -687,7 +719,9 @@ function Devices({ notice }: { notice: (t: string) => void }) {
 /* ---------- 会话 ---------- */
 
 function Sessions({ notice }: { notice: (t: string) => void }) {
+  const canKill = useCan('session.kill');
   const [rows, setRows] = useState<SessionRow[]>([]);
+  const [total, setTotal] = useState(0);
   const [state, setState] = useState('all');
   const [page, setPage] = useState(1);
   const [auto, setAuto] = useState(true);
@@ -699,15 +733,21 @@ function Sessions({ notice }: { notice: (t: string) => void }) {
 
   const load = useCallback(async () => {
     try {
-      const res = await api.sessions(state === 'all' ? undefined : state);
+      setLoading(true);
+      const offset = (page - 1) * PAGE_SIZE;
+      const res = await api.sessions(state === 'all' ? undefined : state, {
+        limit: PAGE_SIZE,
+        offset,
+      });
       setRows(res.items);
+      setTotal(res.total);
       setError(null);
     } catch (err) {
       setError(err);
     } finally {
       setLoading(false);
     }
-  }, [state]);
+  }, [state, page]);
 
   useEffect(() => {
     void load();
@@ -719,20 +759,33 @@ function Sessions({ notice }: { notice: (t: string) => void }) {
     return () => window.clearInterval(t);
   }, [auto, load]);
 
-  const paged = rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   async function kill() {
     if (!target) return;
     if (reason.trim().length < 2) return;
     setBusy(true);
     try {
-      await api.killSession(target.id, reason.trim());
-      notice('已中断 ' + target.id);
+      const res = await api.killSession(target.id, reason.trim());
+      if (!res.closed) {
+        setError(new Error('中断未生效：服务端未关闭会话'));
+      } else if (!res.propagated) {
+        notice('会话已关闭，但传播失败：' + (res.warning ?? '请刷新确认双方状态'));
+        setError(new Error(res.warning ?? '关闭事件传播失败'));
+      } else if (!res.audited) {
+        notice('会话已关闭，但审计写入失败');
+        setError(new Error(res.warning ?? '审计写入失败'));
+      } else {
+        notice('已中断 ' + target.id + '（传播与审计均已确认）');
+      }
       setTarget(null);
       setReason('');
       await load();
     } catch (err) {
-      setError(err);
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        setError(new Error('中断请求超时：结果未知，请刷新列表确认，并复制 trace_id 排查'));
+      } else {
+        setError(err);
+      }
     } finally {
       setBusy(false);
     }
@@ -742,8 +795,8 @@ function Sessions({ notice }: { notice: (t: string) => void }) {
     <div className="stack">
       <ErrorBanner error={error} />
       <Card
-        title={'会话 (' + rows.length + ')'}
-        subtitle="每 15 秒自动刷新 · 中断会立即生效并写入审计"
+        title={'会话 (' + total + ')'}
+        subtitle="每 15 秒自动刷新 · 中断以服务端关闭/传播/审计结果为准"
         actions={
           <>
             <select value={state} onChange={(e) => { setState(e.target.value); setPage(1); }}>
@@ -764,7 +817,7 @@ function Sessions({ notice }: { notice: (t: string) => void }) {
       >
         {loading ? (
           <Loading />
-        ) : paged.length === 0 ? (
+        ) : rows.length === 0 ? (
           <Empty text="暂无会话" />
         ) : (
           <table className="tbl">
@@ -780,7 +833,7 @@ function Sessions({ notice }: { notice: (t: string) => void }) {
               </tr>
             </thead>
             <tbody>
-              {paged.map((s) => (
+              {rows.map((s) => (
                 <tr key={s.id}>
                   <td className="mono">{s.id}</td>
                   <td className="mono">{s.controller_id}</td>
@@ -795,20 +848,22 @@ function Sessions({ notice }: { notice: (t: string) => void }) {
                   <td>{duration(s)}</td>
                   <td className="muted">{fmtTime(s.started_at)}</td>
                   <td className="right">
-                    <button
-                      className="btn danger sm"
-                      disabled={s.state === 'ended'}
-                      onClick={() => setTarget(s)}
-                    >
-                      中断
-                    </button>
+                    {canKill && (
+                      <button
+                        className="btn danger sm"
+                        disabled={s.state === 'ended'}
+                        onClick={() => setTarget(s)}
+                      >
+                        中断
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
         )}
-        <Pagination page={page} total={rows.length} onChange={setPage} />
+        <Pagination page={page} total={total} onChange={setPage} />
       </Card>
 
       {target && (
@@ -834,6 +889,7 @@ function Sessions({ notice }: { notice: (t: string) => void }) {
 
 function Audit() {
   const [rows, setRows] = useState<AuditRow[]>([]);
+  const [total, setTotal] = useState(0);
   const [query, setQuery] = useState('');
   const [action, setAction] = useState('all');
   const [result, setResult] = useState('all');
@@ -843,15 +899,24 @@ function Audit() {
 
   const load = useCallback(async () => {
     try {
-      const res = await api.audit();
+      setLoading(true);
+      const offset = (page - 1) * PAGE_SIZE;
+      const res = await api.audit({
+        limit: PAGE_SIZE,
+        offset,
+        q: query.trim() || undefined,
+        action: action === 'all' ? undefined : action,
+        result: result === 'all' ? undefined : result,
+      });
       setRows(res.items);
+      setTotal(res.total);
       setError(null);
     } catch (err) {
       setError(err);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [page, query, action, result]);
 
   useEffect(() => {
     void load();
@@ -859,23 +924,12 @@ function Audit() {
 
   const actions = useMemo(() => [...new Set(rows.map((r) => r.action))], [rows]);
 
-  const filtered = useMemo(() => {
-    const q = query.trim();
-    return rows.filter((r) => {
-      if (action !== 'all' && r.action !== action) return false;
-      if (result !== 'all' && r.result !== result) return false;
-      if (!q) return true;
-      return r.actor.includes(q) || r.object.includes(q) || r.ip.includes(q);
-    });
-  }, [rows, query, action, result]);
-
-  const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   return (
     <div className="stack">
       <ErrorBanner error={error} />
       <Card
-        title={'审计日志 (' + rows.length + ')'}
+        title={'审计日志 (' + total + ')'}
         subtitle="append-only · 记录操作人、对象、IP 与结果"
         actions={
           <>
@@ -909,7 +963,7 @@ function Audit() {
       >
         {loading ? (
           <Loading />
-        ) : paged.length === 0 ? (
+        ) : rows.length === 0 ? (
           <Empty text="没有匹配的审计记录" />
         ) : (
           <table className="tbl">
@@ -925,7 +979,7 @@ function Audit() {
               </tr>
             </thead>
             <tbody>
-              {paged.map((a) => (
+              {rows.map((a) => (
                 <tr key={a.id}>
                   <td className="muted nowrap">{fmtTime(a.ts)}</td>
                   <td>{a.actor}</td>
@@ -951,7 +1005,7 @@ function Audit() {
             </tbody>
           </table>
         )}
-        <Pagination page={page} total={filtered.length} onChange={setPage} />
+        <Pagination page={page} total={total} onChange={setPage} />
       </Card>
     </div>
   );
@@ -960,6 +1014,7 @@ function Audit() {
 /* ---------- 配置中心（P1-1） ---------- */
 
 function ConfigCenter({ notice }: { notice: (t: string) => void }) {
+  const canWrite = useCan('config.write');
   const [view, setView] = useState<ConfigView | null>(null);
   const [draft, setDraft] = useState<Record<string, string>>({});
   const [error, setError] = useState<unknown>(null);
@@ -1020,11 +1075,15 @@ function ConfigCenter({ notice }: { notice: (t: string) => void }) {
 
   return (
     <div className="stack">
-      <ErrorBanner error={error} onClose={() => setError(null)} />
+      <ErrorBanner error={error} onClose={() => setError(null)} onRetry={() => void load()} />
       {saved && <div className="banner ok"><span>{saved}</span></div>}
       <Card
         title="配置中心"
-        subtitle="超级管理员可改；保存即下发给客户端（GET /v1/config 白名单键），每次写操作都进审计"
+        subtitle={
+          canWrite
+            ? '保存即下发给客户端（GET /v1/config 白名单键），每次写操作都进审计'
+            : '只读：当前角色无配置写权限'
+        }
         actions={
           <>
             <button className="btn ghost sm" onClick={() => void load()} disabled={busy}>
@@ -1037,7 +1096,7 @@ function ConfigCenter({ notice }: { notice: (t: string) => void }) {
             >
               撤销修改
             </button>
-            <button className="btn sm" onClick={() => void save()} disabled={busy || changed.length === 0 || invalid.length > 0}>
+            <button className="btn sm" onClick={() => void save()} disabled={!canWrite || busy || changed.length === 0 || invalid.length > 0}>
               {busy ? '保存中…' : '保存 ' + (changed.length > 0 ? changed.length + ' 项' : '')}
             </button>
           </>
@@ -1076,6 +1135,7 @@ function ConfigCenter({ notice }: { notice: (t: string) => void }) {
                         </select>
                       ) : (
                         <input
+                          disabled={!canWrite}
                           className={'cfg-input' + (bad ? ' bad' : '')}
                           value={raw}
                           inputMode={f.kind === 'int' || f.kind === 'int64' ? 'numeric' : 'text'}
@@ -1099,6 +1159,37 @@ function ConfigCenter({ notice }: { notice: (t: string) => void }) {
             以下配置项取值不合法：{invalid.map((f) => f.key).join('、')}
           </p>
         )}
+      </Card>
+      <Card
+        title="能力成熟度（只读）"
+        subtitle="来自 docs/spec/capabilities.yaml 生成物；服务端只能再关闭，不能在运行时解锁未成熟能力"
+      >
+        <table className="tbl">
+          <thead>
+            <tr>
+              <th>能力</th>
+              <th>成熟度</th>
+              <th>收口卡</th>
+              <th>为什么还没有开放</th>
+            </tr>
+          </thead>
+          <tbody>
+            {CAPABILITIES.map((c) => (
+              <tr key={c.key}>
+                <td>
+                  <div>{c.title}</div>
+                  <div className="muted mono">{c.key}</div>
+                </td>
+                <td className={c.maturity === 'stable' ? '' : 'muted'}>{c.maturity}</td>
+                <td className="mono nowrap">{c.owner}</td>
+                <td className="muted">{c.reason}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <p className="muted" style={{ marginTop: 10 }}>
+          disabled 能力任何构建都不可用；experimental 只在开发构建可见，发布构建隐藏入口。这里不提供开关。
+        </p>
       </Card>
     </div>
   );
@@ -1303,13 +1394,18 @@ export default function App() {
     timer.current = window.setTimeout(() => setNoticeText(''), 4000);
   }, []);
 
-  if (!authed) {
+  const identity = getIdentity();
+  if (!authed || !identity) {
     return <Login onDone={() => setAuthed(true)} />;
   }
 
-  const current = PAGES.find((p) => p.id === page)!;
+  const visiblePages = PAGES.filter(
+    (p) => p.id !== 'config' || identity.permissions.includes('config.read'),
+  );
+  const current = visiblePages.find((p) => p.id === page) ?? PAGES[0];
 
   return (
+    <PermissionContext.Provider value={identity.permissions}>
     <div className="shell">
       <aside className="side">
         <div className="brand">
@@ -1320,7 +1416,7 @@ export default function App() {
           </div>
         </div>
         <nav>
-          {PAGES.map((p) => (
+          {visiblePages.map((p) => (
             <button key={p.id} className={'nav' + (p.id === page ? ' active' : '')} onClick={() => setPage(p.id)}>
               <span className="nav-ico">{p.icon}</span>
               {p.label}
@@ -1329,16 +1425,24 @@ export default function App() {
         </nav>
         <div className="side-foot">
           <div className="who">
-            <span className="avatar">R</span>
+            <span className="avatar">
+              {identity.username.slice(0, 1).toUpperCase()}
+            </span>
             <div>
-              <strong>root</strong>
-              <span>超级管理员</span>
+              <strong>{identity.username}</strong>
+              <span>{ROLE_LABEL[identity.role] ?? identity.role}</span>
             </div>
           </div>
           <button
             className="link"
-            onClick={() => {
+            onClick={async () => {
+              try {
+                await api.logout();
+              } catch (err) {
+                notice('服务端登出失败：' + errorMeta(err).message);
+              }
               setToken(null);
+              setIdentity(null);
               setAuthed(false);
             }}
           >
@@ -1351,7 +1455,7 @@ export default function App() {
         <header className="topbar">
           <div>
             <h2>{current.label}</h2>
-            <p>只读视角的后台，所有写操作都会进审计</p>
+            <p>所有写操作按角色权限执行并写入审计</p>
           </div>
           <div className="top-actions">
             <button className="btn ghost sm" onClick={() => setRefreshKey((k) => k + 1)}>
@@ -1368,5 +1472,6 @@ export default function App() {
         {page === 'config' && <ConfigCenter notice={notice} />}
       </main>
     </div>
+    </PermissionContext.Provider>
   );
 }

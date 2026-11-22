@@ -1,0 +1,17 @@
+== os ==
+Darwin ckkkdeMac-mini.local 25.6.0 Darwin Kernel Version 25.6.0: Fri Jul 31 19:11:03 PDT 2026; root:xnu-12377.161.14~5/RELEASE_ARM64_T8132 arm64
+ProductName:		macOS
+ProductVersion:		26.6.2
+BuildVersion:		25G83
+== xcode ==
+/Library/Developer/CommandLineTools
+ls: /Applications/Xcode.app: No such file or directory
+== flutter doctor ==
+[✓] Flutter (Channel stable, 3.50.0, on macOS 26.6.2 25G83 darwin-arm64, locale zh-Hans-CN) [1,024ms]
+[!] Xcode - develop for iOS and macOS [210ms]
+    ✗ Xcode installation is incomplete; a full installation is necessary for iOS and macOS development.
+      Or install Xcode via the App Store.
+        sudo xcode-select --switch /Applications/Xcode.app/Contents/Developer
+        CocoaPods is a package manager for iOS or macOS platform code.
+        Without CocoaPods, plugins will not work on iOS or macOS.
+    • macOS (desktop) • macos  • darwin-arm64   • macOS 26.6.2 25G83 darwin-arm64

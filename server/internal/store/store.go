@@ -16,6 +16,9 @@ import (
 // ErrNotFound 表示记录不存在。与数据库故障严格区分。
 var ErrNotFound = errors.New("store: not found")
 
+// ErrVersionConflict 表示会话已被其它 command 修改（CAS 失败）。
+var ErrVersionConflict = errors.New("store: version conflict")
+
 // ErrConflict 表示唯一键冲突。
 var ErrConflict = errors.New("store: conflict")
 
@@ -70,6 +73,30 @@ type Session struct {
 	StartedAt    time.Time `json:"started_at"`
 	EndedAt      time.Time `json:"ended_at,omitempty"`
 	AuthExpireAt time.Time `json:"auth_expire_at,omitempty"`
+	// Version 是乐观并发控制版本；每次成功状态迁移 +1。
+	Version int64 `json:"version"`
+	// ReadyController/ReadyTarget 由数据面握手完成事件置位；
+	// 只有双方都 ready 且已授权，状态机才允许进入 active。
+	ReadyController bool `json:"ready_controller"`
+	ReadyTarget     bool `json:"ready_target"`
+}
+
+// SessionEvent 是会话状态迁移的领域事件（outbox）。
+// (SessionID, Version) 唯一：同一迁移重复写入必须被忽略（幂等）。
+type SessionEvent struct {
+	ID         string    `json:"id"`
+	SessionID  string    `json:"session_id"`
+	FromDevice string    `json:"from"`
+	ToDevice   string    `json:"to"`
+	OldState   string    `json:"old_state"`
+	NewState   string    `json:"new_state"`
+	Reason     string    `json:"reason,omitempty"`
+	TraceID    string    `json:"trace_id,omitempty"`
+	Version    int64     `json:"version"`
+	At         time.Time `json:"at"`
+	Delivered  bool      `json:"delivered"`
+	Attempts   int       `json:"attempts"`
+	LastError  string    `json:"last_error,omitempty"`
 }
 
 // FileMeta 是一次文件传输的元数据。字节内容落盘，元数据入库：
@@ -131,6 +158,19 @@ type AdminUser struct {
 type Page struct {
 	Limit  int
 	Offset int
+	// Query 是模糊搜索（各实现在白名单字段内匹配）。
+	Query string
+	// Sort 是字段名白名单；空表示默认排序。
+	Sort string
+	// Desc 为 true 时倒序。
+	Desc bool
+	// Status 是精确状态过滤（账号/会话等；空表示全部）。
+	Status string
+	// Platform 是设备平台精确过滤。
+	Platform string
+	// Action/Result 是审计精确过滤。
+	Action string
+	Result string
 }
 
 // VerifyOutcome 是验证码校验结果。
@@ -185,8 +225,26 @@ type Store interface {
 
 	// sessions
 	CreateSession(ctx context.Context, s *Session) error
+	// CreateSessionExclusive 保证同一对设备最多一个未关闭会话。
+	// created=false 时返回已有会话；并发首次请求由存储层串行化。
+	CreateSessionExclusive(ctx context.Context, s *Session) (existing *Session, created bool, err error)
 	GetSession(ctx context.Context, id string) (*Session, error)
 	UpdateSession(ctx context.Context, s *Session) error
+	// UpdateSessionCAS 仅当存储中的 version == expected 时写入，并把 version+1。
+	// 冲突返回 ErrVersionConflict，调用方必须重新读取并重放 command。
+	UpdateSessionCAS(ctx context.Context, s *Session, expected int64) error
+	// UpdateSessionCASWithEvent 在同一事务里完成 CAS 迁移 + 写入 outbox 事件。
+	UpdateSessionCASWithEvent(ctx context.Context, s *Session, expected int64, ev *SessionEvent) error
+	// ListSessionEvents 按 outbox 投递状态读取事件（delivered=false 即待投递）。
+	ListSessionEvents(ctx context.Context, delivered bool, limit int) ([]*SessionEvent, error)
+	// Count* 返回与对应 List 相同过滤条件下的总数（用于真实分页）。
+	CountAccounts(ctx context.Context, p Page) (int, error)
+	CountDevices(ctx context.Context, p Page) (int, error)
+	CountSessions(ctx context.Context, state string, p Page) (int, error)
+	CountAudit(ctx context.Context, p Page) (int, error)
+	ListAuditPage(ctx context.Context, p Page) ([]*AuditLog, error)
+	MarkSessionEventDelivered(ctx context.Context, id string) error
+	MarkSessionEventFailed(ctx context.Context, id, reason string) error
 	ListSessions(ctx context.Context, state string, p Page) ([]*Session, error)
 
 	// files
@@ -213,6 +271,7 @@ type Store interface {
 	PutAdmin(ctx context.Context, a *AdminUser) error
 	AppendAudit(ctx context.Context, a *AuditLog) error
 	ListAudit(ctx context.Context, limit int) ([]*AuditLog, error)
+	// 旧 ListAudit 保留；新代码使用 ListAuditPage + CountAudit。
 
 	// Ping 用于健康检查。
 	Ping(ctx context.Context) error

@@ -1,0 +1,11 @@
+=== RUN   TestIncompleteCapabilityIsDisabled
+--- PASS: TestIncompleteCapabilityIsDisabled (0.00s)
+=== RUN   TestDisableListOnlySubtracts
+--- PASS: TestDisableListOnlySubtracts (0.00s)
+=== RUN   TestLedgerIsComplete
+--- PASS: TestLedgerIsComplete (0.00s)
+=== RUN   TestUnknownCapabilityFailsClosed
+--- PASS: TestUnknownCapabilityFailsClosed (0.00s)
+PASS
+ok  	github.com/easyremote/server/internal/capability	0.370s
+?   	github.com/easyremote/server/internal/appconfig	[no test files]

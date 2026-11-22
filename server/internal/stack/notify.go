@@ -17,10 +17,15 @@ func SetDevHub(h *signal.Hub) { devHub = h }
 // gatewayNotifier 与 gateway.ConsentNotifier 结构一致（避免包循环）。
 type gatewayNotifier interface {
 	NotifyConsentRequired(sessionID, from, to string) error
+	NotifySessionClosed(sessionID, from, to, reason string) error
 }
 
 type hubNotifier struct {
 	hub *signal.Hub
+}
+
+func (h hubNotifier) NotifySessionClosed(sessionID, from, to, reason string) error {
+	return h.hub.NotifyClosed(sessionID, from, to, reason)
 }
 
 func (h hubNotifier) NotifyConsentRequired(sessionID, from, to string) error {

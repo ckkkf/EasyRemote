@@ -10,19 +10,17 @@ class ErHostLink {
     required String relayAddr,
     required String phone,
     String smsCode = '123456',
-  }) =>
-      <String, dynamic>{
-        'ok': false,
-        'error': 'web 预览环境不支持原生采集（需要桌面端 er_ffi）',
-      };
+  }) => <String, dynamic>{
+    'ok': false,
+    'error': 'web 预览环境不支持原生采集（需要桌面端 er_ffi）',
+  };
 
   Map<String, dynamic> serve({
     required String hostId,
     required String signalBase,
     int frames = 5,
     int timeoutSecs = 30,
-  }) =>
-      <String, dynamic>{'ok': false, 'error': 'web 预览环境不支持被控端服务'};
+  }) => <String, dynamic>{'ok': false, 'error': 'web 预览环境不支持被控端服务'};
 
   Map<String, dynamic> connect({
     required String gatewayUrl,
@@ -32,8 +30,7 @@ class ErHostLink {
     required String captcha,
     String smsCode = '123456',
     int frames = 5,
-  }) =>
-      <String, dynamic>{'ok': false, 'error': 'web 预览环境不支持原生连接'};
+  }) => <String, dynamic>{'ok': false, 'error': 'web 预览环境不支持原生连接'};
 
   bool release(String hostId) => true;
 }

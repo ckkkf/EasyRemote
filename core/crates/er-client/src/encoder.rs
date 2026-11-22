@@ -16,41 +16,6 @@ use er_codec::{create_encoder, EncodeConfig, Encoder};
 
 use crate::gpu_policy::{GpuFallback, GpuPath};
 
-/// GPU 路径的决策结果。
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum GpuDecision {
-    /// 用 GPU 编出来了
-    Encoded,
-    /// 桌面无新帧：不编码，也不改 backend
-    NoFrame,
-    /// GPU 路径失效：本帧交 CPU
-    Fallback,
-}
-
-/// 决策点（独立函数，便于无 GPU 单测）。
-pub(crate) fn classify_gpu_result(
-    result: Result<Option<Vec<u8>>, GpuFallback>,
-    policy: &mut GpuPath,
-    backend: &mut &'static str,
-) -> Option<GpuDecision> {
-    match result {
-        Ok(Some(_)) => {
-            *backend = "gpu-zero-copy";
-            Some(GpuDecision::Encoded)
-        }
-        // 注意：这里**不能**动 backend，也不能把 GPU 路径标成失效
-        Ok(None) => Some(GpuDecision::NoFrame),
-        Err(reason) => {
-            policy.mark_failed(reason);
-            if let Some(msg) = policy.take_log() {
-                eprintln!("[er] 零拷贝路径不可用，回退 CPU: {msg}");
-            }
-            *backend = "cpu";
-            Some(GpuDecision::Fallback)
-        }
-    }
-}
-
 /// 一帧的完整决策 + 执行（GPU 结果由调用方先算好，方便注入测试）。
 ///
 /// 这里是「NoFrame / Fallback / Encoded」的唯一判定点：
@@ -278,35 +243,8 @@ pub fn downscale_bgra(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use er_codec::{CodecError, EncoderKind, Packet};
-    use er_common::protocol::MediaHeader;
     use std::cell::Cell;
     use std::rc::Rc;
-
-    /// 计数用 CPU 编码器：只关心「有没有被调用」。
-    struct CountingEncoder {
-        calls: Rc<Cell<usize>>,
-    }
-
-    impl Encoder for CountingEncoder {
-        fn kind(&self) -> EncoderKind {
-            EncoderKind::Software
-        }
-        fn encode(&mut self, ts: u64, _frame: &[u8]) -> Result<Packet, CodecError> {
-            self.calls.set(self.calls.get() + 1);
-            Ok(Packet {
-                header: MediaHeader {
-                    frame_type: 1,
-                    stream_id: 0,
-                    seq: 0,
-                    flags: MediaHeader::FLAG_FRAME_END | MediaHeader::FLAG_KEYFRAME,
-                    ts_ms: ts as u32,
-                },
-                data: vec![0u8; 8],
-            })
-        }
-        fn request_keyframe(&mut self) {}
-    }
 
     fn policy() -> GpuPath {
         GpuPath::new(3)
@@ -417,8 +355,7 @@ mod tests {
     #[test]
     fn downscale_shrinks_and_keeps_channels() {
         // 4x4 纯色 BGRA → 2x2，颜色必须还是同一个纯色
-        let src: Vec<u8> = std::iter::repeat([10u8, 20, 30, 255])
-            .take(16)
+        let src: Vec<u8> = std::iter::repeat_n([10u8, 20, 30, 255], 16)
             .flatten()
             .collect();
         let dst = downscale_bgra(&src, 4, 4, 2, 2).expect("downscale");

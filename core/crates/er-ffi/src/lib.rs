@@ -6,7 +6,7 @@
 //!   - 字符串用 `*const c_char`（NUL 结尾），由本库分配、调用方用 `er_free_string` 释放
 //!   - 帧数据走调用方提供的 buffer，避免跨边界管理内存
 
-use std::ffi::{c_char, c_int, CStr, CString};
+use std::ffi::{c_char, c_int, CString};
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::ptr;
 
@@ -16,7 +16,6 @@ pub use host::{er_device_connect, er_host_prepare, er_host_release, er_host_serv
 pub use session::er_run_pair_session;
 
 use er_abr::{AbrController, LinkFeedback, QualityLevel};
-use er_capture::privacy::{apply_privacy, is_uniform, PrivacyColor};
 use er_capture::{Capture, RawFrame, ScreenCapture};
 use er_client::encoder::HybridEncoder;
 use er_codec::EncodeConfig;
@@ -36,7 +35,6 @@ pub struct Session {
     /// 采集+编码组合器：Windows 上优先 DXGI→NVENC 零拷贝，失败自动回退 CPU
     enc: Option<HybridEncoder>,
     abr: AbrController,
-    privacy: bool,
     last_error: CString,
     last_frame: Option<RawFrame>,
     /// 最近一次编码输出，供 encode 接口返回
@@ -190,7 +188,6 @@ pub extern "C" fn er_session_new() -> *mut Session {
             capture: None,
             enc: None,
             abr: AbrController::new(0),
-            privacy: false,
             last_error: CString::new("").unwrap(),
             last_frame: None,
             last_encoded: Vec::new(),
@@ -275,16 +272,13 @@ pub unsafe extern "C" fn er_grab_frame(sess: *mut Session, buf: *mut u8, cap: us
         let Some(cap_ref) = s.capture.as_mut() else {
             return ER_ERR_NO_DISPLAY;
         };
-        let mut frame = match cap_ref.grab() {
+        let frame = match cap_ref.grab() {
             Ok(f) => f,
             Err(e) => {
                 set_err(s, format!("grab: {e}"));
                 return ER_ERR_CAPTURE;
             }
         };
-        if s.privacy {
-            apply_privacy(&mut frame, PrivacyColor::default());
-        }
         let need = frame.data.len();
         if need > cap {
             set_err(s, format!("buffer too small: need {need}, have {cap}"));
@@ -315,23 +309,6 @@ pub unsafe extern "C" fn er_frame_size(sess: *mut Session) -> c_int {
             }
             None => ER_ERR_NO_DISPLAY,
         }
-    }));
-    r.unwrap_or(ER_ERR_PANIC)
-}
-
-/// 开关隐私屏。
-///
-/// # Safety
-/// 指针需有效。
-#[no_mangle]
-pub unsafe extern "C" fn er_set_privacy(sess: *mut Session, enabled: c_int) -> c_int {
-    if sess.is_null() {
-        return ER_ERR_NULL;
-    }
-    let r = catch_unwind(AssertUnwindSafe(|| {
-        let s = &mut *sess;
-        s.privacy = enabled != 0;
-        ER_OK
     }));
     r.unwrap_or(ER_ERR_PANIC)
 }
@@ -380,25 +357,6 @@ pub unsafe extern "C" fn er_encode_last_frame(
     r.unwrap_or(ER_ERR_PANIC)
 }
 
-/// 最近一次抓到的帧是否已被抹平（隐私屏自检）。
-///
-/// # Safety
-/// 指针需有效。
-#[no_mangle]
-pub unsafe extern "C" fn er_last_frame_uniform(sess: *mut Session) -> c_int {
-    if sess.is_null() {
-        return ER_ERR_NULL;
-    }
-    let r = catch_unwind(AssertUnwindSafe(|| {
-        let s = &*sess;
-        match &s.last_frame {
-            Some(f) => i32::from(is_uniform(f)),
-            None => ER_ERR_CAPTURE,
-        }
-    }));
-    r.unwrap_or(ER_ERR_PANIC)
-}
-
 /// 喂一次链路反馈，返回当前档位 JSON（调用方释放字符串）。
 ///
 /// # Safety
@@ -419,6 +377,9 @@ pub unsafe extern "C" fn er_abr_update(
             loss_pct,
             rtt_ms,
             queue_ms,
+            throughput_kbps: 0,
+            buffer_ms: queue_ms,
+            encode_queue: 0,
         });
         let lvl: QualityLevel = d.level;
         into_c_string(&format!(
@@ -444,25 +405,6 @@ pub unsafe extern "C" fn er_last_error(sess: *mut Session) -> *mut c_char {
         into_c_string(&msg)
     }));
     r.unwrap_or(ptr::null_mut())
-}
-
-/// 不依赖屏幕的纯逻辑自检：给定一帧数据做隐私屏（供无显示环境测试）。
-///
-/// # Safety
-/// buf 至少 len 字节可读写。
-#[no_mangle]
-pub unsafe extern "C" fn er_privacy_scrub(buf: *mut u8, len: usize) -> c_int {
-    if buf.is_null() || len % 4 != 0 {
-        return ER_ERR_NULL;
-    }
-    let r = catch_unwind(AssertUnwindSafe(|| {
-        let slice = std::slice::from_raw_parts_mut(buf, len);
-        for px in slice.chunks_exact_mut(4) {
-            px.copy_from_slice(&[0, 0, 0, 255]);
-        }
-        ER_OK
-    }));
-    r.unwrap_or(ER_ERR_PANIC)
 }
 
 #[cfg(test)]

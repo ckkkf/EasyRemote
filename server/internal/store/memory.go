@@ -4,7 +4,9 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"fmt"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 )
@@ -33,23 +35,26 @@ type Memory struct {
 	files    map[string]*FileMeta
 	assist   map[string]*AssistCode
 	config   map[string]string
-	closed   bool
+	// sessionEvents 以 sessionID|version 为键做 outbox 幂等去重。
+	sessionEvents map[string]*SessionEvent
+	closed        bool
 }
 
 // NewMemory 创建内存存储。
 func NewMemory() *Memory {
 	return &Memory{
-		accounts: map[string]*Account{},
-		byPhone:  map[string]string{},
-		devices:  map[string]*Device{},
-		byCode:   map[string]string{},
-		codes:    map[string]*VerifyCode{},
-		trust:    map[string]*TrustEdge{},
-		sessions: map[string]*Session{},
-		admins:   map[string]*AdminUser{},
-		files:    map[string]*FileMeta{},
-		assist:   map[string]*AssistCode{},
-		config:   map[string]string{},
+		accounts:      map[string]*Account{},
+		byPhone:       map[string]string{},
+		devices:       map[string]*Device{},
+		byCode:        map[string]string{},
+		codes:         map[string]*VerifyCode{},
+		trust:         map[string]*TrustEdge{},
+		sessions:      map[string]*Session{},
+		admins:        map[string]*AdminUser{},
+		files:         map[string]*FileMeta{},
+		assist:        map[string]*AssistCode{},
+		config:        map[string]string{},
+		sessionEvents: map[string]*SessionEvent{},
 	}
 }
 
@@ -126,11 +131,30 @@ func (m *Memory) ListAccounts(_ context.Context, p Page) ([]*Account, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	all := make([]*Account, 0, len(m.accounts))
+	q := strings.ToLower(p.Query)
 	for _, a := range m.accounts {
+		if p.Status != "" && a.Status != p.Status {
+			continue
+		}
+		if q != "" && !strings.Contains(strings.ToLower(a.ID+" "+a.PhoneEnc+" "+a.Status), q) {
+			continue
+		}
 		cp := *a
 		all = append(all, &cp)
 	}
-	sort.Slice(all, func(i, j int) bool { return all[i].CreatedAt.Before(all[j].CreatedAt) })
+	sort.Slice(all, func(i, j int) bool {
+		less := all[i].CreatedAt.Before(all[j].CreatedAt)
+		switch p.Sort {
+		case "id":
+			less = all[i].ID < all[j].ID
+		case "status":
+			less = all[i].Status < all[j].Status
+		}
+		if p.Desc {
+			return !less
+		}
+		return less
+	})
 	limit, offset := pageBounds(p, 100)
 	if offset >= len(all) {
 		return nil, nil
@@ -209,11 +233,30 @@ func (m *Memory) ListDevices(_ context.Context, p Page) ([]*Device, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	all := make([]*Device, 0, len(m.devices))
+	q := strings.ToLower(p.Query)
 	for _, d := range m.devices {
+		if p.Platform != "" && d.Platform != p.Platform {
+			continue
+		}
+		if q != "" && !strings.Contains(strings.ToLower(d.ID+" "+d.DeviceCode+" "+d.Platform+" "+d.AccountID), q) {
+			continue
+		}
 		cp := *d
 		all = append(all, &cp)
 	}
-	sort.Slice(all, func(i, j int) bool { return all[i].DeviceCode < all[j].DeviceCode })
+	sort.Slice(all, func(i, j int) bool {
+		less := all[i].DeviceCode < all[j].DeviceCode
+		switch p.Sort {
+		case "platform":
+			less = all[i].Platform < all[j].Platform
+		case "last_seen":
+			less = all[i].LastSeenAt.Before(all[j].LastSeenAt)
+		}
+		if p.Desc {
+			return !less
+		}
+		return less
+	})
 	limit, offset := pageBounds(p, 100)
 	if offset >= len(all) {
 		return nil, nil
@@ -364,9 +407,33 @@ func (m *Memory) CreateSession(_ context.Context, s *Session) error {
 	if s.ID == "" {
 		s.ID = randomID("ses")
 	}
+	if s.Version == 0 {
+		s.Version = 1
+	}
 	cp := *s
 	m.sessions[s.ID] = &cp
 	return nil
+}
+
+func (m *Memory) CreateSessionExclusive(_ context.Context, s *Session) (*Session, bool, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, cur := range m.sessions {
+		if cur.ControllerID == s.ControllerID && cur.TargetID == s.TargetID && cur.State != "closed" {
+			cp := *cur
+			return &cp, false, nil
+		}
+	}
+	if s.ID == "" {
+		s.ID = randomID("ses")
+	}
+	if s.Version == 0 {
+		s.Version = 1
+	}
+	cp := *s
+	m.sessions[s.ID] = &cp
+	out := *s
+	return &out, true, nil
 }
 
 func (m *Memory) GetSession(_ context.Context, id string) (*Session, error) {
@@ -386,6 +453,99 @@ func (m *Memory) UpdateSession(_ context.Context, s *Session) error {
 	if _, ok := m.sessions[s.ID]; !ok {
 		return ErrNotFound
 	}
+	if s.Version == 0 {
+		s.Version = 1
+	}
+	s.Version++
+	cp := *s
+	m.sessions[s.ID] = &cp
+	return nil
+}
+
+func (m *Memory) UpdateSessionCASWithEvent(ctx context.Context, s *Session, expected int64, ev *SessionEvent) error {
+	if err := m.UpdateSessionCAS(ctx, s, expected); err != nil {
+		return err
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if ev.SessionID == "" {
+		ev.SessionID = s.ID
+	}
+	if ev.Version == 0 {
+		ev.Version = s.Version
+	}
+	if ev.ID == "" {
+		ev.ID = randomID("evt")
+	}
+	if ev.At.IsZero() {
+		ev.At = time.Now().UTC()
+	}
+	key := fmt.Sprintf("%s|%d", ev.SessionID, ev.Version)
+	if _, ok := m.sessionEvents[key]; ok {
+		return nil
+	}
+	cp := *ev
+	m.sessionEvents[key] = &cp
+	return nil
+}
+
+func (m *Memory) ListSessionEvents(_ context.Context, delivered bool, limit int) ([]*SessionEvent, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	if limit <= 0 || limit > 500 {
+		limit = 100
+	}
+	out := make([]*SessionEvent, 0, limit)
+	for _, ev := range m.sessionEvents {
+		if ev.Delivered == delivered {
+			cp := *ev
+			out = append(out, &cp)
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].At.Before(out[j].At) })
+	if len(out) > limit {
+		out = out[:limit]
+	}
+	return out, nil
+}
+
+func (m *Memory) MarkSessionEventDelivered(_ context.Context, id string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, ev := range m.sessionEvents {
+		if ev.ID == id {
+			ev.Delivered = true
+			ev.LastError = ""
+			return nil
+		}
+	}
+	return ErrNotFound
+}
+
+func (m *Memory) MarkSessionEventFailed(_ context.Context, id, reason string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, ev := range m.sessionEvents {
+		if ev.ID == id {
+			ev.Attempts++
+			ev.LastError = reason
+			return nil
+		}
+	}
+	return ErrNotFound
+}
+
+func (m *Memory) UpdateSessionCAS(_ context.Context, s *Session, expected int64) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	cur, ok := m.sessions[s.ID]
+	if !ok {
+		return ErrNotFound
+	}
+	if cur.Version != expected {
+		return ErrVersionConflict
+	}
+	s.Version = expected + 1
 	cp := *s
 	m.sessions[s.ID] = &cp
 	return nil
@@ -395,13 +555,30 @@ func (m *Memory) ListSessions(_ context.Context, state string, p Page) ([]*Sessi
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	var out []*Session
+	q := strings.ToLower(p.Query)
 	for _, s := range m.sessions {
-		if state == "" || s.State == state {
-			cp := *s
-			out = append(out, &cp)
+		if state != "" && s.State != state {
+			continue
 		}
+		if q != "" && !strings.Contains(strings.ToLower(s.ID+" "+s.ControllerID+" "+s.TargetID+" "+s.State), q) {
+			continue
+		}
+		cp := *s
+		out = append(out, &cp)
 	}
-	sort.Slice(out, func(i, j int) bool { return out[i].StartedAt.After(out[j].StartedAt) })
+	sort.Slice(out, func(i, j int) bool {
+		less := out[i].StartedAt.Before(out[j].StartedAt)
+		switch p.Sort {
+		case "id":
+			less = out[i].ID < out[j].ID
+		case "state":
+			less = out[i].State < out[j].State
+		}
+		if p.Desc {
+			return !less
+		}
+		return less
+	})
 	limit, offset := pageBounds(p, 100)
 	if offset >= len(out) {
 		return nil, nil
@@ -618,4 +795,104 @@ func constantTimeEqual(a, b string) bool {
 		v |= a[i] ^ b[i]
 	}
 	return v == 0
+}
+func (m *Memory) CountAccounts(_ context.Context, p Page) (int, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	q := strings.ToLower(p.Query)
+	n := 0
+	for _, a := range m.accounts {
+		if p.Status != "" && a.Status != p.Status {
+			continue
+		}
+		if q != "" && !strings.Contains(strings.ToLower(a.ID+" "+a.PhoneEnc+" "+a.Status), q) {
+			continue
+		}
+		n++
+	}
+	return n, nil
+}
+
+func (m *Memory) CountDevices(_ context.Context, p Page) (int, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	q := strings.ToLower(p.Query)
+	n := 0
+	for _, d := range m.devices {
+		if p.Platform != "" && d.Platform != p.Platform {
+			continue
+		}
+		if q != "" && !strings.Contains(strings.ToLower(d.ID+" "+d.DeviceCode+" "+d.Platform+" "+d.AccountID), q) {
+			continue
+		}
+		n++
+	}
+	return n, nil
+}
+
+func (m *Memory) CountSessions(_ context.Context, state string, p Page) (int, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	q := strings.ToLower(p.Query)
+	n := 0
+	for _, s := range m.sessions {
+		if state != "" && s.State != state {
+			continue
+		}
+		if q != "" && !strings.Contains(strings.ToLower(s.ID+" "+s.ControllerID+" "+s.TargetID+" "+s.State), q) {
+			continue
+		}
+		n++
+	}
+	return n, nil
+}
+
+func (m *Memory) ListAuditPage(_ context.Context, p Page) ([]*AuditLog, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	q := strings.ToLower(p.Query)
+	all := make([]*AuditLog, 0)
+	for i := len(m.audits) - 1; i >= 0; i-- {
+		a := m.audits[i]
+		if p.Action != "" && a.Action != p.Action {
+			continue
+		}
+		if p.Result != "" && a.Result != p.Result {
+			continue
+		}
+		if q != "" && !strings.Contains(strings.ToLower(a.Actor+" "+a.Action+" "+a.Object+" "+a.Result), q) {
+			continue
+		}
+		cp := *a
+		all = append(all, &cp)
+	}
+	limit, offset := pageBounds(p, 100)
+	if offset >= len(all) {
+		return nil, nil
+	}
+	end := offset + limit
+	if end > len(all) {
+		end = len(all)
+	}
+	return all[offset:end], nil
+}
+
+func (m *Memory) CountAudit(_ context.Context, p Page) (int, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	q := strings.ToLower(p.Query)
+	n := 0
+	for _, a := range m.audits {
+		if p.Action != "" && a.Action != p.Action {
+			continue
+		}
+		if p.Result != "" && a.Result != p.Result {
+			continue
+		}
+		if q != "" && !strings.Contains(strings.ToLower(a.Actor+" "+a.Action+" "+a.Object+" "+a.Result), q) {
+			continue
+		}
+		n++
+	}
+	return n, nil
 }

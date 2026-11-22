@@ -126,6 +126,7 @@ fn main() {
     println!("after resume: sent {} received {}", after.0, after.1);
 
     let _ = relay_child.kill();
+    let _ = relay_child.wait();
     if after.1 != 2 {
         println!("FAIL: frames not delivered after resume");
         std::process::exit(1);

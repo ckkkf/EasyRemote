@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/easyremote/server/internal/appconfig"
+	"github.com/easyremote/server/internal/contract"
 	"github.com/easyremote/server/internal/errcode"
 	"github.com/easyremote/server/internal/httpx"
 	"github.com/easyremote/server/internal/store"
@@ -47,15 +48,15 @@ const (
 )
 
 // fileDTO 是对外可见的文件描述。绝不包含 StoragePath。
-func fileDTO(f *store.FileMeta) map[string]any {
-	return map[string]any{
-		"id":         f.ID,
-		"account_id": f.AccountID,
-		"device_id":  f.DeviceID,
-		"name":       f.Name,
-		"size":       f.Size,
-		"sha256":     f.SHA256,
-		"created_at": f.CreatedAt,
+func fileDTO(f *store.FileMeta) contract.FileRow {
+	return contract.FileRow{
+		ID:        f.ID,
+		AccountID: f.AccountID,
+		DeviceID:  f.DeviceID,
+		Name:      f.Name,
+		Size:      f.Size,
+		Sha256:    f.SHA256,
+		CreatedAt: f.CreatedAt,
 	}
 }
 
@@ -196,7 +197,7 @@ func (a *App) uploadFile(w http.ResponseWriter, r *http.Request) {
 		WriteErr(w, errcode.New(errcode.SrvInternal, err.Error()))
 		return
 	}
-	httpx.OKStatus(w, r, http.StatusCreated, map[string]any{"file": fileDTO(stored)})
+	httpx.OKStatus(w, r, http.StatusCreated, contract.FileUploadResult{File: fileDTO(stored)})
 }
 
 // savePart 把 multipart 分片流式写入临时文件，同时计算 sha256 并强制上限。
@@ -268,11 +269,11 @@ func (a *App) listFiles(w http.ResponseWriter, r *http.Request) {
 		WriteErr(w, errcode.New(errcode.SrvInternal, err.Error()))
 		return
 	}
-	out := make([]map[string]any, 0, len(list))
+	out := make([]contract.FileRow, 0, len(list))
 	for _, f := range list {
 		out = append(out, fileDTO(f))
 	}
-	httpx.OK(w, r, map[string]any{"files": out, "limit": page.Limit, "offset": page.Offset})
+	httpx.OK(w, r, contract.FileListResult{Files: out, Limit: page.Limit, Offset: page.Offset})
 }
 
 // handleFileItem 处理 /v1/files/{id} 与 /v1/files/{id}/ticket。
@@ -395,7 +396,7 @@ func (a *App) deleteFile(w http.ResponseWriter, r *http.Request, id string) {
 	if err != nil {
 		// 幂等：不存在（含已被别人删掉）按成功处理，其余错误照常返回。
 		if errcode.Is(err, errcode.FileNotFound) {
-			httpx.OK(w, r, map[string]any{"ok": true, "deleted": false})
+			httpx.OK(w, r, contract.FileDeletedResult{OK: true, Deleted: false})
 			return
 		}
 		WriteErr(w, err)
@@ -409,7 +410,7 @@ func (a *App) deleteFile(w http.ResponseWriter, r *http.Request, id string) {
 		// 元数据已删，字节残留只会浪费磁盘，不该让用户重试。
 		_ = err
 	}
-	httpx.OK(w, r, map[string]any{"ok": true, "deleted": true})
+	httpx.OK(w, r, contract.FileDeletedResult{OK: true, Deleted: true})
 }
 
 // ---------- 下载票据 ----------
@@ -484,10 +485,10 @@ func (a *App) issueDownloadTicket(w http.ResponseWriter, r *http.Request, id str
 	token := hex.EncodeToString(raw[:])
 	exp := time.Now().Add(downloadTicketTTL)
 	a.ticketsRef().put(token, downloadTicket{fileID: meta.ID, accountID: meta.AccountID, expiresAt: exp})
-	httpx.OK(w, r, map[string]any{
-		"url":        "/v1/files/" + meta.ID + "?ticket=" + token,
-		"expires_at": exp,
-		"name":       meta.Name,
+	httpx.OK(w, r, contract.FileTicketResult{
+		URL:       "/v1/files/" + meta.ID + "?ticket=" + token,
+		ExpiresAt: exp,
+		Name:      meta.Name,
 	})
 }
 

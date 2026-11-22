@@ -52,17 +52,22 @@ void main() {
     await tester.pumpAndSettle();
 
     // 版本号必须来自生成物（scripts/check-version.mjs），不能手写。
-    expect(find.text('v' + erAppVersion), findsOneWidget,
-        reason: '侧边栏版本号要与 pubspec 一致，不允许硬编码');
+    expect(
+      find.text('v' + erAppVersion),
+      findsOneWidget,
+      reason: '侧边栏版本号要与 pubspec 一致，不允许硬编码',
+    );
 
     final settings = find.text('设置');
-    final files = find.text('文件传输');
+    final devices = find.text('我的设备');
     expect(settings, findsOneWidget);
-    expect(files, findsOneWidget);
+    expect(devices, findsWidgets);
+    // A-14：文件尚未走会话 data stream，入口必须隐藏。
+    expect(find.text('文件传输'), findsNothing);
     expect(
       tester.getTopLeft(settings).dy,
-      greaterThan(tester.getBottomLeft(files).dy),
-      reason: '设置必须排在文件传输下方',
+      greaterThan(tester.getBottomLeft(devices.first).dy),
+      reason: '设置必须排在导航项下方',
     );
     // 但它是「导航组」的最后一项，不是整栏最下方：外观/本机面板永远在导航组下面。
     final appearance = find.text('外观');
@@ -85,8 +90,11 @@ void main() {
     await tester.tap(find.text('我的设备').first);
     await tester.pumpAndSettle();
     final searchAgain = tester.widget<TextField>(find.byType(TextField).first);
-    expect(searchAgain.controller?.text, '111',
-        reason: '换页不能 dispose 设备页，否则输入与滚动位置都会丢');
+    expect(
+      searchAgain.controller?.text,
+      '111',
+      reason: '换页不能 dispose 设备页，否则输入与滚动位置都会丢',
+    );
   });
 
   // 回归：导航项的底色过渡目标必须是不透明色。
@@ -110,11 +118,7 @@ void main() {
     final material = tester.widget<Material>(
       find.ancestor(of: settings, matching: find.byType(Material)).first,
     );
-    expect(
-      material.color?.a,
-      1.0,
-      reason: '未选中项的底色不能是透明色，否则过渡中途会变暗闪一下',
-    );
+    expect(material.color?.a, 1.0, reason: '未选中项的底色不能是透明色，否则过渡中途会变暗闪一下');
 
     final ink = tester.widget<InkWell>(
       find.ancestor(of: settings, matching: find.byType(InkWell)).first,

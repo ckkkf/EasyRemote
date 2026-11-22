@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../api.dart';
+import '../error_view.dart';
 import '../models.dart';
 import '../shell.dart';
 import '../theme.dart';
@@ -26,6 +27,7 @@ class _LoginPageState extends State<LoginPage> {
   bool _busy = false;
   bool _agreed = true;
   String? _error;
+  ApiException? _apiError;
   String? _notice;
 
   @override
@@ -39,14 +41,21 @@ class _LoginPageState extends State<LoginPage> {
     setState(() {
       _busy = true;
       _error = null;
+      _apiError = null;
       _notice = null;
     });
     try {
       await action();
     } on ApiException catch (e) {
-      setState(() => _error = e.message);
+      setState(() {
+        _apiError = e;
+        _error = e.message;
+      });
     } catch (e) {
-      setState(() => _error = e.toString());
+      setState(() {
+        _apiError = null;
+        _error = e.toString();
+      });
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -64,13 +73,18 @@ class _LoginPageState extends State<LoginPage> {
     final device = await widget.client.bindDevice(currentPlatformName());
     if (!mounted) return;
     Navigator.of(context).pushReplacement(
-      MaterialPageRoute<void>(builder: (_) => HomeShell(client: widget.client, device: device)),
+      MaterialPageRoute<void>(
+        builder: (_) => HomeShell(client: widget.client, device: device),
+      ),
     );
   }
 
   Future<void> _loginPhone() async {
     if (!_agreed) {
-      setState(() => _error = '请先阅读并同意用户协议与隐私政策');
+      setState(() {
+        _apiError = null;
+        _error = '请先阅读并同意用户协议与隐私政策';
+      });
       return;
     }
     await _run(() async {
@@ -81,7 +95,10 @@ class _LoginPageState extends State<LoginPage> {
 
   Future<void> _loginEmail() async {
     if (!_agreed) {
-      setState(() => _error = '请先阅读并同意用户协议与隐私政策');
+      setState(() {
+        _apiError = null;
+        _error = '请先阅读并同意用户协议与隐私政策';
+      });
       return;
     }
     final ok = await showDialog<bool>(
@@ -104,6 +121,7 @@ class _LoginPageState extends State<LoginPage> {
       busy: _busy,
       agreed: _agreed,
       error: _error,
+      apiError: _apiError,
       notice: _notice,
       onAgree: (v) => setState(() => _agreed = v),
       onSendCode: _busy ? null : _sendCode,
@@ -124,8 +142,14 @@ class _LoginPageState extends State<LoginPage> {
                     color: scheme.surface,
                     child: Center(
                       child: SingleChildScrollView(
-                        padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 32),
-                        child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 352), child: form),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 40,
+                          vertical: 32,
+                        ),
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 352),
+                          child: form,
+                        ),
                       ),
                     ),
                   ),
@@ -150,7 +174,9 @@ class _LoginPageState extends State<LoginPage> {
             right: 16,
             child: Container(
               decoration: BoxDecoration(
-                color: wide ? Colors.transparent : scheme.surfaceContainerHigh.withValues(alpha: 0.7),
+                color: wide
+                    ? Colors.transparent
+                    : scheme.surfaceContainerHigh.withValues(alpha: 0.7),
                 borderRadius: BorderRadius.circular(ErTokens.radiusSm),
               ),
               child: const ThemeModeButton(),
@@ -169,6 +195,7 @@ class _LoginForm extends StatelessWidget {
     required this.busy,
     required this.agreed,
     required this.error,
+    required this.apiError,
     required this.notice,
     required this.onAgree,
     required this.onSendCode,
@@ -181,6 +208,7 @@ class _LoginForm extends StatelessWidget {
   final bool busy;
   final bool agreed;
   final String? error;
+  final ApiException? apiError;
   final String? notice;
   final ValueChanged<bool> onAgree;
   final VoidCallback? onSendCode;
@@ -213,7 +241,10 @@ class _LoginForm extends StatelessWidget {
             hintText: '138 0000 8882',
             prefixIcon: Padding(
               padding: EdgeInsets.only(left: 14, right: 10),
-              child: Text('+86', style: TextStyle(fontSize: 13, color: Color(0xFF777C87))),
+              child: Text(
+                '+86',
+                style: TextStyle(fontSize: 13, color: Color(0xFF777C87)),
+              ),
             ),
             prefixIconConstraints: BoxConstraints(minWidth: 0),
           ),
@@ -237,9 +268,15 @@ class _LoginForm extends StatelessWidget {
         ),
         if (notice != null) ...[
           const SizedBox(height: 10),
-          Text(notice!, style: text.labelSmall?.copyWith(color: scheme.primary)),
+          Text(
+            notice!,
+            style: text.labelSmall?.copyWith(color: scheme.primary),
+          ),
         ],
-        if (error != null) ...[
+        if (apiError != null) ...[
+          const SizedBox(height: 10),
+          ApiErrorView(error: apiError!, onRetry: onSubmit),
+        ] else if (error != null) ...[
           const SizedBox(height: 10),
           Text(error!, style: text.bodySmall?.copyWith(color: scheme.error)),
         ],
@@ -250,7 +287,11 @@ class _LoginForm extends StatelessWidget {
             key: const Key('login-button'),
             onPressed: onSubmit,
             child: busy
-                ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                ? const SizedBox(
+                    height: 18,
+                    width: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
                 : const Text('登录 / 注册'),
           ),
         ),
@@ -259,12 +300,25 @@ class _LoginForm extends StatelessWidget {
         const SizedBox(height: 26),
         Row(
           children: [
-            Expanded(child: Divider(color: scheme.outlineVariant.withValues(alpha: 0.8))),
+            Expanded(
+              child: Divider(
+                color: scheme.outlineVariant.withValues(alpha: 0.8),
+              ),
+            ),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: Text('或', style: text.labelSmall?.copyWith(color: scheme.onSurfaceVariant)),
+              child: Text(
+                '或',
+                style: text.labelSmall?.copyWith(
+                  color: scheme.onSurfaceVariant,
+                ),
+              ),
             ),
-            Expanded(child: Divider(color: scheme.outlineVariant.withValues(alpha: 0.8))),
+            Expanded(
+              child: Divider(
+                color: scheme.outlineVariant.withValues(alpha: 0.8),
+              ),
+            ),
           ],
         ),
         const SizedBox(height: 16),
@@ -307,9 +361,9 @@ class _FieldLabel extends StatelessWidget {
     return Text(
       text,
       style: Theme.of(context).textTheme.labelMedium?.copyWith(
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-            fontWeight: FontWeight.w600,
-          ),
+        color: Theme.of(context).colorScheme.onSurfaceVariant,
+        fontWeight: FontWeight.w600,
+      ),
     );
   }
 }
@@ -340,25 +394,38 @@ class _AgreementRow extends StatelessWidget {
               decoration: BoxDecoration(
                 color: agreed ? scheme.primary : Colors.transparent,
                 borderRadius: BorderRadius.circular(4),
-                border: Border.all(color: agreed ? scheme.primary : scheme.outline),
+                border: Border.all(
+                  color: agreed ? scheme.primary : scheme.outline,
+                ),
               ),
-              child: agreed ? Icon(Icons.check_rounded, size: 11, color: scheme.onPrimary) : null,
+              child: agreed
+                  ? Icon(Icons.check_rounded, size: 11, color: scheme.onPrimary)
+                  : null,
             ),
             const SizedBox(width: 8),
             Expanded(
               child: Text.rich(
                 TextSpan(
-                  style: text.labelSmall?.copyWith(color: scheme.onSurfaceVariant, height: 1.65),
+                  style: text.labelSmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                    height: 1.65,
+                  ),
                   children: [
                     const TextSpan(text: '我已阅读并同意 '),
                     TextSpan(
                       text: '用户协议',
-                      style: TextStyle(color: scheme.primary, fontWeight: FontWeight.w600),
+                      style: TextStyle(
+                        color: scheme.primary,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                     const TextSpan(text: ' 与 '),
                     TextSpan(
                       text: '隐私政策',
-                      style: TextStyle(color: scheme.primary, fontWeight: FontWeight.w600),
+                      style: TextStyle(
+                        color: scheme.primary,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                     const TextSpan(text: '，未注册的手机号将自动创建账号。'),
                   ],
@@ -397,7 +464,9 @@ class _ProviderButton extends StatelessWidget {
     final content = Container(
       height: 44,
       decoration: BoxDecoration(
-        color: enabled ? scheme.surfaceContainerLowest : scheme.surfaceContainerLow,
+        color: enabled
+            ? scheme.surfaceContainerLowest
+            : scheme.surfaceContainerLow,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: scheme.outlineVariant),
       ),
@@ -412,7 +481,9 @@ class _ProviderButton extends StatelessWidget {
           Text(
             'V1',
             style: text.labelSmall?.copyWith(
-              color: scheme.onSurfaceVariant.withValues(alpha: enabled ? 0.9 : 0.6),
+              color: scheme.onSurfaceVariant.withValues(
+                alpha: enabled ? 0.9 : 0.6,
+              ),
               letterSpacing: 0,
             ),
           ),
@@ -543,22 +614,35 @@ class _EmailLoginDialogState extends State<_EmailLoginDialog> {
             ),
             if (_notice != null) ...[
               const SizedBox(height: 10),
-              Text(_notice!, style: text.labelSmall?.copyWith(color: scheme.primary)),
+              Text(
+                _notice!,
+                style: text.labelSmall?.copyWith(color: scheme.primary),
+              ),
             ],
             if (_error != null) ...[
               const SizedBox(height: 10),
-              Text(_error!, style: text.bodySmall?.copyWith(color: scheme.error)),
+              Text(
+                _error!,
+                style: text.bodySmall?.copyWith(color: scheme.error),
+              ),
             ],
           ],
         ),
       ),
       actions: [
-        TextButton(onPressed: _busy ? null : () => Navigator.of(context).pop(false), child: const Text('取消')),
+        TextButton(
+          onPressed: _busy ? null : () => Navigator.of(context).pop(false),
+          child: const Text('取消'),
+        ),
         FilledButton(
           key: const Key('email-login-button'),
           onPressed: _busy ? null : _submit,
           child: _busy
-              ? const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2))
+              ? const SizedBox(
+                  height: 16,
+                  width: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
               : const Text('登录'),
         ),
       ],
@@ -591,7 +675,12 @@ class _BrandPanel extends StatelessWidget {
               height: 520,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                gradient: RadialGradient(colors: [Colors.white.withValues(alpha: 0.17), Colors.white.withValues(alpha: 0)]),
+                gradient: RadialGradient(
+                  colors: [
+                    Colors.white.withValues(alpha: 0.17),
+                    Colors.white.withValues(alpha: 0),
+                  ],
+                ),
               ),
             ),
           ),
@@ -603,7 +692,9 @@ class _BrandPanel extends StatelessWidget {
               height: 420,
               decoration: const BoxDecoration(
                 shape: BoxShape.circle,
-                gradient: RadialGradient(colors: [Color(0x3D82AFFF), Color(0x0082AFFF)]),
+                gradient: RadialGradient(
+                  colors: [Color(0x3D82AFFF), Color(0x0082AFFF)],
+                ),
               ),
             ),
           ),
@@ -618,30 +709,52 @@ class _BrandPanel extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: Colors.white.withValues(alpha: 0.16),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.white.withValues(alpha: 0.26)),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.26),
+                      ),
                     ),
                     alignment: Alignment.center,
                     child: const Text(
                       'ER',
-                      style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600, letterSpacing: 0.5),
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.5,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 12),
                   const Text(
                     'EasyRemote',
-                    style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w600, letterSpacing: -0.2),
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 17,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: -0.2,
+                    ),
                   ),
                 ],
               ),
               const Spacer(),
               const Text(
                 '把任何一台电脑\n装进口袋',
-                style: TextStyle(color: Colors.white, fontSize: 34, height: 1.22, fontWeight: FontWeight.w600, letterSpacing: -1),
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 34,
+                  height: 1.22,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: -1,
+                ),
               ),
               const SizedBox(height: 16),
               Text(
                 '毫秒级响应、真彩还原、多端互连。\n核心功能不限时长、不限次数。',
-                style: TextStyle(color: Colors.white.withValues(alpha: 0.74), fontSize: 13.5, height: 1.75),
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.74),
+                  fontSize: 13.5,
+                  height: 1.75,
+                ),
               ),
               const Spacer(),
               for (final item in const [
@@ -662,7 +775,11 @@ class _BrandPanel extends StatelessWidget {
                       alignment: Alignment.center,
                       child: Text(
                         item.$1,
-                        style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 11),
@@ -672,12 +789,20 @@ class _BrandPanel extends StatelessWidget {
                         children: [
                           Text(
                             item.$2,
-                            style: const TextStyle(color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.w600),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                           const SizedBox(height: 2),
                           Text(
                             item.$3,
-                            style: TextStyle(color: Colors.white.withValues(alpha: 0.62), fontSize: 11.5, height: 1.5),
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.62),
+                              fontSize: 11.5,
+                              height: 1.5,
+                            ),
                           ),
                         ],
                       ),
@@ -689,7 +814,11 @@ class _BrandPanel extends StatelessWidget {
               const SizedBox(height: 10),
               Text(
                 'v1.0.0 · Windows 10 及以上 / macOS 12 及以上',
-                style: TextStyle(color: Colors.white.withValues(alpha: 0.44), fontSize: 10.5, letterSpacing: 0.2),
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.44),
+                  fontSize: 10.5,
+                  letterSpacing: 0.2,
+                ),
               ),
             ],
           ),
@@ -725,22 +854,35 @@ class _BrandBanner extends StatelessWidget {
               borderRadius: BorderRadius.circular(11),
             ),
             alignment: Alignment.center,
-            child: const Text('ER', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
+            child: const Text(
+              'ER',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
           const SizedBox(height: 12),
           const Text(
             'EasyRemote',
-            style: TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.w600, letterSpacing: -0.4),
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 26,
+              fontWeight: FontWeight.w600,
+              letterSpacing: -0.4,
+            ),
           ),
           const SizedBox(height: 6),
           Text(
             '连得稳，看得清。弱网也能用的远程桌面。',
-            style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 13),
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.85),
+              fontSize: 13,
+            ),
           ),
         ],
       ),
     );
   }
 }
-
-

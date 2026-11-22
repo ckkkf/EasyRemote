@@ -1,0 +1,5 @@
+# 测试标签声明：被 flutter test --exclude-tags 使用。
+tags:
+  e2e-desktop:
+    description: 桌面真实 E2E（Dart FFI → 真实 stack/relay）；Linux CI 无显示/FFI，排除后由 macOS/Windows 桌面矩阵（ER-900）覆盖。
+    timeout: 2x

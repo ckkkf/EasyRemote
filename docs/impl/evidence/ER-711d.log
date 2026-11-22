@@ -1,0 +1,12 @@
+00:00 +0: loading /Users/ckkk/dev/code/Go/EasyRemote/client/tool/file_transfer_e2e_test.dart
+00:00 +0: (setUpAll)
+00:03 +0: TestFileTransferOverSessionDataStream
+Shell: CODEC: init kind=Software 1920x1080
+Shell: CODEC: prime_frame=false
+Shell: [OpenH264] this = 0x0xa351e7d50, Warning:ParamValidation(), AdaptiveQuant(1) is not supported yet for screen content, auto turned off
+Shell: [OpenH264] this = 0x0xa351e7d50, Warning:ParamValidation(), BackgroundDetection(1) is not supported yet for screen content, auto turned off
+Shell: [OpenH264] this = 0x0xa351e7d50, Warning:bEnableFrameSkip = 0,bitrate can't be controlled for RC_QUALITY_MODE,RC_BITRATE_MODE and RC_TIMESTAMP_MODE without enabling skip frame.
+Shell: CODEC: backend_final=cpu
+00:42 +1: (tearDownAll)
+00:42 +1: All tests passed!
+EXIT=0

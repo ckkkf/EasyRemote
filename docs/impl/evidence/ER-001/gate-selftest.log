@@ -1,0 +1,14 @@
+✔ TestGateMatchesCIJobs (1.037958ms)
+✔ TestGateFailsWhenAnyStackFails (0.695ms)
+✔ TestGateStepsHaveUniqueIds (0.061834ms)
+✔ TestReportModeOnlyReports (0.110833ms)
+✔ TestAnalyzeRejectsWarningsButAllowsInfo (0.095709ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 46.423208
+SELFTEST_EXIT=0

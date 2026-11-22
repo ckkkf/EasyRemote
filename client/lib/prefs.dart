@@ -17,16 +17,16 @@ export 'prefs_store_types.dart';
 final ValueNotifier<Prefs> appPrefs = ValueNotifier<Prefs>(const Prefs());
 
 ThemeMode themeModeFromPrefs(String value) => switch (value) {
-      'light' => ThemeMode.light,
-      'dark' => ThemeMode.dark,
-      _ => ThemeMode.system,
-    };
+  'light' => ThemeMode.light,
+  'dark' => ThemeMode.dark,
+  _ => ThemeMode.system,
+};
 
 String themeModeName(ThemeMode mode) => switch (mode) {
-      ThemeMode.light => 'light',
-      ThemeMode.dark => 'dark',
-      ThemeMode.system => 'system',
-    };
+  ThemeMode.light => 'light',
+  ThemeMode.dark => 'dark',
+  ThemeMode.system => 'system',
+};
 
 /// 启动时调用：读本地偏好并应用（含主题）。
 Future<void> loadAndApplyPrefs() async {

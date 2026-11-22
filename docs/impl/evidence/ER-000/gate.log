@@ -1,0 +1,67 @@
+
+== 1/9 gofmt ==
+
+== 2/9 go vet + go test ==
+?   	github.com/easyremote/server/cmd/admin	[no test files]
+?   	github.com/easyremote/server/cmd/gateway	[no test files]
+?   	github.com/easyremote/server/cmd/lossyproxy	[no test files]
+?   	github.com/easyremote/server/cmd/relay	[no test files]
+?   	github.com/easyremote/server/cmd/rendezvous	[no test files]
+?   	github.com/easyremote/server/cmd/stack	[no test files]
+?   	github.com/easyremote/server/cmd/udptun	[no test files]
+ok  	github.com/easyremote/server/internal/adminapi	(cached)
+ok  	github.com/easyremote/server/internal/adminhttp	(cached)
+ok  	github.com/easyremote/server/internal/adminsession	(cached)
+?   	github.com/easyremote/server/internal/appconfig	[no test files]
+ok  	github.com/easyremote/server/internal/auth	(cached)
+ok  	github.com/easyremote/server/internal/capability	(cached)
+ok  	github.com/easyremote/server/internal/config	(cached)
+?   	github.com/easyremote/server/internal/contract	[no test files]
+ok  	github.com/easyremote/server/internal/device	(cached)
+ok  	github.com/easyremote/server/internal/errcode	(cached)
+ok  	github.com/easyremote/server/internal/gateway	(cached)
+ok  	github.com/easyremote/server/internal/httpx	(cached)
+ok  	github.com/easyremote/server/internal/netdiag	(cached)
+ok  	github.com/easyremote/server/internal/password	(cached)
+ok  	github.com/easyremote/server/internal/ratelimit	(cached)
+ok  	github.com/easyremote/server/internal/relay	(cached)
+ok  	github.com/easyremote/server/internal/relaymgr	(cached)
+ok  	github.com/easyremote/server/internal/serve	(cached)
+ok  	github.com/easyremote/server/internal/session	(cached)
+ok  	github.com/easyremote/server/internal/signal	(cached)
+ok  	github.com/easyremote/server/internal/stack	(cached)
+ok  	github.com/easyremote/server/internal/store	(cached)
+?   	github.com/easyremote/server/internal/store/storetest	[no test files]
+
+== 3/9 web-admin tsc ==
+
+== 4/9 契约、错误码与能力台账生成物 ==
+✓ server/internal/errcode/codes_gen.go
+✓ core/crates/er-common/src/errors_gen.rs
+✔ 三端错误码与文档一致
+✓ 三端契约一致（12 个类型 / 32 条接口）
+✓ client/lib/capability_gen.dart
+✓ server/internal/capability/capability_gen.go
+✓ web-admin/src/capability_gen.ts
+✔ 三端能力台账与 docs/spec/capabilities.yaml 一致
+
+== 5/9 路由清单 vs 契约 ==
+✓ 路由清单与契约一致（31 条）
+
+== 6/9 禁止模式 ==
+无新增违规（存量 5 个文件待迁移）
+
+== 7/9 版本一致性 ==
+  VERSION: 0.2.8
+  core/Cargo.toml (workspace.package.version): 0.2.8
+  web-admin/package.json: 0.2.8
+  client/pubspec.yaml: 0.2.8
+  client/lib/version_gen.dart: 0.2.8
+
+✓ 各处版本一致：0.2.8
+
+== 8/9 响应信封契约 ==
+ok  	github.com/easyremote/server/internal/adminhttp	(cached)
+
+== 结果 ==
+GATE: PASS

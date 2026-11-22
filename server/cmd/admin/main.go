@@ -6,9 +6,13 @@ import (
 	"context"
 	"flag"
 	"log"
+	"os"
 	"time"
 
+	"github.com/easyremote/server/internal/adminapi"
+	"github.com/easyremote/server/internal/config"
 	"github.com/easyremote/server/internal/serve"
+	"github.com/easyremote/server/internal/signal"
 	"github.com/easyremote/server/internal/stack"
 )
 
@@ -18,6 +22,9 @@ func main() {
 
 	ctx := context.Background()
 
+	if err := config.ValidateDeployment(os.Getenv); err != nil {
+		log.Fatalf("admin: %v", err)
+	}
 	st, err := stack.OpenStore(ctx)
 	if err != nil {
 		log.Fatalf("admin: open store: %v", err)
@@ -37,7 +44,18 @@ func main() {
 	if err != nil {
 		log.Fatalf("admin: open replay guard: %v", err)
 	}
-	app, err := stack.BuildAdmin(st, sessions, limiter, replay)
+	var closer adminapi.SessionCloser
+	var presence adminapi.Presence
+	if url := os.Getenv("REDIS_URL"); url != "" {
+		bus, busErr := signal.NewRedisBus(ctx, url, "admin")
+		if busErr != nil {
+			log.Fatalf("admin: signal bus: %v", busErr)
+		}
+		defer bus.Close()
+		closer = signal.ConsentNotifier{Bus: bus}
+		presence = signal.Presence{Bus: bus}
+	}
+	app, err := stack.BuildAdmin(st, sessions, limiter, replay, closer, presence)
 	if err != nil {
 		log.Fatalf("admin: %v", err)
 	}

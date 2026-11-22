@@ -11,7 +11,10 @@ String? prefsFilePathOverride;
 File _file() {
   final override = prefsFilePathOverride;
   if (override != null && override.isNotEmpty) return File(override);
-  final home = Platform.environment['HOME'] ?? Platform.environment['USERPROFILE'] ?? '.';
+  final home =
+      Platform.environment['HOME'] ??
+      Platform.environment['USERPROFILE'] ??
+      '.';
   return File(home + '/.easyremote/prefs.json');
 }
 
@@ -19,7 +22,9 @@ Future<Prefs> loadPrefs() async {
   final file = _file();
   if (!await file.exists()) return const Prefs();
   try {
-    return Prefs.fromJson(jsonDecode(await file.readAsString()) as Map<String, dynamic>);
+    return Prefs.fromJson(
+      jsonDecode(await file.readAsString()) as Map<String, dynamic>,
+    );
   } catch (_) {
     return const Prefs();
   }

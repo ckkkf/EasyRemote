@@ -14,6 +14,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/easyremote/server/internal/capability"
+	"github.com/easyremote/server/internal/contract"
 	"github.com/easyremote/server/internal/errcode"
 	"github.com/easyremote/server/internal/store"
 )
@@ -192,20 +194,28 @@ func (s *Service) Update(ctx context.Context, values map[string]string) (map[str
 //
 // 客户端拿到的永远是「可用值」而不是「配置项」：缺省键已经填充默认值，
 // 客户端不需要再实现一遍默认逻辑。
-func (s *Service) Public(ctx context.Context) (map[string]any, error) {
+func (s *Service) Public(ctx context.Context) (contract.ClientRuntimeConfig, error) {
 	all, err := s.All(ctx)
 	if err != nil {
-		return nil, err
+		return contract.ClientRuntimeConfig{}, err
 	}
 	sessionMax, _ := strconv.ParseInt(all[KeySessionMaxMinutes], 10, 64)
 	fileMax, _ := strconv.ParseInt(all[KeyFileMaxBytes], 10, 64)
 	autoRefresh, _ := strconv.ParseInt(all[KeyDiagAutoRefreshSec], 10, 64)
 	forceUpdate, _ := strconv.ParseBool(all[KeyClientForceUpdate])
-	return map[string]any{
-		"session": map[string]any{"max_minutes": sessionMax},
-		"file":    map[string]any{"max_bytes": fileMax},
-		"diag":    map[string]any{"auto_refresh_secs": autoRefresh},
-		"client":  map[string]any{"force_update": forceUpdate},
+	endpoints, err := RuntimeEndpointsFromEnv()
+	if err != nil {
+		return contract.ClientRuntimeConfig{}, err
+	}
+	return contract.ClientRuntimeConfig{
+		Endpoints: endpoints,
+		Session:   contract.SessionLimits{MaxMinutes: int(sessionMax)},
+		File:      contract.FileLimits{MaxBytes: fileMax},
+		Diag:      contract.DiagConfig{AutoRefreshSecs: int(autoRefresh)},
+		Client:    contract.ClientFlags{ForceUpdate: forceUpdate},
+		// 只读能力台账开关：来自 docs/spec/capabilities.yaml 生成物。
+		// 客户端/后台可以据此展示「为什么入口不可用」，但不能反向解锁。
+		Capabilities: capability.Public(),
 	}, nil
 }
 

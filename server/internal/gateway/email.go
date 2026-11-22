@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/easyremote/server/internal/auth"
+	"github.com/easyremote/server/internal/contract"
 	"github.com/easyremote/server/internal/errcode"
 	"github.com/easyremote/server/internal/httpx"
 )
@@ -43,7 +44,7 @@ func (a *App) emailSendCode(w http.ResponseWriter, r *http.Request) {
 		WriteErr(w, err)
 		return
 	}
-	httpx.OK(w, r, map[string]any{"ok": true, "email": normalized})
+	httpx.OK(w, r, contract.EmailCodeResult{OK: true, Email: normalized})
 }
 
 func (a *App) emailLogin(w http.ResponseWriter, r *http.Request) {
@@ -72,5 +73,5 @@ func (a *App) emailLogin(w http.ResponseWriter, r *http.Request) {
 		WriteErr(w, err)
 		return
 	}
-	httpx.OK(w, r, map[string]any{"token": tok, "account_id": acc.ID, "email": normalized})
+	httpx.OK(w, r, contract.EmailLoginResult{Token: tok, AccountID: acc.ID, Email: normalized})
 }

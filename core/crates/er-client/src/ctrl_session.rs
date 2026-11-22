@@ -4,12 +4,14 @@
 //! 为什么单独一个模块：`pair.rs` 是本机双端自检，`agent.rs` 是"跑完就结束"的脚本式流程；
 //! 客户端要的是**长驻会话 + 随时取最新帧**，所以这里把循环、双缓冲、输入通道都收进来。
 
+use std::collections::VecDeque;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use er_input::InputEvent;
+use er_session::relay_client::{p2p_token, P2PConfig};
 
 use crate::agent::{ControllerAgent, MSG_VIDEO};
 use crate::link::VideoHeader;
@@ -28,7 +30,74 @@ pub struct CtrlStats {
     pub connected: bool,
     pub session_id: String,
     pub frames: u64,
+    /// 最近一秒实际解码帧率（present 侧由 Flutter 轮询计数对照）。
+    pub decode_fps: u32,
+    /// 最近一帧解码耗时（毫秒）。
+    pub decode_ms: u64,
+    pub dropped_frames: u64,
+    /// 最近一秒收到的媒体码率（kbps）。
+    pub bitrate_kbps: u32,
+    /// 分片级丢包率（%），来自数据面重组统计。
+    pub loss_pct: f32,
+    pub input_acks: u64,
+    /// 输入 ACK P95 延迟（ms）。
+    pub input_p95_ms: u32,
     pub last_error: String,
+}
+
+/// 输入 ACK 延迟 P95（空样本返回 0）。
+pub fn input_p95_ms(samples: &[u32]) -> u32 {
+    if samples.is_empty() {
+        return 0;
+    }
+    let mut sorted = samples.to_vec();
+    sorted.sort_unstable();
+    let idx = ((sorted.len() as f64 * 0.95) as usize).min(sorted.len() - 1);
+    sorted[idx]
+}
+
+/// 关键帧请求策略：丢包/解码失败时请求；最多 2 次/秒。
+pub fn should_request_keyframe(
+    last_seq: Option<u32>,
+    seq: u32,
+    since_last_request: Duration,
+) -> bool {
+    let gap = match last_seq {
+        Some(prev) => seq.wrapping_sub(prev) > 1,
+        None => false,
+    };
+    gap && since_last_request >= Duration::from_millis(500)
+}
+
+/// 统计真实解码 FPS 的窗口计数器（1 秒窗口，测试可注入时间）。
+pub struct FpsCounter {
+    window_start: Instant,
+    frames: u32,
+    last_fps: u32,
+}
+
+impl FpsCounter {
+    pub fn new(now: Instant) -> Self {
+        Self {
+            window_start: now,
+            frames: 0,
+            last_fps: 0,
+        }
+    }
+
+    pub fn tick(&mut self, now: Instant) {
+        self.frames += 1;
+        let elapsed = now.saturating_duration_since(self.window_start);
+        if elapsed >= Duration::from_secs(1) {
+            self.last_fps = (self.frames as f64 / elapsed.as_secs_f64()).round() as u32;
+            self.frames = 0;
+            self.window_start = now;
+        }
+    }
+
+    pub fn fps(&self) -> u32 {
+        self.last_fps
+    }
 }
 
 pub struct CtrlSession {
@@ -73,17 +142,30 @@ pub fn connect(
     std::thread::sleep(Duration::from_millis(1500));
     let (mut relay_cli, mut crypto, keys, msg) =
         ctrl.begin(&session_id).map_err(|e| e.to_string())?;
+    let _ = relay_cli.negotiate_p2p(&P2PConfig::new(
+        &session_id,
+        p2p_token(&session_id),
+        Duration::from_secs(2),
+    ));
     std::thread::sleep(Duration::from_millis(2500));
     ctrl.announce(&mut relay_cli, &msg)
         .map_err(|e| e.to_string())?;
     ctrl.finish(&mut relay_cli, &mut crypto, &keys, &session_id)
         .map_err(|e| e.to_string())?;
+    ctrl.mark_ready(&session_id).map_err(|e| e.to_string())?;
 
     let latest: Arc<Mutex<Option<Frame>>> = Arc::new(Mutex::new(None));
     let stats: Arc<Mutex<CtrlStats>> = Arc::new(Mutex::new(CtrlStats {
         connected: true,
         session_id: session_id.clone(),
         frames: 0,
+        decode_fps: 0,
+        decode_ms: 0,
+        dropped_frames: 0,
+        bitrate_kbps: 0,
+        loss_pct: 0.0,
+        input_acks: 0,
+        input_p95_ms: 0,
         last_error: String::new(),
     }));
     let stop = Arc::new(AtomicBool::new(false));
@@ -137,7 +219,6 @@ fn run_loop(
     stop: Arc<AtomicBool>,
     input_rx: Receiver<InputEvent>,
 ) {
-    let _ = session_id;
     let mut dec = match er_codec::H264Decoder::new() {
         Ok(d) => d,
         Err(e) => {
@@ -148,11 +229,100 @@ fn run_loop(
             return;
         }
     };
-    let mut last_decode = Instant::now() - Duration::from_secs(1);
+    let mut fps_counter = FpsCounter::new(Instant::now());
+    let mut last_video_seq: Option<u32> = None;
+    let mut last_kf_request = Instant::now() - Duration::from_secs(1);
+    let mut media_bytes = 0u64;
+    let mut media_window = Instant::now();
+    let mut pending_inputs: VecDeque<(u32, Instant)> = VecDeque::new();
+    let mut clipboard = if std::env::var("ER_CLIPBOARD_SYNC").ok().as_deref() == Some("1") {
+        Some(er_channels::clipboard::ClipboardService::new(
+            er_channels::clipboard::CommandClipboard,
+            true,
+        ))
+    } else {
+        None
+    };
+    let mut last_clip_poll = Instant::now();
+    let mut file_tx: Option<er_channels::file_stream::StreamSender> = None;
+    let mut file_meta_sent = false;
+    let mut file_last_send = Instant::now();
+    if let Ok(path) = std::env::var("ER_FILE_SEND_PATH") {
+        if let Ok(data) = std::fs::read(&path) {
+            let name = std::path::Path::new(&path)
+                .file_name()
+                .and_then(|s| s.to_str())
+                .unwrap_or("file.bin");
+            let id = (std::process::id() << 16) ^ (data.len() as u32);
+            if let Ok(tx) = er_channels::file_stream::StreamSender::new(
+                id,
+                name,
+                data,
+                er_channels::file_transfer::DEFAULT_CHUNK,
+            ) {
+                file_tx = Some(tx);
+            }
+        }
+    }
+    let mut input_samples: VecDeque<u32> = VecDeque::new();
     // 心跳：让被控端能区分「主控只是没动鼠标」和「主控已经走了」
     let mut last_beat = Instant::now() - Duration::from_secs(10);
+    let mut last_state_check = Instant::now();
 
     while !stop.load(Ordering::Relaxed) {
+        // 关闭传播兜底：被控端/后台关闭后 1s 内停止发送输入并退出。
+        if last_state_check.elapsed() >= Duration::from_secs(1) {
+            last_state_check = Instant::now();
+            if let Ok(state) = ctrl.session_state(session_id) {
+                if state == "closed" || state == "failed" || state == "ended" {
+                    if let Ok(mut s) = stats.lock() {
+                        s.connected = false;
+                        s.last_error = format!("session {state}");
+                    }
+                    break;
+                }
+            }
+        }
+        if let Some(tx) = file_tx.as_mut() {
+            if !file_meta_sent {
+                file_meta_sent = true;
+                let sealed = crypto.seal(&tx.meta());
+                let _ = relay.send(&sealed);
+            }
+            if let Some(chunk) = tx.next_chunk() {
+                file_last_send = Instant::now();
+                let sealed = crypto.seal(&chunk);
+                let _ = relay.send(&sealed);
+            } else if file_last_send.elapsed() >= Duration::from_millis(300) {
+                if let Some(chunk) = tx.retransmit() {
+                    file_last_send = Instant::now();
+                    let sealed = crypto.seal(&chunk);
+                    let _ = relay.send(&sealed);
+                }
+            }
+        }
+        if let Some(svc) = clipboard.as_mut() {
+            if last_clip_poll.elapsed() >= Duration::from_secs(1) {
+                last_clip_poll = Instant::now();
+                if let Ok(Some(update)) = svc.poll_local() {
+                    if let Ok(msg) = er_channels::clipboard::encode_clip(&update) {
+                        let sealed = crypto.seal(&msg);
+                        let _ = relay.send(&sealed);
+                    }
+                }
+            }
+        }
+        if media_window.elapsed() >= Duration::from_secs(1) {
+            let stats_window = relay.link_stats(1000);
+            let kbps =
+                (media_bytes as f64 * 8.0 / media_window.elapsed().as_secs_f64() / 1000.0) as u32;
+            if let Ok(mut s) = stats.lock() {
+                s.bitrate_kbps = kbps;
+                s.loss_pct = stats_window.loss_pct();
+            }
+            media_bytes = 0;
+            media_window = Instant::now();
+        }
         if last_beat.elapsed() >= Duration::from_secs(2) {
             last_beat = Instant::now();
             let beat = [crate::agent::MSG_HEARTBEAT];
@@ -161,52 +331,117 @@ fn run_loop(
         }
         // ① 先把输入发出去（UI 可能一次给很多个移动）
         while let Ok(ev) = input_rx.try_recv() {
-            let _ = ctrl.send_input(relay, crypto, &[ev]);
+            if let Ok(seq) = ctrl.send_input(relay, crypto, &[ev]) {
+                pending_inputs.push_back((seq, Instant::now()));
+                while pending_inputs.len() > 256 {
+                    pending_inputs.pop_front();
+                }
+            }
         }
 
         // ② 收一帧（短超时，保证循环能响应 stop）
-        match relay.recv_timeout(Duration::from_millis(10)) {
-            Ok(Some(sealed)) => {
-                let Ok(plain) = crypto.open(&sealed) else {
-                    continue;
-                };
-                if plain.is_empty() || plain[0] != MSG_VIDEO {
-                    continue;
-                }
-                if plain.len() < 1 + crate::link::VIDEO_HEADER_LEN {
-                    continue;
-                }
-                let Some(_hdr) = VideoHeader::decode(&plain[1..]) else {
-                    continue;
-                };
-                let payload = &plain[1 + crate::link::VIDEO_HEADER_LEN..];
-                // 软解 1080p ~90ms：限到 ~12fps，否则解码队列越拖越长、UI 也追不上
-                if last_decode.elapsed() < Duration::from_millis(80) {
-                    continue;
-                }
-                if let Ok(Some((w, h, rgb))) = dec.decode(payload) {
-                    last_decode = Instant::now();
-                    // 转 RGBA：Flutter 的 decodeImageFromPixels 要 rgba8888
-                    let mut rgba = Vec::with_capacity(w * h * 4);
-                    for px in rgb.chunks_exact(3) {
-                        rgba.push(px[0]);
-                        rgba.push(px[1]);
-                        rgba.push(px[2]);
-                        rgba.push(255);
+        if let Ok(Some(sealed)) = relay.recv_timeout(Duration::from_millis(10)) {
+            let Ok(plain) = crypto.open(&sealed) else {
+                continue;
+            };
+            if !plain.is_empty() && plain[0] == er_channels::file_stream::MSG_FILE_ACK {
+                if let (Some(tx), true) = (file_tx.as_mut(), plain.len() >= 9) {
+                    let id = u32::from_be_bytes([plain[1], plain[2], plain[3], plain[4]]);
+                    let index = u32::from_be_bytes([plain[5], plain[6], plain[7], plain[8]]);
+                    if tx.id() == id {
+                        let _ = tx.ack(index);
                     }
-                    if let Ok(mut g) = latest.lock() {
-                        *g = Some(Frame {
-                            width: w,
-                            height: h,
-                            rgba,
-                        });
+                }
+                continue;
+            }
+            if !plain.is_empty() && plain[0] == er_channels::clipboard::MSG_CLIP {
+                if let Some(svc) = clipboard.as_mut() {
+                    if let Some(update) = er_channels::clipboard::decode_clip(&plain) {
+                        let _ = svc.apply_remote(&update);
                     }
-                    if let Ok(mut s) = stats.lock() {
-                        s.frames += 1;
+                }
+                continue;
+            }
+            if !plain.is_empty() && plain[0] == crate::agent::MSG_INPUT_ACK {
+                if plain.len() >= 5 {
+                    let seq = u32::from_be_bytes([plain[1], plain[2], plain[3], plain[4]]);
+                    if let Some(pos) = pending_inputs.iter().position(|(s, _)| *s == seq) {
+                        let (_, sent_at) = pending_inputs.remove(pos).unwrap();
+                        let rtt = sent_at.elapsed().as_millis() as u32;
+                        input_samples.push_back(rtt);
+                        while input_samples.len() > 100 {
+                            input_samples.pop_front();
+                        }
+                        let mut sorted: Vec<u32> = input_samples.iter().copied().collect();
+                        sorted.sort_unstable();
+                        let p95 = sorted
+                            .get(
+                                ((sorted.len() as f64 * 0.95) as usize)
+                                    .min(sorted.len().saturating_sub(1)),
+                            )
+                            .copied()
+                            .unwrap_or(0);
+                        if let Ok(mut s) = stats.lock() {
+                            s.input_acks += 1;
+                            s.input_p95_ms = p95;
+                        }
                     }
+                }
+                continue;
+            }
+            if plain.is_empty() || plain[0] != MSG_VIDEO {
+                continue;
+            }
+            if plain.len() < 1 + crate::link::VIDEO_HEADER_LEN {
+                continue;
+            }
+            let Some(hdr) = VideoHeader::decode(&plain[1..]) else {
+                continue;
+            };
+            if should_request_keyframe(last_video_seq, hdr.seq, last_kf_request.elapsed()) {
+                last_kf_request = Instant::now();
+                let req = crypto.seal(&[crate::agent::MSG_KEYFRAME]);
+                let _ = relay.send(&req);
+            }
+            last_video_seq = Some(hdr.seq);
+            media_bytes += plain.len() as u64;
+            let payload = &plain[1 + crate::link::VIDEO_HEADER_LEN..];
+            // 不人为限帧：解码耗时由真实硬解/软解能力决定，FPS 通过统计上报。
+            let decode_started = Instant::now();
+            if let Ok(Some((w, h, rgb))) = dec.decode(payload) {
+                // 转 RGBA：Flutter 的 decodeImageFromPixels 要 rgba8888
+                let mut rgba = Vec::with_capacity(w * h * 4);
+                let (pixels, _) = rgb.as_chunks::<3>();
+                for px in pixels {
+                    rgba.push(px[0]);
+                    rgba.push(px[1]);
+                    rgba.push(px[2]);
+                    rgba.push(255);
+                }
+                if let Ok(mut g) = latest.lock() {
+                    *g = Some(Frame {
+                        width: w,
+                        height: h,
+                        rgba,
+                    });
+                }
+                fps_counter.tick(Instant::now());
+                if let Ok(mut s) = stats.lock() {
+                    s.frames += 1;
+                    s.decode_ms = decode_started.elapsed().as_millis() as u64;
+                    s.decode_fps = fps_counter.fps();
+                }
+            } else {
+                if let Ok(mut s) = stats.lock() {
+                    s.dropped_frames += 1;
+                }
+                // 解码失败（缺参考帧/花屏）：请求新的关键帧，最多 2 次/秒。
+                if last_kf_request.elapsed() >= Duration::from_millis(500) {
+                    last_kf_request = Instant::now();
+                    let req = crypto.seal(&[crate::agent::MSG_KEYFRAME]);
+                    let _ = relay.send(&req);
                 }
             }
-            _ => {}
         }
     }
 
@@ -230,6 +465,11 @@ pub fn attach(
         .map_err(|e| e.to_string())?;
     let (mut relay_cli, mut crypto, keys, msg) =
         ctrl.begin(session_id).map_err(|e| e.to_string())?;
+    let _ = relay_cli.negotiate_p2p(&P2PConfig::new(
+        session_id,
+        p2p_token(session_id),
+        Duration::from_secs(2),
+    ));
     // 时序对齐：被控端收到 consent 后要 sleep 1.2s → begin → 再 sleep 2.5s 才 announce，
     // 也就是说它在中继上「可收包」大约在 3.7s 之后。主控 600ms 就 announce 的话，
     // 中继会因对端未注册直接丢包，接着 finish 干等 15s —— 就是用户看到的
@@ -252,12 +492,21 @@ pub fn attach(
     if !handshake_ok {
         return Err("handshake failed after 3 attempts".to_string());
     }
+    ctrl.mark_ready(session_id)
+        .map_err(|e| format!("mark ready: {e}"))?;
 
     let latest: Arc<Mutex<Option<Frame>>> = Arc::new(Mutex::new(None));
     let stats: Arc<Mutex<CtrlStats>> = Arc::new(Mutex::new(CtrlStats {
         connected: true,
         session_id: session_id.to_string(),
         frames: 0,
+        decode_fps: 0,
+        decode_ms: 0,
+        dropped_frames: 0,
+        bitrate_kbps: 0,
+        loss_pct: 0.0,
+        input_acks: 0,
+        input_p95_ms: 0,
         last_error: String::new(),
     }));
     let stop = Arc::new(AtomicBool::new(false));
@@ -291,4 +540,47 @@ pub fn attach(
         input_tx,
         stop,
     })
+}
+#[cfg(test)]
+mod stats_tests {
+    use super::*;
+
+    #[test]
+    fn fps_counter_reports_window_rate() {
+        let t0 = Instant::now();
+        let mut c = FpsCounter::new(t0);
+        // 30 帧均匀分布在 1 秒内。
+        for i in 1..=30 {
+            c.tick(t0 + Duration::from_millis(i * 33));
+        }
+        c.tick(t0 + Duration::from_millis(1001));
+        assert!(c.fps() >= 27 && c.fps() <= 33, "fps={}", c.fps());
+    }
+}
+#[cfg(test)]
+mod keyframe_policy_tests {
+    use super::*;
+
+    #[test]
+    fn requests_on_gap_but_throttles() {
+        assert!(!should_request_keyframe(None, 5, Duration::from_secs(1)));
+        assert!(should_request_keyframe(Some(5), 7, Duration::from_secs(1)));
+        assert!(!should_request_keyframe(Some(5), 6, Duration::from_secs(1)));
+        assert!(!should_request_keyframe(
+            Some(5),
+            9,
+            Duration::from_millis(100)
+        ));
+    }
+}
+#[cfg(test)]
+mod input_p95_tests {
+    use super::*;
+
+    #[test]
+    fn p95_is_window_index() {
+        assert_eq!(input_p95_ms(&[]), 0);
+        let s: Vec<u32> = (1..=100).collect();
+        assert_eq!(input_p95_ms(&s), 96);
+    }
 }

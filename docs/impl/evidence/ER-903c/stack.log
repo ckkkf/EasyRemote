@@ -1,0 +1,4 @@
+2026/11/22 18:01:49 stack using in-memory store + signalling (set DATABASE_URL to use postgres), listening on 127.0.0.1:51742
+2026/11/22 18:01:49 stack listening on 127.0.0.1:51742
+2026/11/22 18:02:12 notify: session=ses-885d78ee576a87a6 from=dev-21db928641df9668 to=dev-7ca8bcac1d7348de err=signal: session not bound
+2026/11/22 18:02:13 stack shutting down

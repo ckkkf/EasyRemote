@@ -99,11 +99,13 @@ void main() {
   test('反向代理回 "bad gateway" 纯文本：转成人话 ApiException，不抛 SyntaxError', () async {
     final client = GatewayClient(
       baseUrl: 'http://gw.test',
-      client: MockClient((req) async => http.Response(
-            'bad gateway',
-            502,
-            headers: {'content-type': 'text/plain'},
-          )),
+      client: MockClient(
+        (req) async => http.Response(
+          'bad gateway',
+          502,
+          headers: {'content-type': 'text/plain'},
+        ),
+      ),
     );
     await expectLater(
       client.listDevices(),
@@ -119,11 +121,13 @@ void main() {
   test('反向代理回 HTML 错误页：提示 HTML 而不是甩一堆标签', () async {
     final client = GatewayClient(
       baseUrl: 'http://gw.test',
-      client: MockClient((req) async => http.Response(
-            '<html><body><h1>502 Bad Gateway</h1></body></html>',
-            502,
-            headers: {'content-type': 'text/html'},
-          )),
+      client: MockClient(
+        (req) async => http.Response(
+          '<html><body><h1>502 Bad Gateway</h1></body></html>',
+          502,
+          headers: {'content-type': 'text/html'},
+        ),
+      ),
     );
     await expectLater(
       client.listDevices(),

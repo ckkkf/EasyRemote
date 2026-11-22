@@ -1,5 +1,0 @@
-server/internal/gateway/assist.go 2
-server/internal/gateway/config.go 2
-server/internal/gateway/email.go 2
-server/internal/gateway/files.go 8
-server/internal/gateway/handler.go 13

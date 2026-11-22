@@ -7,7 +7,7 @@ import 'package:flutter/services.dart';
 import '../api.dart';
 import '../models.dart';
 import '../net_probe.dart';
-import '../main.dart' show erGatewayBaseUrl;
+
 import '../net_probe_cache.dart';
 import '../session_video.dart';
 import '../theme.dart';
@@ -64,11 +64,10 @@ class _SessionPageState extends State<SessionPage> {
   /// 查到就显示真值，查不到就写「未知（需桌面端）」，不猜。
   DeviceInfo? _target;
 
-  /// 悬浮质量浮层用的轻量链路采样（5 次 ping + /v1/net/reflect）。
+  /// 悬浮质量浮层用的轻量链路采样（5 次 ping）。
   Duration? _rtt;
   int _samples = 0;
   int _lost = 0;
-  ReflectInfo? _reflect;
 
   /// 本机 NAT 实测结果（与诊断页同一套 STUN 探测）。
   NatProbeResult? _nat;
@@ -86,14 +85,21 @@ class _SessionPageState extends State<SessionPage> {
     _tick = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) setState(() {});
     });
-    _startVideo();
+    unawaited(_startVideo());
   }
-
 
   Timer? _videoTimer;
 
+  /// ER-504b：当前不做自动重连；用户可手动重新 attach 同一会话。
+  Future<void> _reconnectVideo() async {
+    _videoTimer?.cancel();
+    SessionVideo.instance.close();
+    await _startVideo();
+    if (mounted) setState(() {});
+  }
+
   /// 接管会话并开始拉帧：FFI 里已经建好双缓冲，这里只是定时把最新帧解码成 ui.Image。
-  void _startVideo() {
+  Future<void> _startVideo() async {
     final token = widget.client.token ?? "";
     final deviceId = widget.client.deviceId ?? "";
     final deviceToken = widget.client.deviceToken ?? "";
@@ -101,9 +107,14 @@ class _SessionPageState extends State<SessionPage> {
       debugPrint("[video] 缺少登录态，跳过画面接管");
       return;
     }
-    SessionVideo.instance.attach(
-      gateway: erGatewayBaseUrl.isEmpty ? "http://127.0.0.1:18090" : erGatewayBaseUrl,
-      relay: "127.0.0.1:19000",
+    final relay = widget.client.relayAddr;
+    if (relay.isEmpty) {
+      debugPrint("[video] 运行时端点未加载，跳过画面接管");
+      return;
+    }
+    await SessionVideo.instance.attach(
+      gateway: widget.client.gatewayURL,
+      relay: relay,
       token: token,
       deviceId: deviceId,
       deviceToken: deviceToken,
@@ -163,22 +174,17 @@ class _SessionPageState extends State<SessionPage> {
       }
     } on ApiException catch (e) {
       if (!mounted) return;
-      setState(() => _status = SessionStatus(SessionState.failed, message: e.message));
+      setState(
+        () => _status = SessionStatus(SessionState.failed, message: e.message),
+      );
       _poll?.cancel();
     } finally {
       _polling = false;
     }
   }
 
-  /// 链路采样：出口地址取服务端看到的 TCP 源地址，时延/丢包用真实 5 次 ping。
+  /// 链路采样：时延/丢包用真实 5 次 ping；出口地址在质量抽屉里单独采样。
   Future<void> _measureLink() async {
-    try {
-      final info = await widget.client.netReflect();
-      if (!mounted) return;
-      setState(() => _reflect = info);
-    } catch (_) {
-      // 单次失败不影响其它指标。
-    }
     final rtts = <Duration>[];
     var lost = 0;
     for (var i = 0; i < 5; i++) {
@@ -206,14 +212,19 @@ class _SessionPageState extends State<SessionPage> {
   String get _prettyCode {
     final code = widget.targetCode;
     if (code.length != 9) return code;
-    return code.substring(0, 3) + ' ' + code.substring(3, 6) + ' ' + code.substring(6);
+    return code.substring(0, 3) +
+        ' ' +
+        code.substring(3, 6) +
+        ' ' +
+        code.substring(6);
   }
 
   String get _ownCode {
     final own = widget.ownDevice;
     if (own != null && own.code.isNotEmpty) return own.prettyCode;
     final c = widget.client.ownDeviceCode;
-    if (c.length == 9) return c.substring(0, 3) + ' ' + c.substring(3, 6) + ' ' + c.substring(6);
+    if (c.length == 9)
+      return c.substring(0, 3) + ' ' + c.substring(3, 6) + ' ' + c.substring(6);
     return c.isEmpty ? '未知' : c;
   }
 
@@ -225,22 +236,22 @@ class _SessionPageState extends State<SessionPage> {
   }
 
   String get _stateLabel => switch (_status.state) {
-        SessionState.requesting => '正在发起请求',
-        SessionState.waitingConsent => '等待对方授权',
-        SessionState.connecting => '正在建立连接',
-        SessionState.authorized => '已授权 · 通道建立中',
-        SessionState.active => '会话进行中',
-        SessionState.ended => '会话已结束',
-        SessionState.failed => '连接失败',
-        SessionState.idle => '空闲',
-      };
+    SessionState.requesting => '正在发起请求',
+    SessionState.waitingConsent => '等待对方授权',
+    SessionState.connecting => '正在建立连接',
+    SessionState.authorized => '已授权 · 通道建立中',
+    SessionState.active => '会话进行中',
+    SessionState.ended => '会话已结束',
+    SessionState.failed => '连接失败',
+    SessionState.idle => '空闲',
+  };
 
   /// 三步进度（原型 s04 的五步在 Web 侧只有前三步有真实含义，压缩为一行小字）。
   int get _stepIndex => switch (_status.state) {
-        SessionState.requesting => 0,
-        SessionState.waitingConsent => 1,
-        _ => 2,
-      };
+    SessionState.requesting => 0,
+    SessionState.waitingConsent => 1,
+    _ => 2,
+  };
 
   static const _stepLabels = ['发起连接请求', '对方授权', '建立加密通道'];
 
@@ -257,13 +268,16 @@ class _SessionPageState extends State<SessionPage> {
   }
 
   void _openDiagnostics() {
-    Navigator.of(context).push(MaterialPageRoute<void>(
-      builder: (_) => Scaffold(body: DiagnosticsPage(client: widget.client)),
-    ));
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => Scaffold(body: DiagnosticsPage(client: widget.client)),
+      ),
+    );
   }
 
   void _leaveWith(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
     widget.onLeave();
   }
 
@@ -272,9 +286,7 @@ class _SessionPageState extends State<SessionPage> {
     final live = _status.isLive;
     return Scaffold(
       backgroundColor: live ? const Color(0xFF23262B) : null,
-      body: SafeArea(
-        child: live ? _liveBody(context) : _waitingBody(context),
-      ),
+      body: SafeArea(child: live ? _liveBody(context) : _waitingBody(context)),
     );
   }
 
@@ -304,20 +316,32 @@ class _SessionPageState extends State<SessionPage> {
               ),
               const Spacer(),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 5,
+                ),
                 decoration: BoxDecoration(
                   color: scheme.surfaceContainerHigh,
                   borderRadius: BorderRadius.circular(ErTokens.radiusPill),
                 ),
-                child: Text('连接中 · 步骤 ' + (_stepIndex + 1).toString() + ' / 3',
-                    style: text.labelSmall?.copyWith(color: scheme.onSurfaceVariant)),
+                child: Text(
+                  '连接中 · 步骤 ' + (_stepIndex + 1).toString() + ' / 3',
+                  style: text.labelSmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
               ),
             ],
           ),
         ),
         Expanded(
           child: SingleChildScrollView(
-            padding: EdgeInsets.fromLTRB(wide ? 32 : 16, 12, wide ? 32 : 16, 28),
+            padding: EdgeInsets.fromLTRB(
+              wide ? 32 : 16,
+              12,
+              wide ? 32 : 16,
+              28,
+            ),
             child: wide
                 ? Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -362,7 +386,11 @@ class _SessionPageState extends State<SessionPage> {
                   color: scheme.surfaceContainerHigh,
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(Icons.desktop_windows_rounded, size: 24, color: scheme.onSurfaceVariant),
+                child: Icon(
+                  Icons.desktop_windows_rounded,
+                  size: 24,
+                  color: scheme.onSurfaceVariant,
+                ),
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -378,7 +406,9 @@ class _SessionPageState extends State<SessionPage> {
                     Text(
                       _platform + ' · 位置未知（需桌面端）',
                       key: const Key('target-platform'),
-                      style: text.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+                      style: text.bodySmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
                     ),
                   ],
                 ),
@@ -391,8 +421,11 @@ class _SessionPageState extends State<SessionPage> {
           const SizedBox(height: 14),
           Row(
             children: [
-              Icon(failed ? Icons.error_outline_rounded : Icons.lock_clock_rounded,
-                  size: 15, color: failed ? scheme.error : scheme.onSurfaceVariant),
+              Icon(
+                failed ? Icons.error_outline_rounded : Icons.lock_clock_rounded,
+                size: 15,
+                color: failed ? scheme.error : scheme.onSurfaceVariant,
+              ),
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
@@ -402,10 +435,17 @@ class _SessionPageState extends State<SessionPage> {
                     SessionState.connecting => '对方已确认，正在建立端到端加密通道。',
                     _ => _stateLabel,
                   },
-                  style: text.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+                  style: text.bodySmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
                 ),
               ),
-              Text('已等待 ' + _elapsed, style: text.labelSmall?.copyWith(color: scheme.onSurfaceVariant)),
+              Text(
+                '已等待 ' + _elapsed,
+                style: text.labelSmall?.copyWith(
+                  color: scheme.onSurfaceVariant,
+                ),
+              ),
             ],
           ),
           if (_status.message.isNotEmpty) ...[
@@ -416,8 +456,10 @@ class _SessionPageState extends State<SessionPage> {
                 color: scheme.errorContainer,
                 borderRadius: BorderRadius.circular(ErTokens.radiusMd),
               ),
-              child: Text(_status.message,
-                  style: text.bodySmall?.copyWith(color: scheme.onErrorContainer)),
+              child: Text(
+                _status.message,
+                style: text.bodySmall?.copyWith(color: scheme.onErrorContainer),
+              ),
             ),
           ],
           const SizedBox(height: 20),
@@ -436,8 +478,12 @@ class _SessionPageState extends State<SessionPage> {
                 onPressed: _openDiagnostics,
                 child: const Text('网络有问题？运行诊断'),
               ),
-              Text('连接全程端到端加密',
-                  style: text.labelSmall?.copyWith(color: scheme.onSurfaceVariant)),
+              Text(
+                '连接全程端到端加密',
+                style: text.labelSmall?.copyWith(
+                  color: scheme.onSurfaceVariant,
+                ),
+              ),
             ],
           ),
         ],
@@ -450,21 +496,27 @@ class _SessionPageState extends State<SessionPage> {
     final text = Theme.of(context).textTheme;
 
     Widget row(String label, String value) => Padding(
-          key: Key('info-' + label),
-          padding: const EdgeInsets.symmetric(vertical: 6),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SizedBox(
-                width: 86,
-                child: Text(label, style: text.labelSmall?.copyWith(color: scheme.onSurfaceVariant)),
-              ),
-              Expanded(
-                child: Text(value, style: text.bodySmall?.copyWith(fontWeight: FontWeight.w600)),
-              ),
-            ],
+      key: Key('info-' + label),
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 86,
+            child: Text(
+              label,
+              style: text.labelSmall?.copyWith(color: scheme.onSurfaceVariant),
+            ),
           ),
-        );
+          Expanded(
+            child: Text(
+              value,
+              style: text.bodySmall?.copyWith(fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
+    );
 
     return Container(
       key: const Key('connect-info-card'),
@@ -481,8 +533,10 @@ class _SessionPageState extends State<SessionPage> {
           const SizedBox(height: 8),
           row('本机设备码', _ownCode),
           row('连接方式', widget.assist ? '协助码临时授权' : '设备码直连'),
-          row('本机 NAT',
-              _nat == null ? '探测中…' : (_nat!.supported ? _nat!.nat : '不支持（当前平台）')),
+          row(
+            '本机 NAT',
+            _nat == null ? '探测中…' : (_nat!.supported ? _nat!.nat : '不支持（当前平台）'),
+          ),
           row('中继节点', '未知（需桌面端）'),
           row('加密协议', 'Ed25519 握手 · 中继只见密文'),
           row('画质策略', '智能 · 自动（本机设置）'),
@@ -500,7 +554,9 @@ class _SessionPageState extends State<SessionPage> {
                 const SizedBox(height: 4),
                 Text(
                   '防止陌生人在你不知情时接入。被控端可在「设置 · 安全」中调整确认策略，但无人值守模式仍会保留验证码。',
-                  style: text.labelSmall?.copyWith(color: scheme.onSurfaceVariant),
+                  style: text.labelSmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
                 ),
               ],
             ),
@@ -527,7 +583,11 @@ class _SessionPageState extends State<SessionPage> {
             child: _sessionTopBar(context, width),
           ),
         if (showBadge && !_immersive)
-          Positioned(top: 64, right: 16, child: _QualityBadge(rtt: _rtt, samples: _samples, lost: _lost)),
+          Positioned(
+            top: 64,
+            right: 16,
+            child: _QualityBadge(rtt: _rtt, samples: _samples, lost: _lost),
+          ),
         Align(
           alignment: Alignment.bottomCenter,
           child: Padding(
@@ -540,7 +600,9 @@ class _SessionPageState extends State<SessionPage> {
             child: _QualityDrawer(
               client: widget.client,
               sessionId: widget.sessionId,
-              targetLabel: _prettyCode.isEmpty ? '会话 ' + widget.sessionId : _prettyCode,
+              targetLabel: _prettyCode.isEmpty
+                  ? '会话 ' + widget.sessionId
+                  : _prettyCode,
               stateLabel: _stateLabel,
               connectedFor: _elapsed,
               onClose: () => setState(() => _sheetOpen = false),
@@ -577,7 +639,9 @@ class _SessionPageState extends State<SessionPage> {
               child: SizedBox(
                 width: iw * scale,
                 height: ih * scale,
-                child: RawImage(image: img, fit: BoxFit.fill),
+                child: SessionVideo.instance.textureId != null
+                    ? Texture(textureId: SessionVideo.instance.textureId!)
+                    : RawImage(image: img, fit: BoxFit.fill),
               ),
             ),
           );
@@ -615,11 +679,21 @@ class _SessionPageState extends State<SessionPage> {
               borderRadius: BorderRadius.circular(24),
               border: Border.all(color: Colors.white24),
             ),
-            child: const Icon(Icons.desktop_windows_rounded, size: 46, color: Colors.white54),
+            child: const Icon(
+              Icons.desktop_windows_rounded,
+              size: 46,
+              color: Colors.white54,
+            ),
           ),
           const SizedBox(height: 18),
-          const Text('桌面端渲染远端画面',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white70)),
+          const Text(
+            '桌面端渲染远端画面',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: Colors.white70,
+            ),
+          ),
           const SizedBox(height: 6),
           Text(
             error.isEmpty
@@ -658,10 +732,18 @@ class _SessionPageState extends State<SessionPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(_prettyCode.isEmpty ? '远程会话' : _prettyCode,
-                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white)),
-              Text('已连接 ' + _elapsed,
-                  style: const TextStyle(fontSize: 11, color: Colors.white54)),
+              Text(
+                _prettyCode.isEmpty ? '远程会话' : _prettyCode,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                ),
+              ),
+              Text(
+                '已连接 ' + _elapsed,
+                style: const TextStyle(fontSize: 11, color: Colors.white54),
+              ),
             ],
           ),
           const Spacer(),
@@ -687,7 +769,10 @@ class _SessionPageState extends State<SessionPage> {
                   ),
                 ),
                 const SizedBox(width: 6),
-                Text(_stateLabel, style: const TextStyle(fontSize: 11, color: Colors.white70)),
+                Text(
+                  _stateLabel,
+                  style: const TextStyle(fontSize: 11, color: Colors.white70),
+                ),
               ],
             ),
           ),
@@ -705,7 +790,13 @@ class _SessionPageState extends State<SessionPage> {
         color: const Color(0xF01F2226),
         borderRadius: BorderRadius.circular(ErTokens.radiusPill),
         border: Border.all(color: Colors.white12),
-        boxShadow: const [BoxShadow(color: Color(0x55000000), blurRadius: 18, offset: Offset(0, 6))],
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x55000000),
+            blurRadius: 18,
+            offset: Offset(0, 6),
+          ),
+        ],
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -719,7 +810,9 @@ class _SessionPageState extends State<SessionPage> {
           ),
           _ToolItem(
             key: const Key('fullscreen-toggle'),
-            icon: _immersive ? Icons.fullscreen_exit_rounded : Icons.fullscreen_rounded,
+            icon: _immersive
+                ? Icons.fullscreen_exit_rounded
+                : Icons.fullscreen_rounded,
             label: _immersive ? '退出全屏' : '全屏',
             compact: compact,
             onTap: () => setState(() => _immersive = !_immersive),
@@ -727,8 +820,22 @@ class _SessionPageState extends State<SessionPage> {
           if (!compact)
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 6),
-              child: SizedBox(height: 18, child: VerticalDivider(width: 1, color: Colors.white24, thickness: 1)),
+              child: SizedBox(
+                height: 18,
+                child: VerticalDivider(
+                  width: 1,
+                  color: Colors.white24,
+                  thickness: 1,
+                ),
+              ),
             ),
+          _ToolItem(
+            key: const Key('reconnect'),
+            icon: Icons.refresh_rounded,
+            label: '重连',
+            compact: compact,
+            onTap: _reconnectVideo,
+          ),
           _ToolItem(
             key: const Key('disconnect'),
             icon: Icons.call_end_rounded,
@@ -760,14 +867,17 @@ class _OnlineChip extends StatelessWidget {
     final (Color bg, Color fg, String label) = connected
         ? (const Color(0xFFC8F6D0), const Color(0xFF2A6239), '在线')
         : device == null
-            ? (scheme.surfaceContainerHigh, scheme.onSurfaceVariant, '在线状态待确认')
-            : device.online
-                ? (const Color(0xFFC8F6D0), const Color(0xFF2A6239), '在线')
-                : (scheme.surfaceContainerHigh, scheme.onSurfaceVariant, '离线');
+        ? (scheme.surfaceContainerHigh, scheme.onSurfaceVariant, '在线状态待确认')
+        : device.online
+        ? (const Color(0xFFC8F6D0), const Color(0xFF2A6239), '在线')
+        : (scheme.surfaceContainerHigh, scheme.onSurfaceVariant, '离线');
     return Container(
       key: const Key('target-online-chip'),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(ErTokens.radiusPill)),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(ErTokens.radiusPill),
+      ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -777,8 +887,13 @@ class _OnlineChip extends StatelessWidget {
             decoration: BoxDecoration(color: fg, shape: BoxShape.circle),
           ),
           const SizedBox(width: 6),
-          Text(label,
-              style: text.labelSmall?.copyWith(color: fg, fontWeight: FontWeight.w600)),
+          Text(
+            label,
+            style: text.labelSmall?.copyWith(
+              color: fg,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
         ],
       ),
     );
@@ -787,7 +902,11 @@ class _OnlineChip extends StatelessWidget {
 
 /// 三步进度：原型 s04 的五步只保留与 Web 侧真实能力相符的三步，压成一行小字。
 class _StepLine extends StatelessWidget {
-  const _StepLine({required this.step, required this.labels, required this.failed});
+  const _StepLine({
+    required this.step,
+    required this.labels,
+    required this.failed,
+  });
 
   final int step;
   final List<String> labels;
@@ -810,20 +929,26 @@ class _StepLine extends StatelessWidget {
               if (i > 0)
                 Padding(
                   padding: const EdgeInsets.only(right: 6),
-                  child: Icon(Icons.chevron_right_rounded, size: 14, color: scheme.outlineVariant),
+                  child: Icon(
+                    Icons.chevron_right_rounded,
+                    size: 14,
+                    color: scheme.outlineVariant,
+                  ),
                 ),
               Icon(
                 i < step
                     ? Icons.check_circle_rounded
                     : i == step
-                        ? (failed ? Icons.error_rounded : Icons.radio_button_checked_rounded)
-                        : Icons.circle_outlined,
+                    ? (failed
+                          ? Icons.error_rounded
+                          : Icons.radio_button_checked_rounded)
+                    : Icons.circle_outlined,
                 size: 14,
                 color: failed && i == step
                     ? scheme.error
                     : i <= step
-                        ? scheme.primary
-                        : scheme.outlineVariant,
+                    ? scheme.primary
+                    : scheme.outlineVariant,
               ),
               const SizedBox(width: 4),
               Text(
@@ -873,7 +998,14 @@ class _ToolItem extends StatelessWidget {
           Icon(icon, size: 18, color: color),
           if (!compact) ...[
             const SizedBox(width: 6),
-            Text(label, style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: color)),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+                color: color,
+              ),
+            ),
           ],
         ],
       ),
@@ -883,7 +1015,11 @@ class _ToolItem extends StatelessWidget {
 
 /// 常驻质量浮层（原型 s05 右上角）。
 class _QualityBadge extends StatelessWidget {
-  const _QualityBadge({required this.rtt, required this.samples, required this.lost});
+  const _QualityBadge({
+    required this.rtt,
+    required this.samples,
+    required this.lost,
+  });
 
   final Duration? rtt;
   final int samples;
@@ -892,28 +1028,43 @@ class _QualityBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     Widget item(String label, String value, {String? unit}) => Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(label, style: const TextStyle(fontSize: 10, color: Colors.white38)),
-            const SizedBox(height: 2),
-            RichText(
-              text: TextSpan(
-                text: value,
-                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Colors.white),
-                children: [
-                  if (unit != null)
-                    TextSpan(
-                        text: unit,
-                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w400, color: Colors.white38)),
-                ],
-              ),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(fontSize: 10, color: Colors.white38),
+        ),
+        const SizedBox(height: 2),
+        RichText(
+          text: TextSpan(
+            text: value,
+            style: const TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              color: Colors.white,
             ),
-          ],
-        );
+            children: [
+              if (unit != null)
+                TextSpan(
+                  text: unit,
+                  style: const TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w400,
+                    color: Colors.white38,
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
 
     final lossRate = samples == 0 ? 0.0 : lost / samples * 100;
-    final lossText = samples == 0 ? '正在采样…' : (lost == 0 ? '网络稳定 · ' : '有丢包 · ') +
-        lossRate.toStringAsFixed(0) + '% 丢包';
+    final lossText = samples == 0
+        ? '正在采样…'
+        : (lost == 0 ? '网络稳定 · ' : '有丢包 · ') +
+              lossRate.toStringAsFixed(0) +
+              '% 丢包';
     return Container(
       key: const Key('quality-badge'),
       width: 214,
@@ -928,23 +1079,35 @@ class _QualityBadge extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Text('连接质量', style: TextStyle(fontSize: 11, color: Colors.white54)),
+              const Text(
+                '连接质量',
+                style: TextStyle(fontSize: 11, color: Colors.white54),
+              ),
               const Spacer(),
-              const Text('实时', style: TextStyle(fontSize: 11, color: Colors.white70)),
+              const Text(
+                '本机采样',
+                style: TextStyle(fontSize: 11, color: Colors.white70),
+              ),
             ],
           ),
           const SizedBox(height: 10),
           Row(
             children: [
-              Expanded(child: item('帧率', '—', unit: '桌面端')),
-              Expanded(child: item('延迟', rtt == null ? '—' : rtt!.inMilliseconds.toString(), unit: 'ms')),
+              Expanded(child: item('帧率', '—', unit: '未接入')),
+              Expanded(
+                child: item(
+                  '网关 RTT',
+                  rtt == null ? '—' : rtt!.inMilliseconds.toString(),
+                  unit: 'ms',
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 8),
           Row(
             children: [
-              Expanded(child: item('码率', '—', unit: '桌面端')),
-              Expanded(child: item('链路', '已授权')),
+              Expanded(child: item('码率', '—', unit: '未接入')),
+              Expanded(child: item('链路类型', '未接入')),
             ],
           ),
           const SizedBox(height: 10),
@@ -957,8 +1120,8 @@ class _QualityBadge extends StatelessWidget {
                   color: samples == 0
                       ? Colors.white38
                       : lost == 0
-                          ? const Color(0xFF6BE39B)
-                          : const Color(0xFFFFC46B),
+                      ? const Color(0xFF6BE39B)
+                      : const Color(0xFFFFC46B),
                   shape: BoxShape.circle,
                 ),
               ),
@@ -1075,10 +1238,20 @@ class _QualityDrawerState extends State<_QualityDrawer> {
     return [
       'EasyRemote 连接质量报告',
       '设备：' + widget.targetLabel,
-      '会话：' + widget.sessionId + '（' + widget.stateLabel + '，已连接 ' + widget.connectedFor + '）',
-      '采样：' + _total.toString() + ' 次 · 中位 RTT ' +
+      '会话：' +
+          widget.sessionId +
+          '（' +
+          widget.stateLabel +
+          '，已连接 ' +
+          widget.connectedFor +
+          '）',
+      '采样：' +
+          _total.toString() +
+          ' 次 · 中位 RTT ' +
           (m == null ? '—' : m.inMilliseconds.toString() + ' ms') +
-          ' · 丢包 ' + _loss.toStringAsFixed(0) + '%',
+          ' · 丢包 ' +
+          _loss.toStringAsFixed(0) +
+          '%',
       '出口地址（TCP）：' + (_reflect?.pretty ?? '—'),
       '帧率 / 码率 / 编码器：需桌面端解码统计，Web 预览不提供',
       '生成时间：' + DateTime.now().toIso8601String(),
@@ -1088,7 +1261,8 @@ class _QualityDrawerState extends State<_QualityDrawer> {
   Future<void> _copy() async {
     await Clipboard.setData(ClipboardData(text: _report));
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('质量报告已复制到剪贴板')));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(const SnackBar(content: Text('质量报告已复制到剪贴板')));
   }
 
   @override
@@ -1098,6 +1272,9 @@ class _QualityDrawerState extends State<_QualityDrawer> {
     final scheme = Theme.of(context).colorScheme;
     final text = Theme.of(context).textTheme;
     final median = _median;
+    final video = SessionVideo.instance;
+    final mediaFps = video.presentFps > 0 ? video.presentFps : video.nativeFps;
+    final dataLoss = video.attached ? video.lossPct : null;
 
     return Stack(
       children: [
@@ -1143,7 +1320,11 @@ class _QualityDrawerState extends State<_QualityDrawer> {
                             color: scheme.primaryContainer,
                             borderRadius: BorderRadius.circular(11),
                           ),
-                          child: Icon(Icons.monitor_heart_rounded, size: 22, color: scheme.onPrimaryContainer),
+                          child: Icon(
+                            Icons.monitor_heart_rounded,
+                            size: 22,
+                            color: scheme.onPrimaryContainer,
+                          ),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
@@ -1152,8 +1333,14 @@ class _QualityDrawerState extends State<_QualityDrawer> {
                             children: [
                               Text('连接质量', style: text.titleLarge),
                               Text(
-                                widget.targetLabel + ' · ' + widget.stateLabel + ' · 已连接 ' + widget.connectedFor,
-                                style: text.labelSmall?.copyWith(color: scheme.onSurfaceVariant),
+                                widget.targetLabel +
+                                    ' · ' +
+                                    widget.stateLabel +
+                                    ' · 已连接 ' +
+                                    widget.connectedFor,
+                                style: text.labelSmall?.copyWith(
+                                  color: scheme.onSurfaceVariant,
+                                ),
                               ),
                             ],
                           ),
@@ -1175,19 +1362,27 @@ class _QualityDrawerState extends State<_QualityDrawer> {
                         LayoutBuilder(
                           builder: (context, constraints) {
                             final two = constraints.maxWidth >= 380;
-                            final w = two ? (constraints.maxWidth - 12) / 2 : constraints.maxWidth;
+                            final w = two
+                                ? (constraints.maxWidth - 12) / 2
+                                : constraints.maxWidth;
                             return Wrap(
                               spacing: 12,
                               runSpacing: 12,
                               children: [
                                 SizedBox(
                                   width: w,
-                                  child: const _MetricCard(
-                                    key: Key('metric-fps'),
+                                  child: _MetricCard(
+                                    key: const Key('metric-fps'),
                                     label: '帧率',
-                                    value: '—',
+                                    value: mediaFps <= 0
+                                        ? '—'
+                                        : mediaFps.toString(),
                                     unit: 'fps',
-                                    hint: '桌面端解码统计',
+                                    hint: mediaFps <= 0
+                                        ? '等待首帧/未解码'
+                                        : 'present/native 统计（' +
+                                              video.decodeMs.toString() +
+                                              ' ms/帧）',
                                     icon: Icons.speed_rounded,
                                   ),
                                 ),
@@ -1195,22 +1390,33 @@ class _QualityDrawerState extends State<_QualityDrawer> {
                                   width: w,
                                   child: _MetricCard(
                                     key: const Key('metric-rtt'),
-                                    label: '端到端延迟',
-                                    value: median == null ? '—' : median.inMilliseconds.toString(),
+                                    label: '网关往返时延（RTT）',
+                                    value: median == null
+                                        ? '—'
+                                        : median.inMilliseconds.toString(),
                                     unit: 'ms',
-                                    hint: _total == 0 ? '正在采样' : _total.toString() + ' 次采样中位数',
+                                    hint: _total == 0
+                                        ? '正在采样'
+                                        : _total.toString() + ' 次网关探测中位数（非端到端）',
                                     icon: Icons.schedule_rounded,
-                                    spark: _rtts.map((d) => d.inMilliseconds.toDouble()).toList(),
+                                    spark: _rtts
+                                        .map((d) => d.inMilliseconds.toDouble())
+                                        .toList(),
                                   ),
                                 ),
                                 SizedBox(
                                   width: w,
-                                  child: const _MetricCard(
-                                    key: Key('metric-bitrate'),
+                                  child: _MetricCard(
+                                    key: const Key('metric-bitrate'),
                                     label: '码率',
-                                    value: '—',
+                                    value: video.attached
+                                        ? (video.bitrateKbps / 1000)
+                                              .toStringAsFixed(1)
+                                        : '—',
                                     unit: 'Mbps',
-                                    hint: '桌面端解码统计',
+                                    hint: video.attached
+                                        ? '最近 1 秒数据面接收'
+                                        : '等待数据面统计',
                                     icon: Icons.upload_rounded,
                                   ),
                                 ),
@@ -1219,11 +1425,20 @@ class _QualityDrawerState extends State<_QualityDrawer> {
                                   child: _MetricCard(
                                     key: const Key('metric-loss'),
                                     label: '丢包率',
-                                    value: _loss.toStringAsFixed(1),
+                                    value: (dataLoss ?? _loss).toStringAsFixed(
+                                      1,
+                                    ),
                                     unit: '%',
-                                    hint: _total == 0 ? '正在采样' : _lost.toString() + ' / ' + _total.toString() + ' 次探测失败',
+                                    hint: dataLoss != null
+                                        ? '数据面分片丢失（最近 1 秒）'
+                                        : (_total == 0
+                                              ? '正在采样'
+                                              : _lost.toString() +
+                                                    ' / ' +
+                                                    _total.toString() +
+                                                    ' 次探测失败'),
                                     icon: Icons.wifi_rounded,
-                                    warned: _lost > 0,
+                                    warned: (dataLoss ?? _loss) > 0,
                                   ),
                                 ),
                               ],
@@ -1233,18 +1448,55 @@ class _QualityDrawerState extends State<_QualityDrawer> {
                         const SizedBox(height: 18),
                         Text('链路明细', style: text.titleSmall),
                         const SizedBox(height: 6),
-                        _detail('往返时延 RTT', median == null ? '—' : median.inMilliseconds.toString() + ' ms'),
+                        _detail(
+                          '往返时延 RTT',
+                          median == null
+                              ? '—'
+                              : median.inMilliseconds.toString() + ' ms',
+                        ),
                         _detail('出口地址（TCP）', _reflect?.pretty ?? '未知'),
-                        _detail('丢包率', _loss.toStringAsFixed(1) + ' %'),
-                        _detail('编码器', '未知（需桌面端）'),
-                        _detail('编码 / 解码耗时', '未知（需桌面端）'),
-                        _detail('NAT 类型',
-                            _nat == null ? '探测中…' : (_nat!.supported ? _nat!.nat : '不支持（当前平台）')),
+                        _detail(
+                          '丢包率',
+                          (dataLoss ?? _loss).toStringAsFixed(1) + ' %',
+                        ),
+                        _detail(
+                          '输入 ACK P95',
+                          video.attached
+                              ? video.inputP95Ms.toString() +
+                                    ' ms（' +
+                                    video.inputAcks.toString() +
+                                    ' 次）'
+                              : '—',
+                        ),
+                        _detail(
+                          '解码耗时',
+                          video.attached
+                              ? video.decodeMs.toString() + ' ms'
+                              : '—',
+                        ),
+                        _detail(
+                          '呈现帧率 / native 帧率',
+                          mediaFps <= 0
+                              ? '—'
+                              : video.presentFps.toString() +
+                                    ' / ' +
+                                    video.nativeFps.toString() +
+                                    ' fps',
+                        ),
+                        _detail(
+                          'NAT 类型',
+                          _nat == null
+                              ? '探测中…'
+                              : (_nat!.supported ? _nat!.nat : '不支持（当前平台）'),
+                        ),
                         _detail('当前档位', '智能 · 自动（本机设置）'),
                         const SizedBox(height: 10),
                         Text(
-                          '时延与丢包为真实测量：打开面板先连续 ping 5 次，此后每 2 秒补一次，取最近 5 个样本的中位数。帧率、码率与编码器信息只有桌面端解码管线才能给出。',
-                          style: text.labelSmall?.copyWith(color: scheme.onSurfaceVariant, height: 1.6),
+                          '丢包在数据面可用时取最近 1 秒分片丢失率；否则退回网关 ping 探测。帧率/码率/解码耗时来自数据面 telemetry（native/decoder 统计），不是 UI 轮询次数。',
+                          style: text.labelSmall?.copyWith(
+                            color: scheme.onSurfaceVariant,
+                            height: 1.6,
+                          ),
                         ),
                       ],
                     ),
@@ -1258,7 +1510,10 @@ class _QualityDrawerState extends State<_QualityDrawer> {
                           child: OutlinedButton.icon(
                             key: const Key('run-diagnostics'),
                             onPressed: widget.onDiagnostics,
-                            icon: const Icon(Icons.monitor_heart_outlined, size: 16),
+                            icon: const Icon(
+                              Icons.monitor_heart_outlined,
+                              size: 16,
+                            ),
                             label: const Text('运行网络诊断'),
                           ),
                         ),
@@ -1290,8 +1545,16 @@ class _QualityDrawerState extends State<_QualityDrawer> {
       padding: const EdgeInsets.symmetric(vertical: 5),
       child: Row(
         children: [
-          Expanded(child: Text(label, style: text.bodySmall?.copyWith(color: scheme.onSurfaceVariant))),
-          Text(value, style: text.bodySmall?.copyWith(fontWeight: FontWeight.w600)),
+          Expanded(
+            child: Text(
+              label,
+              style: text.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+            ),
+          ),
+          Text(
+            value,
+            style: text.bodySmall?.copyWith(fontWeight: FontWeight.w600),
+          ),
         ],
       ),
     );
@@ -1330,9 +1593,10 @@ class _MetricCard extends StatelessWidget {
         color: scheme.surfaceContainerLow,
         borderRadius: BorderRadius.circular(ErTokens.radiusLg),
         border: Border.all(
-            color: warned
-                ? scheme.error.withValues(alpha: 0.4)
-                : scheme.outlineVariant.withValues(alpha: 0.7)),
+          color: warned
+              ? scheme.error.withValues(alpha: 0.4)
+              : scheme.outlineVariant.withValues(alpha: 0.7),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1341,24 +1605,39 @@ class _MetricCard extends StatelessWidget {
             children: [
               Icon(icon, size: 14, color: scheme.onSurfaceVariant),
               const SizedBox(width: 6),
-              Text(label, style: text.labelSmall?.copyWith(color: scheme.onSurfaceVariant)),
+              Text(
+                label,
+                style: text.labelSmall?.copyWith(
+                  color: scheme.onSurfaceVariant,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 6),
           RichText(
             text: TextSpan(
               text: value,
-              style: text.headlineSmall?.copyWith(fontFeatures: const [FontFeature.tabularFigures()]),
+              style: text.headlineSmall?.copyWith(
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
               children: [
                 TextSpan(
                   text: unit,
-                  style: text.labelSmall?.copyWith(color: scheme.onSurfaceVariant),
+                  style: text.labelSmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
                 ),
               ],
             ),
           ),
           const SizedBox(height: 4),
-          Text(hint, style: text.labelSmall?.copyWith(color: scheme.onSurfaceVariant, fontSize: 10)),
+          Text(
+            hint,
+            style: text.labelSmall?.copyWith(
+              color: scheme.onSurfaceVariant,
+              fontSize: 10,
+            ),
+          ),
           if (spark.isNotEmpty) ...[
             const SizedBox(height: 8),
             SizedBox(

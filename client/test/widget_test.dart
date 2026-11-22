@@ -52,24 +52,27 @@ void main() {
     expect(short.prettyCode, '123');
   });
 
-  testWidgets('设置页展示隐私屏与防睡眠开关', (tester) async {
+  testWidgets('设置页展示隐私屏与防睡眠（未接入，只读）', (tester) async {
     await tester.pumpWidget(wrap(Scaffold(body: SettingsPage(device: device))));
     expect(find.text('隐私屏'), findsOneWidget);
     expect(find.text('会话期间阻止睡眠'), findsOneWidget);
+    // ER-000：两项能力在台账里是 disabled，入口只读且明确标未接入。
+    expect(find.byKey(const Key('capability-privacy_screen')), findsOneWidget);
+    expect(find.byKey(const Key('capability-prevent_sleep')), findsOneWidget);
+    expect(find.text('未接入'), findsWidgets);
     // 「本机」区块在运行参数下面，需要滚动到可见位置才会被构建。
     await tester.scrollUntilVisible(find.text('本机设备码'), 200);
     expect(find.text('842 615 037'), findsOneWidget);
   });
 
-  testWidgets('隐私屏开关可切换', (tester) async {
+  testWidgets('未接入能力不渲染可切换的开关', (tester) async {
     await tester.pumpWidget(wrap(Scaffold(body: SettingsPage(device: device))));
-    final privacySwitch = find.widgetWithText(SwitchListTile, '隐私屏');
-    await tester.ensureVisible(privacySwitch);
-    await tester.pumpAndSettle();
-    final before = tester.widget<SwitchListTile>(privacySwitch).value;
-    await tester.tap(privacySwitch);
-    await tester.pumpAndSettle();
-    expect(tester.widget<SwitchListTile>(privacySwitch).value, !before);
+    expect(find.widgetWithText(SwitchListTile, '隐私屏'), findsNothing);
+    expect(find.widgetWithText(SwitchListTile, '会话期间阻止睡眠'), findsNothing);
+    final privacy = tester.widget<ListTile>(
+      find.byKey(const Key('capability-privacy_screen')),
+    );
+    expect(privacy.enabled, isFalse);
   });
 
   testWidgets('诊断页展示关键指标', (tester) async {

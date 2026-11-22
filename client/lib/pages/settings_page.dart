@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../capabilities.dart';
 import '../host_service.dart';
 import '../models.dart';
 import '../prefs.dart';
@@ -50,6 +51,23 @@ class _SettingsPageState extends State<SettingsPage> {
 
   void _patch(Prefs Function(Prefs p) change) {
     updatePrefs(change(appPrefs.value));
+  }
+
+  /// 未闭环能力的只读行：没有开关键，明确写「未接入」和负责人。
+  Widget _capabilityRow(BuildContext context, String key, String title) {
+    final state = CapabilityGate.instance.stateOf(key);
+    final scheme = Theme.of(context).colorScheme;
+    final text = Theme.of(context).textTheme;
+    return ListTile(
+      key: Key('capability-' + key),
+      enabled: false,
+      title: Text(title),
+      subtitle: Text((state.available ? '' : '未接入 · ') + state.reason),
+      trailing: Text(
+        state.available ? state.spec!.maturity.name : '未接入',
+        style: text.labelMedium?.copyWith(color: scheme.onSurfaceVariant),
+      ),
+    );
   }
 
   @override
@@ -165,11 +183,14 @@ class _SettingsPageState extends State<SettingsPage> {
                       color: scheme.onSurfaceVariant,
                     ),
                     title: const Text('允许被控（本机共享）'),
-                    subtitle: const Text(
-                      '默认开启；开关在「我的设备 → 允许被控」，关闭后其他设备无法连接本机。',
+                    subtitle: Text(
+                      '默认关闭；开关在「我的设备 → 允许被控」。'
+                      '${CapabilityGate.instance.stateOf('remote_host').available ? '' : '该能力尚未开放（缺本地授权弹窗）。'}',
                     ),
                     trailing: Text(
-                      !HostService.supported
+                      !CapabilityGate.instance.stateOf('remote_host').available
+                          ? '未接入'
+                          : !HostService.supported
                           ? '当前平台不支持'
                           : (prefs.allowControl ? '已开启' : '已关闭'),
                       style: text.bodyMedium?.copyWith(
@@ -184,24 +205,62 @@ class _SettingsPageState extends State<SettingsPage> {
               const SizedBox(height: 16),
               _Section(
                 title: '安全',
+                subtitle: '这些设置只能在被控端本机修改，远程会话无法开启它们',
                 children: [
-                  SwitchListTile(
-                    key: const Key('privacy-screen-switch'),
-                    value: prefs.privacyScreen,
-                    onChanged: (v) =>
-                        _patch((p) => p.copyWith(privacyScreen: v)),
-                    title: const Text('隐私屏'),
-                    subtitle: const Text('开启后被控端画面不离开本机（对方看到黑屏）'),
-                  ),
+                  _capabilityRow(context, 'privacy_screen', '隐私屏'),
                   const Divider(height: 1),
-                  SwitchListTile(
-                    key: const Key('prevent-sleep-switch'),
-                    value: prefs.preventSleep,
-                    onChanged: (v) =>
-                        _patch((p) => p.copyWith(preventSleep: v)),
-                    title: const Text('会话期间阻止睡眠'),
-                    subtitle: const Text('避免长时间无人操作时主机休眠断连'),
-                  ),
+                  _capabilityRow(context, 'prevent_sleep', '会话期间阻止睡眠'),
+                  if (!CapabilityGate.instance
+                      .stateOf('remote_host')
+                      .available) ...[
+                    const Divider(height: 1),
+                    ListTile(
+                      key: const Key('allow-control-unavailable'),
+                      leading: Icon(
+                        Icons.shield_outlined,
+                        size: 18,
+                        color: scheme.onSurfaceVariant,
+                      ),
+                      title: const Text('允许被远程控制（总开关）'),
+                      subtitle: const Text('未接入：本地授权弹窗（C18）尚未实现'),
+                      trailing: Text(
+                        '未接入',
+                        style: text.labelMedium?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+              const SizedBox(height: 16),
+              _Section(
+                title: '能力开放状态',
+                subtitle:
+                    '来自 docs/spec/capabilities.yaml；发布构建只开放 beta/stable 能力',
+                children: [
+                  for (var i = 0; i < kCapabilities.length; i++) ...[
+                    if (i > 0) const Divider(height: 1),
+                    ListTile(
+                      key: Key('capability-ledger-${kCapabilities[i].key}'),
+                      title: Text(kCapabilities[i].title),
+                      subtitle: Text(
+                        kCapabilities[i].reason,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      trailing: Text(
+                        kCapabilities[i].maturity.name,
+                        style: text.labelSmall?.copyWith(
+                          color:
+                              kCapabilities[i].maturity ==
+                                  CapabilityMaturity.stable
+                              ? scheme.primary
+                              : scheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
               ),
               const SizedBox(height: 16),

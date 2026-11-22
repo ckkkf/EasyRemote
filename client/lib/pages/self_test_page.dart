@@ -2,17 +2,18 @@ import 'dart:isolate';
 
 import 'package:flutter/material.dart';
 
+import '../main.dart' show erGatewayBaseUrl;
 import '../native.dart' if (dart.library.js_interop) '../native_stub.dart';
 import '../theme.dart';
 
 /// 顶层 serve 任务：FFI 阻塞调用必须离开 UI isolate。
 Map<String, dynamic> _serveInIsolate(Map<String, String> args) {
   return ErHostLink.load().serve(
-        hostId: args['hostId']!,
-        signalBase: args['signalBase']!,
-        frames: 5,
-        timeoutSecs: 30,
-      );
+    hostId: args['hostId']!,
+    signalBase: args['signalBase']!,
+    frames: 5,
+    timeoutSecs: 30,
+  );
 }
 
 /// 会话自检：完整走「被控端等信令 → 主控用设备码+验证码连接」的真实流程。
@@ -24,8 +25,8 @@ class SelfTestPage extends StatefulWidget {
 }
 
 class _SelfTestPageState extends State<SelfTestPage> {
-  final _gateway = TextEditingController(text: 'http://127.0.0.1:18099');
-  final _relay = TextEditingController(text: '127.0.0.1:19121');
+  final _gateway = TextEditingController(text: erGatewayBaseUrl);
+  final _relay = TextEditingController();
 
   String? _hostId;
   String? _deviceCode;
@@ -84,10 +85,12 @@ class _SelfTestPageState extends State<SelfTestPage> {
     final hostId = _hostId;
     if (hostId == null) return;
     await _run(() async {
-      final r = await Isolate.run(() => _serveInIsolate({
-            'hostId': hostId,
-            'signalBase': _gateway.text.trim(),
-          }));
+      final r = await Isolate.run(
+        () => _serveInIsolate({
+          'hostId': hostId,
+          'signalBase': _gateway.text.trim(),
+        }),
+      );
       setState(() => _served = r);
     });
   }
@@ -127,13 +130,19 @@ class _SelfTestPageState extends State<SelfTestPage> {
           TextField(
             key: const Key('gateway-field'),
             controller: _gateway,
-            decoration: const InputDecoration(labelText: '网关/信令地址', border: OutlineInputBorder()),
+            decoration: const InputDecoration(
+              labelText: '网关/信令地址',
+              border: OutlineInputBorder(),
+            ),
           ),
           const SizedBox(height: ErTokens.gap),
           TextField(
             key: const Key('relay-field'),
             controller: _relay,
-            decoration: const InputDecoration(labelText: '中继地址', border: OutlineInputBorder()),
+            decoration: const InputDecoration(
+              labelText: '中继地址',
+              border: OutlineInputBorder(),
+            ),
           ),
           const SizedBox(height: ErTokens.gapLg),
           Wrap(
@@ -173,7 +182,11 @@ class _SelfTestPageState extends State<SelfTestPage> {
           ],
           if (_error != null) ...[
             const SizedBox(height: ErTokens.gap),
-            Text(_error!, key: const Key('self-test-error'), style: TextStyle(color: scheme.error)),
+            Text(
+              _error!,
+              key: const Key('self-test-error'),
+              style: TextStyle(color: scheme.error),
+            ),
           ],
           if (_connected != null) ...[
             const SizedBox(height: ErTokens.gapLg),
@@ -195,7 +208,10 @@ class _SelfTestPageState extends State<SelfTestPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('被控端结果', style: Theme.of(context).textTheme.titleMedium),
+                    Text(
+                      '被控端结果',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
                     const SizedBox(height: 8),
                     Text('收到帧数：${_served!['frames']}'),
                     Text('画面尺寸：${_served!['width']}×${_served!['height']}'),

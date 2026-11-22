@@ -3,7 +3,9 @@ package stack
 import (
 	"context"
 	"encoding/json"
+	"log"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -43,10 +45,8 @@ func (w *wsConn) Send(t int, body any) error {
 
 func (w *wsConn) Close() error { return w.c.Close() }
 
-var rzUpgrader = websocket.Upgrader{
-	ReadBufferSize:  4096,
-	WriteBufferSize: 4096,
-	CheckOrigin:     func(*http.Request) bool { return true },
+func newRzUpgrader() websocket.Upgrader {
+	return signal.WSUpgrader(signal.AllowedOriginsFromEnv(os.Getenv("ER_ALLOWED_ORIGINS")))
 }
 
 // BuildRendezvous 用同一份存储构建信令 handler。
@@ -72,14 +72,19 @@ func BuildRendezvousWithHub(st store.Store, secret []byte, hub *signal.Hub) (htt
 	}
 	hub.SetInstanceID("stack")
 
+	upgrader := newRzUpgrader()
 	mux := http.NewServeMux()
 	mux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
-		raw, err := rzUpgrader.Upgrade(w, r, nil)
+		raw, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
+			// 升级失败必须留痕：客户端只会看到 "HTTP error: 500/4xx"，没有日志无法定位。
+			log.Printf("rendezvous: upgrade failed remote=%s path=%s: %v", r.RemoteAddr, r.URL.Path, err)
 			return
 		}
+		raw.SetReadLimit(signal.MaxWSMessageBytes)
 		conn := newWSConn(raw)
 		deviceID := ""
+		authDeadline := time.Now().Add(signal.WSAuthTimeoutFromEnv())
 
 		defer func() {
 			if deviceID != "" {
@@ -89,7 +94,14 @@ func BuildRendezvousWithHub(st store.Store, secret []byte, hub *signal.Hub) (htt
 		}()
 
 		for {
-			_ = raw.SetReadDeadline(time.Now().Add(60 * time.Second))
+			if deviceID == "" {
+				if time.Now().After(authDeadline) {
+					return
+				}
+				_ = raw.SetReadDeadline(authDeadline)
+			} else {
+				_ = raw.SetReadDeadline(time.Now().Add(60 * time.Second))
+			}
 			var env envelope
 			if err := raw.ReadJSON(&env); err != nil {
 				return
@@ -116,6 +128,12 @@ func BuildRendezvousWithHub(st store.Store, secret []byte, hub *signal.Hub) (htt
 				_ = conn.Send(signal.TypeHelloAck, map[string]any{
 					"server_time": time.Now().UTC(), "heartbeat_interval_ms": 15000,
 				})
+
+			case signal.TypeHeartbeat:
+				// 心跳只续租 presence，不改变其它状态。
+				if deviceID != "" {
+					hub.Touch(deviceID, conn)
+				}
 
 			case signal.TypeQueryDevice:
 				var body struct {

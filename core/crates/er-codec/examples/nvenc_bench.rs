@@ -9,7 +9,7 @@
 
 use std::time::Instant;
 
-use er_capture::{Capture, ScreenCapture};
+use er_capture::ScreenCapture;
 use er_codec::{create_encoder, EncodeConfig, Encoder, EncoderKind, H264Decoder};
 
 fn main() {

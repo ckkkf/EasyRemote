@@ -45,9 +45,16 @@ CREATE TABLE IF NOT EXISTS sessions (
     reason         text NOT NULL DEFAULT '',
     started_at     timestamptz NOT NULL DEFAULT now(),
     ended_at       timestamptz,
-    auth_expire_at timestamptz
+    auth_expire_at timestamptz,
+    version        bigint NOT NULL DEFAULT 1,
+    ready_controller boolean NOT NULL DEFAULT false,
+    ready_target     boolean NOT NULL DEFAULT false
 );
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS version bigint NOT NULL DEFAULT 1;
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS ready_controller boolean NOT NULL DEFAULT false;
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS ready_target boolean NOT NULL DEFAULT false;
 CREATE INDEX IF NOT EXISTS sessions_state_idx ON sessions(state);
+CREATE UNIQUE INDEX IF NOT EXISTS sessions_live_pair_idx ON sessions(controller_id, target_id) WHERE state <> 'closed';
 CREATE INDEX IF NOT EXISTS sessions_pair_idx ON sessions(controller_id, target_id);
 
 CREATE TABLE IF NOT EXISTS admin_users (
@@ -115,4 +122,20 @@ CREATE TABLE IF NOT EXISTS app_config (
     value      text NOT NULL,
     updated_at timestamptz NOT NULL DEFAULT now()
 );
-
+CREATE TABLE IF NOT EXISTS session_events (
+    id          text PRIMARY KEY,
+    session_id  text NOT NULL,
+    from_device text NOT NULL DEFAULT '',
+    to_device   text NOT NULL DEFAULT '',
+    old_state   text NOT NULL,
+    new_state   text NOT NULL,
+    reason      text NOT NULL DEFAULT '',
+    trace_id    text NOT NULL DEFAULT '',
+    version     bigint NOT NULL,
+    at          timestamptz NOT NULL DEFAULT now(),
+    delivered   boolean NOT NULL DEFAULT false,
+    attempts    integer NOT NULL DEFAULT 0,
+    last_error  text NOT NULL DEFAULT '',
+    UNIQUE (session_id, version)
+);
+CREATE INDEX IF NOT EXISTS session_events_pending_idx ON session_events(delivered, at);

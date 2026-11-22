@@ -4,8 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../api.dart';
+import '../capabilities.dart';
+import '../consent_controller.dart';
+import '../consent_dialog.dart';
 import '../host_service.dart';
-import '../main.dart' show erGatewayBaseUrl;
+import '../local_control_bar.dart';
+
 import '../models.dart';
 import '../prefs.dart';
 import '../shell.dart';
@@ -48,6 +52,7 @@ class _DeviceListPageState extends State<DeviceListPage> {
   HostStatus _hostStatus = HostStatus.idle;
   Timer? _hostTimer;
   String? _directBusyCode;
+  bool _consentDialogOpen = false;
 
   @override
   void initState() {
@@ -55,6 +60,8 @@ class _DeviceListPageState extends State<DeviceListPage> {
     _future = widget.client.listDevices();
     // 偏好（免密直连）改了要立刻反映到设备卡片上的按钮文案。
     appPrefs.addListener(_onPrefs);
+    // 本地授权请求：HostService 轮询到后写入 ConsentController，这里负责弹窗。
+    ConsentController.instance.addListener(_onConsentChanged);
     // 被控状态每 2 秒轮询一次（主控连进来后 frames/injected 会变）
     _hostTimer = Timer.periodic(const Duration(seconds: 2), (_) {
       if (!mounted || !_hostOn) return;
@@ -66,19 +73,15 @@ class _DeviceListPageState extends State<DeviceListPage> {
         setState(() => _hostStatus = st);
       }
     });
-    // 默认允许被控：登录进主界面就把本机共享打开，不再让用户先找开关。
+    // 只在「本机已经被控服务持有」时同步展示状态；绝不因为登录/默认偏好自动开启。
+    // C18 本地授权弹窗没实现前，被控能力在台账里是 disabled（见 capabilities.yaml）。
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      final already = HostService.instance.active;
-      if (already) {
+      if (HostService.instance.active) {
         setState(() {
           _hostOn = true;
           _hostPassword = HostService.instance.password;
         });
-        return;
-      }
-      if (appPrefs.value.allowControl && HostService.supported) {
-        _toggleHost(true, fromUser: false);
       }
     });
   }
@@ -87,11 +90,42 @@ class _DeviceListPageState extends State<DeviceListPage> {
     if (mounted) setState(() {});
   }
 
+  Future<void> _disconnectRemote() async {
+    final id = _hostStatus.sessionId;
+    if (id.isNotEmpty) HostService.instance.closeSession(id);
+    setState(() => _hostStatus = HostStatus.idle);
+  }
+
+  void _onConsentChanged() {
+    if (!mounted) return;
+    final controller = ConsentController.instance;
+    if (controller.pending != null && !_consentDialogOpen) {
+      _consentDialogOpen = true;
+      showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => ConsentDialog(controller: controller),
+      ).whenComplete(() => _consentDialogOpen = false);
+    } else if (controller.pending == null && _consentDialogOpen) {
+      // 决策后 controller 会清空 pending；关闭对应弹窗（只关我们打开的那一个）。
+      _consentDialogOpen = false;
+      Navigator.of(context).maybePop();
+    }
+  }
+
   /// 「允许被控」开关：prepare（复用本机设备身份）→ 生成/同步密码 → 开流。
   ///
   /// [fromUser] 为 false 表示启动时的自动开启：失败只提示，不改用户偏好。
   Future<void> _toggleHost(bool on, {bool fromUser = true}) async {
     if (_hostBusy) return;
+    final gate = CapabilityGate.instance.stateOf('remote_host');
+    if (!gate.available) {
+      setState(() {
+        _hostOn = false;
+        _hostError = "未接入：${gate.reason}";
+      });
+      return;
+    }
     setState(() {
       _hostBusy = true;
       _hostError = "";
@@ -106,11 +140,13 @@ class _DeviceListPageState extends State<DeviceListPage> {
         final device = await widget.client.ensureDevice(
           platform: currentPlatformName(),
         );
+        final relay = widget.client.relayAddr;
+        if (relay.isEmpty) {
+          throw StateError("运行时端点未加载：无法启动被控（请检查服务端配置）");
+        }
         final code = HostService.instance.prepare(
-          gateway: erGatewayBaseUrl.isEmpty
-              ? "http://127.0.0.1:18090"
-              : erGatewayBaseUrl,
-          relay: "127.0.0.1:19000",
+          gateway: widget.client.gatewayURL,
+          relay: relay,
           token: widget.client.token ?? "",
           deviceId: device.id,
           deviceCode: device.code,
@@ -118,9 +154,8 @@ class _DeviceListPageState extends State<DeviceListPage> {
         );
         final pw = HostService.instance.ensurePassword();
         HostService.instance.start(
-          signalBase: erGatewayBaseUrl.isEmpty
-              ? "http://127.0.0.1:18090"
-              : erGatewayBaseUrl,
+          signalBase: widget.client.signalURL,
+          keepAwake: appPrefs.value.preventSleep,
         );
         setState(() {
           _hostOn = true;
@@ -166,6 +201,12 @@ class _DeviceListPageState extends State<DeviceListPage> {
   /// 同账号免密直连：点设备卡片的「连接」直接发起会话。
   Future<void> _directConnect(DeviceInfo d) async {
     if (_directBusyCode != null) return;
+    final gate = CapabilityGate.instance.stateOf('remote_control');
+    if (!gate.available) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('远程控制未开放：${gate.reason}')));
+      return;
+    }
     setState(() => _directBusyCode = d.code);
     try {
       final sid = await widget.client.requestConnect(d.code, direct: true);
@@ -200,6 +241,7 @@ class _DeviceListPageState extends State<DeviceListPage> {
   @override
   void dispose() {
     appPrefs.removeListener(_onPrefs);
+    ConsentController.instance.removeListener(_onConsentChanged);
     _hostTimer?.cancel();
     // 只有应用真的销毁这个页面才停被控；切导航由 IndexedStack 保留页面，不会走到这里。
     if (_hostOn) HostService.instance.stop();
@@ -304,7 +346,10 @@ class _DeviceListPageState extends State<DeviceListPage> {
         ? st.sessionId.substring(st.sessionId.length - 8)
         : st.sessionId;
     final supported = HostService.supported;
-    final statusText = !supported
+    final hostGate = CapabilityGate.instance.stateOf('remote_host');
+    final statusText = !hostGate.available
+        ? "未接入：${hostGate.reason}"
+        : !supported
         ? "当前平台不支持被控：浏览器没有原生采集/注入，请用桌面客户端"
         : !_hostOn
         ? "未开启：打开开关后，这台设备才能被远程控制"
@@ -329,8 +374,11 @@ class _DeviceListPageState extends State<DeviceListPage> {
               const SizedBox(width: 8),
               Expanded(child: Text("允许被控（本机共享）", style: text.titleSmall)),
               Switch(
-                value: supported && _hostOn,
-                onChanged: (!supported || _hostBusy) ? null : _toggleHost,
+                key: const Key('allow-control-switch'),
+                value: hostGate.available && supported && _hostOn,
+                onChanged: (!hostGate.available || !supported || _hostBusy)
+                    ? null
+                    : _toggleHost,
               ),
             ],
           ),
@@ -402,6 +450,11 @@ class _DeviceListPageState extends State<DeviceListPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (_hostStatus.hasSession)
+          LocalControlBar(
+            sessionId: _hostStatus.sessionId,
+            onDisconnect: _disconnectRemote,
+          ),
         PageHeader(
           title: '我的设备',
           subtitle: '本机设备码 ' + widget.ownDevice.prettyCode + ' · 让对方输入这串数字即可连接',
@@ -721,6 +774,7 @@ class _DeviceCard extends StatelessWidget {
     final text = Theme.of(context).textTheme;
     final online = device.online;
     final isWindows = device.platform.toLowerCase().contains('windows');
+    final controlGate = CapabilityGate.instance.stateOf('remote_control');
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -845,22 +899,29 @@ class _DeviceCard extends StatelessWidget {
                   ),
                 )
               else if (online)
-                FilledButton.tonal(
-                  // 免密直连开启时点一下就发起；关闭时仍走设备码 + 临时密码页。
-                  onPressed: busy
-                      ? null
-                      : (direct ? onDirect : () => onConnect(device.code)),
-                  style: FilledButton.styleFrom(
-                    minimumSize: const Size(0, 36),
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                Tooltip(
+                  message: controlGate.available ? '' : controlGate.reason,
+                  child: FilledButton.tonal(
+                    // 免密直连开启时点一下就发起；关闭时仍走设备码 + 临时密码页。
+                    onPressed: (!controlGate.available || busy)
+                        ? null
+                        : (direct ? onDirect : () => onConnect(device.code)),
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size(0, 36),
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                    ),
+                    child: busy
+                        ? const SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Text(
+                            controlGate.available
+                                ? (direct ? '直接连接' : '连接')
+                                : '未开放',
+                          ),
                   ),
-                  child: busy
-                      ? const SizedBox(
-                          width: 14,
-                          height: 14,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : Text(direct ? '直接连接' : '连接'),
                 )
               else
                 FilledButton.tonal(

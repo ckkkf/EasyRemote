@@ -1,0 +1,52 @@
+# EasyRemote 能力成熟度台账（唯一来源）
+#
+# 规则：
+#   1. 本文件是「某个能力现在能不能给用户用」的唯一来源；生成物：
+#      client/lib/capability_gen.dart、server/internal/capability/capability_gen.go、
+#      web-admin/src/capability_gen.ts。禁止手改生成物。
+#   2. maturity 取值：disabled | experimental | beta | stable。
+#      - disabled：实现未闭环或语义错误，任何构建都不得暴露入口（fail-closed）
+#      - experimental：仅非发布构建可进入，发布构建隐藏/禁用
+#      - beta / stable：可用；beta 表示仍需降级与回滚验证
+#   3. owner 指向负责把它升级的整改卡号；reason 必须写清缺哪一段闭环。
+#   4. 升级成熟度只能通过改本文件 + 重新生成 + 对应验收测试，禁止运行时开关绕过。
+#   5. 服务端只能把能力「再关掉」（/v1/config 的 capabilities 布尔表），不能打开客户端未成熟能力。
+
+version: 1
+
+capabilities:
+  remote_control:
+    title: 远程控制会话（主控端）
+    maturity: experimental
+    owner: ER-201
+    reason: 数据面未闭环：authorized 即被当成已连接，没有 ready/active、可靠输入与关闭传播
+  remote_host:
+    title: 允许被控（本机共享）
+    maturity: experimental
+    owner: ER-102
+    reason: 本地授权弹窗（C18）已接入；会话关闭/票据失效仍由 ER-202/203 验证，发布构建不开放
+  privacy_screen:
+    title: 隐私屏
+    maturity: disabled
+    owner: ER-701
+    reason: 现实现是涂黑采集帧，与 PRD「本机物理显示不可见、远端采集继续」语义相反
+  prevent_sleep:
+    title: 会话期间阻止睡眠
+    maturity: disabled
+    owner: ER-702
+    reason: 只写本机偏好，未接系统防休眠 API，开关没有真实副作用
+  file_transfer:
+    title: 文件传输
+    maturity: disabled
+    owner: ER-711
+    reason: 尚未接入会话 data stream（A-14）；网关文件存储不等于点对点传输，先隐藏入口
+  clipboard_sync:
+    title: 剪贴板同步
+    maturity: disabled
+    owner: ER-710
+    reason: 没有 data stream 通道与开关语义，任何同步入口都会是空壳
+  quality_metrics:
+    title: 会话质量指标
+    maturity: experimental
+    owner: ER-603
+    reason: RTT/丢包是网关 ping 真实采样；帧率/码率/链路类型/编解码耗时未接入数据面 telemetry

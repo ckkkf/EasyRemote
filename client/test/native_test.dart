@@ -1,8 +1,4 @@
-import 'dart:io';
-import 'dart:typed_data';
-
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ffi/ffi.dart';
 
 import 'package:easyremote_client/native.dart';
 
@@ -46,24 +42,17 @@ void main() {
     if (!available) return;
     final s = native.open();
     final size = s.screenSize();
-    if (size == null) { s.close(); return; }
+    if (size == null) {
+      s.close();
+      return;
+    }
     final frame = s.grabFrame();
     expect(frame.length, size.width * size.height * 4);
-    expect(frame.any((b) => b != 0), isTrue, reason: 'captured frame is all zero');
-    s.close();
-  });
-
-  test('隐私屏开启后整帧被抹平', () {
-    if (!available) return;
-    final s = native.open();
-    final size = s.screenSize();
-    if (size == null) { s.close(); return; }
-    s.setPrivacy(true);
-    s.grabFrame();
-    expect(s.lastFrameUniform(), isTrue);
-    s.setPrivacy(false);
-    s.grabFrame();
-    expect(s.lastFrameUniform(), isFalse);
+    expect(
+      frame.any((b) => b != 0),
+      isTrue,
+      reason: 'captured frame is all zero',
+    );
     s.close();
   });
 
@@ -71,14 +60,23 @@ void main() {
     if (!available) return;
     final s = native.open();
     final size = s.screenSize();
-    if (size == null) { s.close(); return; }
+    if (size == null) {
+      s.close();
+      return;
+    }
     s.grabFrame();
     final encoded = s.encodeLastFrame();
     expect(encoded.length, greaterThan(0));
-    final isAnnexB = encoded.length >= 4 &&
-        encoded[0] == 0 && encoded[1] == 0 &&
+    final isAnnexB =
+        encoded.length >= 4 &&
+        encoded[0] == 0 &&
+        encoded[1] == 0 &&
         (encoded[2] == 1 || (encoded[2] == 0 && encoded[3] == 1));
-    expect(isAnnexB, isTrue, reason: 'not Annex-B: ' + encoded.take(8).toList().toString());
+    expect(
+      isAnnexB,
+      isTrue,
+      reason: 'not Annex-B: ' + encoded.take(8).toList().toString(),
+    );
     s.close();
   });
 

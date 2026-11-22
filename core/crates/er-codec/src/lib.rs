@@ -127,9 +127,11 @@ impl OpenH264Codec {
         // 表现是 encode 返回空 bitstream，上层再把它当空消息发出去
         // （实测导致「发 5 帧只收到 2 帧」）。实时屏幕共享必须关掉跳帧。
         let enc_cfg = openh264::encoder::EncoderConfig::new()
-            .enable_skip_frame(false)
-            .set_bitrate_bps(cfg.bitrate_kbps.saturating_mul(1000))
-            .max_frame_rate(cfg.fps as f32)
+            .skip_frames(false)
+            .bitrate(openh264::encoder::BitRate::from_bps(
+                cfg.bitrate_kbps.saturating_mul(1000),
+            ))
+            .max_frame_rate(openh264::encoder::FrameRate::from_hz(cfg.fps as f32))
             .usage_type(openh264::encoder::UsageType::ScreenContentRealTime)
             .rate_control_mode(openh264::encoder::RateControlMode::Bitrate);
         let enc = H264Encoder::with_api_config(openh264::OpenH264API::from_source(), enc_cfg)
@@ -200,6 +202,99 @@ impl Encoder for OpenH264Codec {
     }
 }
 
+/// 本机编码能力（ER-600 能力矩阵）。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct EncoderCapability {
+    pub kind: EncoderKind,
+    pub max_width: u32,
+    pub max_height: u32,
+    pub max_bitrate_kbps: u32,
+    /// 软件编码在 1080p 的实测上限（release 约 15fps）。
+    pub software_1080p_fps: u32,
+}
+
+/// 探测本机能力：Windows 有可用 NVENC 才视为硬件，其余按软件。
+pub fn host_capability() -> EncoderCapability {
+    #[cfg(target_os = "windows")]
+    {
+        let probe = nvenc::probe();
+        if probe.available {
+            return EncoderCapability {
+                kind: EncoderKind::Nvenc,
+                max_width: 3840,
+                max_height: 2160,
+                max_bitrate_kbps: 50_000,
+                software_1080p_fps: 60,
+            };
+        }
+    }
+    EncoderCapability {
+        kind: EncoderKind::Software,
+        max_width: 1920,
+        max_height: 1080,
+        max_bitrate_kbps: 8000,
+        // 本机 release 实测 1080p 软件编码 14.9fps，留 1 帧余量。
+        software_1080p_fps: 15,
+    }
+}
+
+/// 解析结果：实际配置 + 是否降档 + 原因。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ResolvedEncodeConfig {
+    pub config: EncodeConfig,
+    pub downgraded: bool,
+    pub reason: String,
+}
+
+/// 按能力矩阵夹取请求：分辨率/帧率/码率绝不超出实测能力。
+pub fn resolve_config(requested: EncodeConfig, cap: EncoderCapability) -> ResolvedEncodeConfig {
+    let mut cfg = requested;
+    let mut reasons: Vec<String> = Vec::new();
+    if cfg.width > cap.max_width {
+        cfg.width = cap.max_width;
+        reasons.push(format!("width>{}", cap.max_width));
+    }
+    if cfg.height > cap.max_height {
+        cfg.height = cap.max_height;
+        reasons.push(format!("height>{}", cap.max_height));
+    }
+    if !cap.kind.is_hardware() && cfg.bitrate_kbps > cap.max_bitrate_kbps {
+        cfg.bitrate_kbps = cap.max_bitrate_kbps;
+        reasons.push(format!("bitrate>{}", cap.max_bitrate_kbps));
+    }
+    let max_fps = cap.max_fps_for(cfg.width, cfg.height);
+    if cfg.fps > max_fps {
+        cfg.fps = max_fps;
+        reasons.push(format!("fps>{}", max_fps));
+    }
+    cfg.width &= !1;
+    cfg.height &= !1;
+    cfg.gop = cfg.gop.min(cfg.fps.max(1));
+    let downgraded = cfg != requested;
+    ResolvedEncodeConfig {
+        config: cfg,
+        downgraded,
+        reason: reasons.join(","),
+    }
+}
+
+impl EncoderCapability {
+    /// 软件编码按像素面积降档；硬件保持 60。
+    pub fn max_fps_for(&self, width: u32, height: u32) -> u32 {
+        if self.kind.is_hardware() {
+            return 60;
+        }
+        let pixels = width as u64 * height as u64;
+        if pixels >= 1920 * 1080 {
+            self.software_1080p_fps.max(1)
+        } else if pixels >= 1280 * 720 {
+            (self.software_1080p_fps * 2).min(60)
+        } else {
+            (self.software_1080p_fps * 4).min(60)
+        }
+    }
+}
+
 /// 按平台能力选编码器：Windows 上先试 NVENC（真开一次会话），
 /// 不可用再退回 OpenH264 软件编码。其它平台直接软件编码。
 pub fn create_encoder(cfg: EncodeConfig) -> Result<Box<dyn Encoder>, CodecError> {
@@ -241,7 +336,8 @@ impl H264Decoder {
             .map_err(|e| CodecError::Internal(e.to_string()))?;
         let Some(yuv) = yuv else { return Ok(None) };
         let (w, h) = yuv.dimensions();
-        let mut rgb = vec![0u8; yuv.estimate_rgb_u8_size()];
+        let (dw, dh) = yuv.dimensions();
+        let mut rgb = vec![0u8; dw * dh * 3];
         yuv.write_rgb8(&mut rgb);
         Ok(Some((w, h, rgb)))
     }
@@ -250,7 +346,6 @@ impl H264Decoder {
 /// 假编码器：按固定比例产出压缩数据，用于上层与统计测试。
 #[derive(Debug)]
 pub struct FakeEncoder {
-    cfg: EncodeConfig,
     kind: EncoderKind,
     seq: u16,
     next_keyframe: bool,
@@ -263,7 +358,6 @@ impl FakeEncoder {
             return Err(CodecError::UnsupportedConfig);
         }
         Ok(Self {
-            cfg,
             kind,
             seq: 0,
             next_keyframe: true,
@@ -400,5 +494,79 @@ mod tests {
         assert_eq!((dw, dh), (w as usize, h as usize));
         assert!(rgb.iter().any(|b| *b != 0), "decoded pixels are all zero");
         eprintln!("roundtrip {}x{} -> {} bytes rgb", dw, dh, rgb.len());
+    }
+}
+#[cfg(test)]
+mod capability_tests {
+    use super::*;
+
+    fn sw() -> EncoderCapability {
+        host_capability()
+    }
+
+    #[test]
+    fn software_1080p60_downgrades_fps() {
+        let r = resolve_config(
+            EncodeConfig {
+                width: 1920,
+                height: 1080,
+                fps: 60,
+                bitrate_kbps: 4000,
+                gop: 60,
+                bframes: 0,
+            },
+            sw(),
+        );
+        assert!(r.downgraded);
+        assert!(r.config.fps <= 15, "fps={}", r.config.fps);
+        assert_eq!(r.config.bframes, 0);
+    }
+
+    #[test]
+    fn software_720p_downgrades_less() {
+        let r = resolve_config(
+            EncodeConfig {
+                width: 1280,
+                height: 720,
+                fps: 60,
+                bitrate_kbps: 4000,
+                gop: 60,
+                bframes: 0,
+            },
+            sw(),
+        );
+        assert!(r.config.fps <= 30, "fps={}", r.config.fps);
+    }
+
+    #[test]
+    fn software_4k_is_clamped() {
+        let r = resolve_config(
+            EncodeConfig {
+                width: 3840,
+                height: 2160,
+                fps: 60,
+                bitrate_kbps: 20000,
+                gop: 60,
+                bframes: 0,
+            },
+            sw(),
+        );
+        assert_eq!(r.config.width, 1920);
+        assert_eq!(r.config.height, 1080);
+        assert!(r.config.bitrate_kbps <= 8000);
+    }
+
+    #[test]
+    fn hardware_keeps_1080p60() {
+        let cap = EncoderCapability {
+            kind: EncoderKind::Nvenc,
+            max_width: 3840,
+            max_height: 2160,
+            max_bitrate_kbps: 50_000,
+            software_1080p_fps: 60,
+        };
+        let r = resolve_config(EncodeConfig::default(), cap);
+        assert!(!r.downgraded);
+        assert_eq!(r.config.fps, 60);
     }
 }

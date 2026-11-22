@@ -100,5 +100,6 @@ fn main() {
 
     println!("ok: reconnected after {} retries with backoff", retries);
     let _ = child.kill();
+    let _ = child.wait();
     println!("RECONNECT E2E PASSED");
 }

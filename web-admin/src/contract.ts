@@ -85,7 +85,15 @@ export type AdminSession = {
   token: string;
   username: string;
   role: string;
+  permissions: string[];
   expires_at: string;
+};
+
+export type KillSessionResult = {
+  closed: boolean;
+  propagated: boolean;
+  audited: boolean;
+  warning?: string;
 };
 
 export type ConfigField = {
@@ -107,6 +115,160 @@ export type ConfigPutResult = {
   audited: boolean;
 };
 
+export type LoginResult = {
+  token: string;
+  account_id: string;
+};
+
+export type DeviceItem = {
+  device_code: string;
+  raw_code: string;
+  platform: string;
+  online: boolean;
+  last_seen: string;
+};
+
+export type DeviceListResult = {
+  devices: DeviceItem[];
+};
+
+export type VerifyCodeResult = {
+  code: string;
+  expires_at: string;
+};
+
+export type ConnectResult = {
+  session_id: string;
+  state: string;
+  trusted: boolean;
+};
+
+export type ConsentResult = {
+  session_id: string;
+  state: string;
+  auth_expire_at: string;
+};
+
+export type SessionStateResult = {
+  session_id: string;
+  state: string;
+  reason: string;
+};
+
+export type SessionKeysResult = {
+  session_id: string;
+  controller_id: string;
+  target_id: string;
+  controller_pubkey: string;
+  target_pubkey: string;
+};
+
+export type RelayTicketResult = {
+  ticket: string;
+  self_device: string;
+};
+
+export type EmailCodeResult = {
+  ok: boolean;
+  email: string;
+};
+
+export type EmailLoginResult = {
+  token: string;
+  account_id: string;
+  email: string;
+};
+
+export type AssistCreateResult = {
+  code: string;
+  expires_at: string;
+  target_device_id: string;
+  ttl_seconds: number;
+};
+
+export type AssistRedeemResult = {
+  session_id: string;
+  state: string;
+  target_id: string;
+};
+
+export type ReflectResult = {
+  ip: string;
+  port: number;
+  source: string;
+  via: string;
+  at_unix: number;
+};
+
+export type FileRow = {
+  id: string;
+  account_id: string;
+  device_id: string;
+  name: string;
+  size: number;
+  sha256: string;
+  created_at: string;
+};
+
+export type FileUploadResult = {
+  file: FileRow;
+};
+
+export type FileListResult = {
+  files: FileRow[];
+  limit: number;
+  offset: number;
+};
+
+export type FileDeletedResult = {
+  ok: boolean;
+  deleted: boolean;
+};
+
+export type FileTicketResult = {
+  url: string;
+  expires_at: string;
+  name: string;
+};
+
+export type SessionLimits = {
+  max_minutes: number;
+};
+
+export type FileLimits = {
+  max_bytes: number;
+};
+
+export type DiagConfig = {
+  auto_refresh_secs: number;
+};
+
+export type ClientFlags = {
+  force_update: boolean;
+};
+
+export type RuntimeEndpoints = {
+  gateway_url: string;
+  signal_url: string;
+  relay_addr: string;
+  stun_url: string;
+  webtransport_url: string;
+  tls_required: boolean;
+};
+
+export type ClientRuntimeConfig = {
+  endpoints: RuntimeEndpoints;
+  session: SessionLimits;
+  file: FileLimits;
+  diag: DiagConfig;
+  client: ClientFlags;
+  capabilities: Record<string, boolean>;
+};
+
+export type ClientConfigResult = {
+  config: ClientRuntimeConfig;
+};
+
 export type EndpointSpec = {
   id: string;
   method: string;
@@ -124,29 +286,35 @@ export const ENDPOINTS: readonly EndpointSpec[] = [
   { id: 'ADM-05', method: 'POST', path: '/admin/v1/users/ban', auth: 'admin', response: 'OkResult', errors: ['ADMIN_SESSION_EXPIRED', 'ADMIN_FORBIDDEN', 'ADMIN_REASON_REQUIRED'] },
   { id: 'ADM-06', method: 'GET', path: '/admin/v1/devices', auth: 'admin', response: 'list<DeviceRow>', errors: ['ADMIN_SESSION_EXPIRED', 'ADMIN_FORBIDDEN'] },
   { id: 'ADM-07', method: 'GET', path: '/admin/v1/sessions', auth: 'admin', response: 'list<SessionRow>', errors: ['ADMIN_SESSION_EXPIRED', 'ADMIN_FORBIDDEN'] },
-  { id: 'ADM-08', method: 'POST', path: '/admin/v1/sessions/kill', auth: 'admin', response: 'OkResult', errors: ['ADMIN_SESSION_EXPIRED', 'ADMIN_FORBIDDEN', 'ADMIN_REASON_REQUIRED'] },
+  { id: 'ADM-08', method: 'POST', path: '/admin/v1/sessions/kill', auth: 'admin', response: 'KillSessionResult', errors: ['ADMIN_SESSION_EXPIRED', 'ADMIN_FORBIDDEN', 'ADMIN_REASON_REQUIRED'] },
   { id: 'ADM-09', method: 'GET', path: '/admin/v1/config', auth: 'admin', response: 'ConfigView', errors: ['ADMIN_SESSION_EXPIRED', 'ADMIN_FORBIDDEN'] },
   { id: 'ADM-10', method: 'PUT', path: '/admin/v1/config', auth: 'admin', response: 'ConfigPutResult', errors: ['ADMIN_SESSION_EXPIRED', 'ADMIN_FORBIDDEN', 'ADMIN_CONFIG_INVALID'] },
   { id: 'ADM-11', method: 'GET', path: '/admin/v1/audit', auth: 'admin', response: 'list<AuditRow>', errors: ['ADMIN_SESSION_EXPIRED', 'ADMIN_FORBIDDEN'] },
   { id: 'GW-01', method: 'POST', path: '/v1/auth/sms', auth: 'none', response: 'OkResult', errors: ['AUTH_INVALID_CREDENTIAL', 'AUTH_SMS_RATE_LIMITED'] },
-  { id: 'GW-02', method: 'POST', path: '/v1/auth/login', auth: 'none', response: 'any', errors: ['AUTH_INVALID_CREDENTIAL', 'AUTH_TOO_MANY_ATTEMPTS'] },
-  { id: 'GW-03', method: 'GET', path: '/v1/devices', auth: 'bearer', response: 'any', errors: ['AUTH_TOKEN_EXPIRED', 'SRV_INTERNAL'] },
+  { id: 'GW-02', method: 'POST', path: '/v1/auth/login', auth: 'none', response: 'LoginResult', errors: ['AUTH_INVALID_CREDENTIAL', 'AUTH_TOO_MANY_ATTEMPTS'] },
+  { id: 'GW-03', method: 'GET', path: '/v1/devices', auth: 'bearer', response: 'DeviceListResult', errors: ['AUTH_TOKEN_EXPIRED', 'SRV_INTERNAL'] },
   { id: 'GW-04', method: 'POST', path: '/v1/devices/bind', auth: 'bearer', response: 'BindResult', errors: ['AUTH_TOKEN_EXPIRED', 'SRV_INTERNAL'] },
-  { id: 'GW-05', method: 'POST', path: '/v1/devices/verify-code', auth: 'device', response: 'any', errors: ['CONN_DEVICE_NOT_FOUND', 'ADMIN_FORBIDDEN'] },
-  { id: 'GW-06', method: 'POST', path: '/v1/connect/request', auth: 'bearer', response: 'any', errors: ['CONN_DEVICE_NOT_FOUND', 'CONN_DEVICE_OFFLINE', 'CONN_CAPTCHA_INVALID', 'CONN_RATE_LIMITED'] },
-  { id: 'GW-07', method: 'POST', path: '/v1/connect/consent', auth: 'device', response: 'any', errors: ['CONN_DEVICE_NOT_FOUND', 'ADMIN_FORBIDDEN'] },
-  { id: 'GW-08', method: 'POST', path: '/v1/connect/status', auth: 'bearer', response: 'any', errors: ['SESSION_NOT_FOUND', 'AUTH_TOKEN_EXPIRED'] },
-  { id: 'GW-09', method: 'POST', path: '/v1/devices/identity', auth: 'device', response: 'any', errors: ['CONN_DEVICE_NOT_FOUND', 'ADMIN_FORBIDDEN'] },
-  { id: 'GW-10', method: 'POST', path: '/v1/connect/keys', auth: 'bearer', response: 'any', errors: ['SESSION_NOT_FOUND', 'AUTH_TOKEN_EXPIRED'] },
-  { id: 'GW-11', method: 'POST', path: '/v1/relay/ticket', auth: 'device', response: 'any', errors: ['SESSION_NOT_FOUND', 'SESSION_AUTH_WINDOW_EXCEEDED', 'ADMIN_FORBIDDEN'] },
-  { id: 'GW-12', method: 'POST', path: '/v1/auth/email/code', auth: 'none', response: 'any', errors: ['AUTH_INVALID_CREDENTIAL', 'AUTH_SMS_RATE_LIMITED'] },
-  { id: 'GW-13', method: 'POST', path: '/v1/auth/email/login', auth: 'none', response: 'any', errors: ['AUTH_INVALID_CREDENTIAL', 'AUTH_TOO_MANY_ATTEMPTS'] },
-  { id: 'GW-14', method: 'POST', path: '/v1/files', auth: 'bearer', response: 'any', errors: ['AUTH_TOKEN_EXPIRED', 'FILE_READ_FAILED', 'CONN_RATE_LIMITED'] },
-  { id: 'GW-15', method: 'GET', path: '/v1/files/', auth: 'bearer', response: 'any', errors: ['AUTH_TOKEN_EXPIRED', 'FILE_NOT_FOUND', 'ADMIN_FORBIDDEN'] },
-  { id: 'GW-16', method: 'POST', path: '/v1/assist/create', auth: 'bearer', response: 'any', errors: ['CONN_DEVICE_NOT_FOUND', 'ADMIN_FORBIDDEN', 'CONN_RATE_LIMITED'] },
-  { id: 'GW-17', method: 'POST', path: '/v1/assist/redeem', auth: 'bearer', response: 'any', errors: ['CONN_ASSIST_CODE_INVALID', 'CONN_ASSIST_CODE_USED', 'CONN_ASSIST_CODE_EXPIRED', 'CONN_SELF_CONNECT'] },
-  { id: 'GW-18', method: 'GET', path: '/v1/config', auth: 'none', response: 'any', errors: ['SRV_INTERNAL'] },
-  { id: 'GW-19', method: 'POST', path: '/v1/net/reflect', auth: 'none', response: 'any', errors: ['SRV_INTERNAL'] },
-  { id: 'GW-20', method: 'POST', path: '/v1/devices/password', auth: 'bearer', response: 'any', errors: ['CONN_DEVICE_NOT_FOUND', 'CONN_CAPTCHA_INVALID', 'AUTH_TOKEN_EXPIRED'] },
+  { id: 'GW-05', method: 'POST', path: '/v1/devices/verify-code', auth: 'device', response: 'VerifyCodeResult', errors: ['CONN_DEVICE_NOT_FOUND', 'ADMIN_FORBIDDEN'] },
+  { id: 'GW-06', method: 'POST', path: '/v1/connect/request', auth: 'bearer', response: 'ConnectResult', errors: ['CONN_DEVICE_NOT_FOUND', 'CONN_DEVICE_OFFLINE', 'CONN_CAPTCHA_INVALID', 'CONN_RATE_LIMITED'] },
+  { id: 'GW-07', method: 'POST', path: '/v1/connect/consent', auth: 'device', response: 'ConsentResult', errors: ['CONN_DEVICE_NOT_FOUND', 'ADMIN_FORBIDDEN'] },
+  { id: 'GW-08', method: 'GET', path: '/v1/connect/status', auth: 'bearer', response: 'SessionStateResult', errors: ['SESSION_NOT_FOUND', 'AUTH_TOKEN_EXPIRED'] },
+  { id: 'GW-09', method: 'POST', path: '/v1/devices/identity', auth: 'device', response: 'OkResult', errors: ['CONN_DEVICE_NOT_FOUND', 'ADMIN_FORBIDDEN'] },
+  { id: 'GW-10', method: 'GET', path: '/v1/connect/keys', auth: 'bearer', response: 'SessionKeysResult', errors: ['SESSION_NOT_FOUND', 'AUTH_TOKEN_EXPIRED'] },
+  { id: 'GW-11', method: 'POST', path: '/v1/relay/ticket', auth: 'device', response: 'RelayTicketResult', errors: ['SESSION_NOT_FOUND', 'SESSION_AUTH_WINDOW_EXCEEDED', 'ADMIN_FORBIDDEN'] },
+  { id: 'GW-12', method: 'POST', path: '/v1/auth/email/code', auth: 'none', response: 'EmailCodeResult', errors: ['AUTH_INVALID_CREDENTIAL', 'AUTH_SMS_RATE_LIMITED'] },
+  { id: 'GW-13', method: 'POST', path: '/v1/auth/email/login', auth: 'none', response: 'EmailLoginResult', errors: ['AUTH_INVALID_CREDENTIAL', 'AUTH_TOO_MANY_ATTEMPTS'] },
+  { id: 'GW-14', method: 'POST', path: '/v1/files', auth: 'bearer', response: 'FileUploadResult', errors: ['AUTH_TOKEN_EXPIRED', 'FILE_READ_FAILED', 'CONN_RATE_LIMITED'] },
+  { id: 'GW-15', method: 'GET', path: '/v1/files/', auth: 'bearer', response: 'binary', errors: ['AUTH_TOKEN_EXPIRED', 'FILE_NOT_FOUND', 'ADMIN_FORBIDDEN'] },
+  { id: 'GW-16', method: 'POST', path: '/v1/assist/create', auth: 'bearer', response: 'AssistCreateResult', errors: ['CONN_DEVICE_NOT_FOUND', 'ADMIN_FORBIDDEN', 'CONN_RATE_LIMITED'] },
+  { id: 'GW-17', method: 'POST', path: '/v1/assist/redeem', auth: 'bearer', response: 'AssistRedeemResult', errors: ['CONN_ASSIST_CODE_INVALID', 'CONN_ASSIST_CODE_USED', 'CONN_ASSIST_CODE_EXPIRED', 'CONN_SELF_CONNECT'] },
+  { id: 'GW-18', method: 'GET', path: '/v1/config', auth: 'none', response: 'ClientConfigResult', errors: ['SRV_INTERNAL'] },
+  { id: 'GW-19', method: 'GET', path: '/v1/net/reflect', auth: 'none', response: 'ReflectResult', errors: ['SRV_INTERNAL'] },
+  { id: 'GW-20', method: 'POST', path: '/v1/devices/password', auth: 'bearer', response: 'OkResult', errors: ['CONN_DEVICE_NOT_FOUND', 'CONN_CAPTCHA_INVALID', 'AUTH_TOKEN_EXPIRED'] },
+  { id: 'GW-21', method: 'GET', path: '/v1/files', auth: 'bearer', response: 'FileListResult', errors: ['AUTH_TOKEN_EXPIRED', 'SRV_INTERNAL'] },
+  { id: 'GW-22', method: 'DELETE', path: '/v1/files/', auth: 'bearer', response: 'FileDeletedResult', errors: ['AUTH_TOKEN_EXPIRED', 'FILE_NOT_FOUND', 'ADMIN_FORBIDDEN'] },
+  { id: 'GW-23', method: 'POST', path: '/v1/files/', auth: 'bearer', response: 'FileTicketResult', errors: ['AUTH_TOKEN_EXPIRED', 'FILE_NOT_FOUND', 'CONN_DEVICE_NOT_FOUND'] },
+  { id: 'GW-24', method: 'POST', path: '/v1/sessions/ready', auth: 'device', response: 'SessionStateResult', errors: ['SESSION_NOT_FOUND', 'ADMIN_FORBIDDEN', 'SESSION_AUTH_WINDOW_EXCEEDED'] },
+  { id: 'GW-25', method: 'POST', path: '/v1/sessions/close', auth: 'device', response: 'SessionStateResult', errors: ['SESSION_NOT_FOUND', 'ADMIN_FORBIDDEN'] },
   { id: 'SYS-01', method: 'GET', path: '/healthz', auth: 'none', response: 'OkResult', errors: ['[]'] },
+  { id: 'SYS-02', method: 'GET', path: '/readyz', auth: 'none', response: 'OkResult', errors: ['SRV_DB_UNAVAILABLE', 'SRV_CACHE_UNAVAILABLE'] },
 ];

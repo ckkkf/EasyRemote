@@ -62,6 +62,8 @@ func NewRedisBus(ctx context.Context, url, self string) (*RedisBus, error) {
 
 func channel(deviceID string) string { return "er:signal:dev:" + deviceID }
 
+func revokedKey(sessionID string) string { return "er:revoked:session:" + sessionID }
+
 // Publish 发到目标设备频道。
 func (b *RedisBus) Publish(ctx context.Context, deviceID string, msg Envelope) error {
 	raw, err := json.Marshal(msg)
@@ -69,6 +71,44 @@ func (b *RedisBus) Publish(ctx context.Context, deviceID string, msg Envelope) e
 		return err
 	}
 	return b.rdb.Publish(ctx, channel(deviceID), raw).Err()
+}
+
+// RevokeSession 标记会话已关闭（共享 TTL）。中继在注册票据时检查该键，
+// 让关闭后的旧票据在到期前就失效。
+func (b *RedisBus) RevokeSession(ctx context.Context, sessionID string, ttl time.Duration) error {
+	if ttl <= 0 {
+		ttl = 2 * time.Hour
+	}
+	return b.rdb.Set(ctx, revokedKey(sessionID), "1", ttl).Err()
+}
+
+// NextTicketEpoch 为某设备签发新的票据代号（INCR），旧代号立即失效。
+func (b *RedisBus) NextTicketEpoch(ctx context.Context, sessionID, deviceID string) (int64, error) {
+	key := "er:ticket:epoch:" + sessionID + ":" + deviceID
+	n, err := b.rdb.Incr(ctx, key).Result()
+	if err != nil {
+		return 0, err
+	}
+	_ = b.rdb.Expire(ctx, key, 2*time.Hour).Err()
+	return n, nil
+}
+
+// TicketEpoch 读取当前票据代号；不存在为 0。
+func (b *RedisBus) TicketEpoch(ctx context.Context, sessionID, deviceID string) (int64, error) {
+	v, err := b.rdb.Get(ctx, "er:ticket:epoch:"+sessionID+":"+deviceID).Int64()
+	if err == redis.Nil {
+		return 0, nil
+	}
+	return v, err
+}
+
+// IsRevoked 查询会话撤销标记（供中继/诊断使用）。
+func (b *RedisBus) IsRevoked(ctx context.Context, sessionID string) (bool, error) {
+	n, err := b.rdb.Exists(ctx, revokedKey(sessionID)).Result()
+	if err != nil {
+		return false, err
+	}
+	return n > 0, nil
 }
 
 // Subscribe 订阅本实例的投递频道（按 deviceID 分发）。
@@ -89,6 +129,11 @@ func (b *RedisBus) Subscribe(ctx context.Context, handler func(deviceID string, 
 		}
 	}()
 	return nil
+}
+
+// Ping 检查共享 Bus（Redis）可用性，用于 /readyz。
+func (b *RedisBus) Ping(ctx context.Context) error {
+	return b.rdb.Ping(ctx).Err()
 }
 
 // Close 关闭订阅与连接。

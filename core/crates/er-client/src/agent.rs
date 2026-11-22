@@ -40,6 +40,12 @@ pub const MSG_FEEDBACK: u8 = 3;
 /// 这期间谁都连不进来。心跳让"对端还在不在"变成一个可测的事实。
 pub const MSG_HEARTBEAT: u8 = 4;
 
+/// 主控请求关键帧：[MSG_KEYFRAME]，无负载。
+pub const MSG_KEYFRAME: u8 = 5;
+
+/// 被控端输入 ACK：[MSG_INPUT_ACK][seq u32]（用于 P95 延迟统计）。
+pub const MSG_INPUT_ACK: u8 = 6;
+
 /// 组一条视频消息：`[MSG_VIDEO][seq][ts][w][h][h264...]`。
 ///
 /// 头部是丢帧率与 RTT 的唯一来源：没有 seq 就无法区分「网络丢包」和「静止桌面不出帧」。
@@ -91,7 +97,6 @@ pub struct TargetAgent {
     identity: DeviceIdentity,
     relay_addr: SocketAddr,
     token: String,
-    gateway_base: String,
 }
 
 impl TargetAgent {
@@ -126,7 +131,6 @@ impl TargetAgent {
             identity,
             relay_addr,
             token: token.to_string(),
-            gateway_base: gateway_base.to_string(),
         })
     }
 
@@ -162,7 +166,6 @@ impl TargetAgent {
             identity,
             relay_addr,
             token,
-            gateway_base: gateway_base.to_string(),
         })
     }
 
@@ -207,6 +210,42 @@ impl TargetAgent {
             .map_err(|e| AgentError(e.to_string()))
     }
 
+    /// 读取服务端会话状态（关闭传播的兜底观察点）。
+    pub fn session_state(&self, session_id: &str) -> Result<String, AgentError> {
+        let v = self
+            .gw
+            .connect_status(session_id)
+            .map_err(|e| AgentError(e.to_string()))?;
+        Ok(v.get("state")
+            .and_then(|s| s.as_str())
+            .unwrap_or("")
+            .to_string())
+    }
+
+    /// 本机断开当前会话（被控端本地控制条）。
+    pub fn close_session(&self, session_id: &str) -> Result<(), AgentError> {
+        self.gw
+            .close_session(session_id)
+            .map(|_| ())
+            .map_err(|e| AgentError(e.to_string()))
+    }
+
+    /// 数据面就绪上报（被控端）。
+    pub fn mark_ready(&self, session_id: &str) -> Result<(), AgentError> {
+        self.gw
+            .mark_ready(session_id)
+            .map(|_| ())
+            .map_err(|e| AgentError(e.to_string()))
+    }
+
+    /// 拒绝会话（本机授权弹窗选择拒绝/超时）。
+    pub fn reject(&self, session_id: &str) -> Result<(), AgentError> {
+        self.gw
+            .consent(session_id, false)
+            .map(|_| ())
+            .map_err(|e| AgentError(e.to_string()))
+    }
+
     /// 授权会话。
     pub fn consent(&self, session_id: &str) -> Result<(), AgentError> {
         let state = self
@@ -234,7 +273,7 @@ impl TargetAgent {
             .session_keys(session_id)
             .map_err(|e| AgentError(e.to_string()))?;
 
-        let mut relay = RelayClient::new(self.relay_addr, session_id, &self.device.device_id)
+        let relay = RelayClient::new(self.relay_addr, session_id, &self.device.device_id)
             .map_err(|e| AgentError(e.to_string()))?;
         relay
             .register(&ticket)
@@ -263,12 +302,35 @@ impl TargetAgent {
         crypto: &mut CryptoSession,
         session_id: &str,
     ) -> Result<(), AgentError> {
+        self.finish_with_resend(relay, crypto, session_id, None)
+    }
+
+    /// 与 finish 相同，但在等待对端期间周期重发自己的握手包。
+    ///
+    /// 中继是无序 UDP 且注册与数据包没有确认：两端同时注册时，先发的握手包
+    /// 可能在对端注册完成前被丢弃，只靠一次发送会出现「双方都在等对方」。
+    pub fn finish_with_resend(
+        &self,
+        relay: &mut RelayClient,
+        crypto: &mut CryptoSession,
+        session_id: &str,
+        own_msg: Option<&[u8]>,
+    ) -> Result<(), AgentError> {
         let keys = self
             .gw
             .session_keys(session_id)
             .map_err(|e| AgentError(e.to_string()))?;
-        // 中继是无序 UDP：握手可能重发、也可能晚到，这里循环等到一个能解出来的
-        let peer = wait_peer_handshake(relay, Duration::from_secs(15))?;
+        let ticket = self
+            .gw
+            .relay_ticket(session_id)
+            .map_err(|e| AgentError(format!("finish ticket: {e}")))?;
+        // 中继没有注册确认：等待期间同时重发注册与握手，避免「注册包丢了一次就双方干等」。
+        let peer = wait_peer_handshake(relay, Duration::from_secs(15), own_msg, Some(&ticket))?;
+        // 对端注册前发出的握手会被中继丢弃。收到对端握手说明它已注册，
+        // 这里再补发一次自己的，保证对方也能收到（否则双方会一方完成、一方干等）。
+        if let Some(msg) = own_msg {
+            let _ = relay.send(msg);
+        }
 
         // 用服务端下发的公钥验签：中继无法伪造
         let ctrl_pub = decode_pubkey(&keys.controller_pubkey)
@@ -392,6 +454,7 @@ fn recv_video_frames(
     // 每帧都解会把 UDP 接收缓冲撑爆（实测「发 5 帧收 2 帧」）。
     // 后续帧只做完整性校验，尺寸沿用首帧。
     let mut dims: Option<(usize, usize)> = None;
+    let mut file_rx: Option<er_channels::file_stream::StreamReceiver> = None;
     while out.len() < count && Instant::now() < deadline {
         let Some(sealed) = relay
             .recv_timeout(Duration::from_secs(3))
@@ -406,6 +469,45 @@ fn recv_video_frames(
             Err(e) => fail!("decrypt: {e}"),
         };
         if plain.is_empty() {
+            continue;
+        }
+        // ER-711d：文件通道（opt-in，仅目标侧配置了接收目录时处理）。
+        if plain[0] == er_channels::file_stream::MSG_FILE_META
+            && std::env::var("ER_FILE_RECV_DIR").is_ok()
+        {
+            file_rx = er_channels::file_stream::StreamReceiver::from_meta(&plain);
+            continue;
+        }
+        if plain[0] == er_channels::file_stream::MSG_FILE_CHUNK {
+            if let Some(rx) = file_rx.as_mut() {
+                let id = rx.id();
+                if let Ok((index, _)) = rx.on_chunk(&plain) {
+                    let complete = rx.missing().is_empty();
+                    let name = rx.name().to_string();
+                    if !complete {
+                        let ack = er_channels::file_stream::StreamReceiver::ack(index, id);
+                        let sealed = crypto.seal(&ack);
+                        let _ = relay.send(&sealed);
+                    } else {
+                        let dir = std::env::var("ER_FILE_RECV_DIR").unwrap_or_else(|_| ".".into());
+                        let file_name = std::path::Path::new(&name)
+                            .file_name()
+                            .and_then(|s| s.to_str())
+                            .unwrap_or("file.bin");
+                        let path = std::path::Path::new(&dir).join(file_name);
+                        let stored = file_rx.take().is_some_and(|done| {
+                            done.finish()
+                                .ok()
+                                .is_some_and(|bytes| std::fs::write(&path, &bytes).is_ok())
+                        });
+                        if stored {
+                            let ack = er_channels::file_stream::StreamReceiver::ack(index, id);
+                            let sealed = crypto.seal(&ack);
+                            let _ = relay.send(&sealed);
+                        }
+                    }
+                }
+            }
             continue;
         }
         // 首字节是消息类型；输入事件与链路反馈由专门的接收路径处理
@@ -610,6 +712,7 @@ pub struct ControllerAgent {
     device: BoundDevice,
     identity: DeviceIdentity,
     relay_addr: SocketAddr,
+    input_seq: std::sync::atomic::AtomicU32,
 }
 
 impl ControllerAgent {
@@ -641,6 +744,7 @@ impl ControllerAgent {
             device,
             identity,
             relay_addr,
+            input_seq: std::sync::atomic::AtomicU32::new(0),
         })
     }
 
@@ -674,6 +778,7 @@ impl ControllerAgent {
             device,
             identity,
             relay_addr,
+            input_seq: std::sync::atomic::AtomicU32::new(0),
         })
     }
 
@@ -682,10 +787,65 @@ impl ControllerAgent {
     }
 
     /// 用设备码 + 验证码发起连接。
+    /// 读取服务端会话状态（关闭传播的兜底观察点）。
+    pub fn session_state(&self, session_id: &str) -> Result<String, AgentError> {
+        let v = self
+            .gw
+            .connect_status(session_id)
+            .map_err(|e| AgentError(e.to_string()))?;
+        Ok(v.get("state")
+            .and_then(|s| s.as_str())
+            .unwrap_or("")
+            .to_string())
+    }
+
+    /// 数据面就绪上报（主控端）。
+    pub fn mark_ready(&self, session_id: &str) -> Result<(), AgentError> {
+        self.gw
+            .mark_ready(session_id)
+            .map(|_| ())
+            .map_err(|e| AgentError(e.to_string()))
+    }
+
     pub fn request_session(&self, device_code: &str, captcha: &str) -> Result<String, AgentError> {
         self.gw
             .request_connect(device_code, captcha)
             .map_err(|e| AgentError(e.to_string()))
+    }
+
+    /// 等会话真正进入 authorized（被控端已同意）再取票据。
+    ///
+    /// HTTP 成功只代表「请求已登记」，不代表对端已同意；直接取票据会拿到 403。
+    /// 这是 ER-201（事件驱动）落地前的有界轮询兜底，不能让 UI 无限等待。
+    pub fn wait_authorized(
+        &self,
+        session_id: &str,
+        timeout: std::time::Duration,
+    ) -> Result<(), AgentError> {
+        let deadline = std::time::Instant::now() + timeout;
+        loop {
+            let v = self
+                .gw
+                .connect_status(session_id)
+                .map_err(|e| AgentError(e.to_string()))?;
+            let state = v.get("state").and_then(|s| s.as_str()).unwrap_or("");
+            match state {
+                "authorized" | "active" => return Ok(()),
+                "failed" | "closed" | "ended" => {
+                    return Err(AgentError(format!(
+                        "session {state}: {}",
+                        v.get("reason").and_then(|r| r.as_str()).unwrap_or("")
+                    )))
+                }
+                _ => {}
+            }
+            if std::time::Instant::now() >= deadline {
+                return Err(AgentError(format!(
+                    "authorization timeout (last state={state})"
+                )));
+            }
+            std::thread::sleep(std::time::Duration::from_millis(50));
+        }
     }
 
     /// 握手第一步：注册中继并构造好本方握手消息（**不发送**）。
@@ -702,7 +862,7 @@ impl ControllerAgent {
             .session_keys(session_id)
             .map_err(|e| AgentError(e.to_string()))?;
 
-        let mut relay = RelayClient::new(self.relay_addr, session_id, &self.device.device_id)
+        let relay = RelayClient::new(self.relay_addr, session_id, &self.device.device_id)
             .map_err(|e| AgentError(e.to_string()))?;
         relay
             .register(&ticket)
@@ -731,7 +891,27 @@ impl ControllerAgent {
         keys: &SessionKeys,
         session_id: &str,
     ) -> Result<(), AgentError> {
-        let peer = wait_peer_handshake(relay, Duration::from_secs(15))?;
+        self.finish_with_resend(relay, crypto, keys, session_id, None)
+    }
+
+    /// 与 finish 相同，但等待对端期间周期重发自己的握手包（见 TargetAgent 同名方法）。
+    pub fn finish_with_resend(
+        &self,
+        relay: &mut RelayClient,
+        crypto: &mut CryptoSession,
+        keys: &SessionKeys,
+        session_id: &str,
+        own_msg: Option<&[u8]>,
+    ) -> Result<(), AgentError> {
+        let ticket = self
+            .gw
+            .relay_ticket(session_id)
+            .map_err(|e| AgentError(format!("finish ticket: {e}")))?;
+        let peer = wait_peer_handshake(relay, Duration::from_secs(15), own_msg, Some(&ticket))?;
+        // 同 TargetAgent：收到对端后补发一次，避免自己的包在对方注册前被丢弃。
+        if let Some(msg) = own_msg {
+            let _ = relay.send(msg);
+        }
 
         let target_pub = decode_pubkey(&keys.target_pubkey)
             .ok_or_else(|| AgentError("bad target pubkey".into()))?;
@@ -749,18 +929,26 @@ impl ControllerAgent {
         relay: &mut RelayClient,
         crypto: &mut CryptoSession,
         events: &[er_input::InputEvent],
-    ) -> Result<usize, AgentError> {
-        for e in events {
+    ) -> Result<u32, AgentError> {
+        let mut first_seq = 0;
+        for (i, e) in events.iter().enumerate() {
+            let seq = self
+                .input_seq
+                .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            if i == 0 {
+                first_seq = seq;
+            }
             let body = e.encode();
-            let mut msg = Vec::with_capacity(body.len() + 1);
+            let mut msg = Vec::with_capacity(body.len() + 5);
             msg.push(MSG_INPUT);
+            msg.extend_from_slice(&seq.to_be_bytes());
             msg.extend_from_slice(&body);
             let sealed = crypto.seal(&msg);
             relay
                 .send(&sealed)
                 .map_err(|err| AgentError(err.to_string()))?;
         }
-        Ok(events.len())
+        Ok(first_seq)
     }
 
     /// 中继重启后重新注册（**不重建加密会话**）。
@@ -837,10 +1025,23 @@ impl ControllerAgent {
 fn wait_peer_handshake(
     relay: &mut RelayClient,
     timeout: Duration,
+    resend: Option<&[u8]>,
+    ticket: Option<&str>,
 ) -> Result<Handshake, AgentError> {
     let deadline = Instant::now() + timeout;
+    let mut next_resend = Instant::now();
     while Instant::now() < deadline {
-        match relay.recv_timeout(Duration::from_secs(2)) {
+        if Instant::now() >= next_resend {
+            // 注册与握手一起重发：中继注册没有 ACK，丢一次就永远收不到对端。
+            if let Some(t) = ticket {
+                let _ = relay.register(t);
+            }
+            if let Some(msg) = resend {
+                let _ = relay.send(msg);
+            }
+            next_resend = Instant::now() + Duration::from_millis(300);
+        }
+        match relay.recv_timeout(Duration::from_millis(300)) {
             Ok(Some(msg)) => {
                 if !msg.starts_with(TAG) {
                     continue;

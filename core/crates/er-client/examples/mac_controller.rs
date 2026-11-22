@@ -15,7 +15,7 @@ use er_codec::{EncodeConfig, OpenH264Codec};
 use er_session::crypto::CryptoSession;
 use er_session::relay_client::RelayClient;
 
-use er_client::agent::{encode_video_msg, MSG_VIDEO};
+use er_client::agent::encode_video_msg;
 
 fn arg(i: usize, default: &str) -> String {
     std::env::args()

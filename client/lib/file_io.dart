@@ -18,7 +18,8 @@ Future<Uint8List> readLocalFile(String path) async {
 /// 把下载字节写到 ~/Downloads（不存在则落临时目录），返回落盘路径。
 /// 同名文件不覆盖：追加序号，避免把用户已有文件冲掉。
 Future<String> saveDownload(Uint8List bytes, String name) async {
-  final home = Platform.environment['HOME'] ?? Platform.environment['USERPROFILE'];
+  final home =
+      Platform.environment['HOME'] ?? Platform.environment['USERPROFILE'];
   final downloads = home == null ? null : Directory('$home/Downloads');
   final dir = (downloads != null && downloads.existsSync())
       ? downloads

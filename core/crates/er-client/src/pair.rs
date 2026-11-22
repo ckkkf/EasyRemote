@@ -12,7 +12,8 @@ use er_capture::{Capture, ScreenCapture};
 use er_codec::{EncodeConfig, H264Decoder, OpenH264Codec};
 use er_session::crypto::CryptoSession;
 use er_session::identity::{sign_handshake, verify_handshake, DeviceIdentity, Handshake};
-use er_session::relay_client::RelayClient;
+use er_session::relay_client::{p2p_token, RelayClient};
+use er_transport::p2p::P2PConfig;
 
 const TAG: &[u8] = b"ER-HS:";
 
@@ -29,6 +30,7 @@ pub struct PairReport {
     pub keys_match_registered: bool,
     pub handshake_verified: bool,
     pub plaintext_marker_absent: bool,
+    pub link: String,
 }
 
 /// 编排一次完整会话。
@@ -114,6 +116,55 @@ pub fn run_pair(
         .map_err(|e| e.to_string())?;
     std::thread::sleep(Duration::from_millis(400));
 
+    // ER-502b：先通过 Relay 交换候选，再并行打洞；双方 ready 才切 P2P，否则保持 Relay。
+    let p2p_cfg = P2PConfig::new(&session_id, p2p_token(&session_id), Duration::from_secs(2));
+    let mut link = "relay".to_string();
+    if ctrl_relay.prepare_p2p(&p2p_cfg).is_ok() && target_relay.prepare_p2p(&p2p_cfg).is_ok() {
+        let ctrl_cands = ctrl_relay
+            .await_candidates(&p2p_cfg, Duration::from_secs(2))
+            .unwrap_or_default();
+        let target_cands = target_relay
+            .await_candidates(&p2p_cfg, Duration::from_secs(2))
+            .unwrap_or_default();
+        if !ctrl_cands.is_empty() && !target_cands.is_empty() {
+            ctrl_relay.set_peer_candidates(ctrl_cands);
+            target_relay.set_peer_candidates(target_cands);
+            let cfg1 = p2p_cfg.clone();
+            let cfg2 = p2p_cfg.clone();
+            let ctrl_thread = std::thread::spawn(move || {
+                let ok = ctrl_relay.punch(&cfg1);
+                (ctrl_relay, ok)
+            });
+            let target_thread = std::thread::spawn(move || {
+                let ok = target_relay.punch(&cfg2);
+                (target_relay, ok)
+            });
+            let (new_ctrl, ctrl_ok) = ctrl_thread.join().map_err(|_| "ctrl p2p thread")?;
+            let (new_target, target_ok) = target_thread.join().map_err(|_| "target p2p thread")?;
+            ctrl_relay = new_ctrl;
+            target_relay = new_target;
+            ctrl_relay
+                .send_ready(&p2p_cfg, ctrl_ok)
+                .map_err(|e| e.to_string())?;
+            target_relay
+                .send_ready(&p2p_cfg, target_ok)
+                .map_err(|e| e.to_string())?;
+            let ctrl_peer_ok = ctrl_relay
+                .await_ready(&p2p_cfg, Duration::from_secs(2))
+                .unwrap_or(false);
+            let target_peer_ok = target_relay
+                .await_ready(&p2p_cfg, Duration::from_secs(2))
+                .unwrap_or(false);
+            ctrl_relay.activate_p2p(ctrl_ok, ctrl_peer_ok);
+            target_relay.activate_p2p(target_ok, target_peer_ok);
+            if ctrl_relay.link_kind() == er_session::relay_client::LinkKind::P2P
+                && target_relay.link_kind() == er_session::relay_client::LinkKind::P2P
+            {
+                link = "p2p".to_string();
+            }
+        }
+    }
+
     let (mut ctrl_crypto, ctrl_eph) = CryptoSession::new(&session_id, true);
     let (mut target_crypto, target_eph) = CryptoSession::new(&session_id, false);
 
@@ -154,7 +205,7 @@ pub fn run_pair(
     // 采集 → 编码
     let mut cap = ScreenCapture::open_primary().map_err(|e| format!("no display: {e}"))?;
     let info = cap.info();
-    let cfg = EncodeConfig {
+    let requested = EncodeConfig {
         width: info.width & !1,
         height: info.height & !1,
         fps: 60,
@@ -162,6 +213,8 @@ pub fn run_pair(
         gop: 60,
         bframes: 0,
     };
+    let resolved = er_codec::resolve_config(requested, er_codec::host_capability());
+    let cfg = resolved.config;
     let mut codec = OpenH264Codec::new(cfg).map_err(|e| e.to_string())?;
     let frame = cap.grab().map_err(|e| e.to_string())?;
     let encoded = codec
@@ -198,5 +251,6 @@ pub fn run_pair(
         keys_match_registered,
         handshake_verified,
         plaintext_marker_absent,
+        link,
     })
 }

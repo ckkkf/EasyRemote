@@ -1,0 +1,97 @@
+00:00 +0: loading /Users/ckkk/dev/code/Go/EasyRemote/client/test/connect_code_input_test.dart
+00:00 +0: /Users/ckkk/dev/code/Go/EasyRemote/client/test/connect_code_input_test.dart: 每格都是真 TextField，且光标可见
+00:00 +1: /Users/ckkk/dev/code/Go/EasyRemote/client/test/connect_code_input_test.dart: 鼠标划过格子不再出现 Material 的灰色悬停块
+00:00 +2: /Users/ckkk/dev/code/Go/EasyRemote/client/test/connect_code_input_test.dart: 逐格输入自动前移，输满 9 位后按钮可用
+00:00 +3: /Users/ckkk/dev/code/Go/EasyRemote/client/test/connect_code_input_test.dart: 粘贴 9 位会自动铺满所有格子
+00:00 +4: /Users/ckkk/dev/code/Go/EasyRemote/client/test/connect_code_input_test.dart: 空格子上退格会回到上一格并删掉它
+00:00 +5: /Users/ckkk/dev/code/Go/EasyRemote/client/test/connect_code_input_test.dart: 外部带入设备码会铺进格子
+00:00 +6: loading /Users/ckkk/dev/code/Go/EasyRemote/client/test/p2_login_files_test.dart
+00:01 +6: /Users/ckkk/dev/code/Go/EasyRemote/client/test/p2_login_files_test.dart: 登录页是原型单表单：没有手机号/邮箱大 Tab，邮箱入口可点开弹窗
+00:01 +7: /Users/ckkk/dev/code/Go/EasyRemote/client/test/p2_login_files_test.dart: 邮箱弹窗真的调 /v1/auth/email/code 与 /v1/auth/email/login
+00:02 +8: /Users/ckkk/dev/code/Go/EasyRemote/client/test/p2_login_files_test.dart: 文件页复刻原型：队列 + 本机/远端双栏 + 真实上传到 100%
+00:02 +9: loading /Users/ckkk/dev/code/Go/EasyRemote/client/test/settings_prefs_test.dart
+00:02 +9: /Users/ckkk/dev/code/Go/EasyRemote/client/test/settings_prefs_test.dart: 隐私屏/防休眠未接入：没有开关，点了也不改偏好
+00:03 +10: /Users/ckkk/dev/code/Go/EasyRemote/client/test/settings_prefs_test.dart: 同账号免密直连默认关，打开后写进偏好总线
+00:03 +11: /Users/ckkk/dev/code/Go/EasyRemote/client/test/settings_prefs_test.dart: 落盘后能读回（刷新后设置不会丢）
+00:03 +12: /Users/ckkk/dev/code/Go/EasyRemote/client/test/settings_prefs_test.dart: 重新进入设置页会读回已保存的值（模拟刷新后重进）
+00:03 +13: loading /Users/ckkk/dev/code/Go/EasyRemote/client/test/connect_pending_test.dart
+00:03 +13: /Users/ckkk/dev/code/Go/EasyRemote/client/test/connect_pending_test.dart: 请求中显示等待条与取消，取消后回到可操作状态
+00:04 +14: /Users/ckkk/dev/code/Go/EasyRemote/client/test/connect_pending_test.dart: 请求超时会被打断，而不是一直挂着
+00:04 +15: loading /Users/ckkk/dev/code/Go/EasyRemote/client/test/session_e2e_test.dart
+00:04 +15: /Users/ckkk/dev/code/Go/EasyRemote/client/test/session_e2e_test.dart: (setUpAll)
+00:05 +15: /Users/ckkk/dev/code/Go/EasyRemote/client/test/session_e2e_test.dart: 完整会话：登录→建会话→握手→加密→解码
+Shell: [OpenH264] this = 0x0x98cec2370, Warning:ParamValidation(), AdaptiveQuant(1) is not supported yet for screen content, auto turned off
+Shell: [OpenH264] this = 0x0x98cec2370, Warning:ParamValidation(), BackgroundDetection(1) is not supported yet for screen content, auto turned off
+Shell: [OpenH264] this = 0x0x98cec2370, Warning:bEnableFrameSkip = 0,bitrate can't be controlled for RC_QUALITY_MODE,RC_BITRATE_MODE and RC_TIMESTAMP_MODE without enabling skip frame.
+00:07 +16: /Users/ckkk/dev/code/Go/EasyRemote/client/test/session_e2e_test.dart: 扁平 JSON 解析正确
+00:07 +17: /Users/ckkk/dev/code/Go/EasyRemote/client/test/session_e2e_test.dart: (tearDownAll)
+00:07 +17: loading /Users/ckkk/dev/code/Go/EasyRemote/client/test/widget_test.dart
+00:07 +17: /Users/ckkk/dev/code/Go/EasyRemote/client/test/widget_test.dart: 设备码格式化为 3-3-3
+00:07 +18: /Users/ckkk/dev/code/Go/EasyRemote/client/test/widget_test.dart: 非 9 位设备码原样展示
+00:07 +19: /Users/ckkk/dev/code/Go/EasyRemote/client/test/widget_test.dart: 设置页展示隐私屏与防睡眠（未接入，只读）
+00:07 +20: /Users/ckkk/dev/code/Go/EasyRemote/client/test/widget_test.dart: 未接入能力不渲染可切换的开关
+00:07 +21: /Users/ckkk/dev/code/Go/EasyRemote/client/test/widget_test.dart: 诊断页展示关键指标
+00:07 +22: /Users/ckkk/dev/code/Go/EasyRemote/client/test/widget_test.dart: 设备页显示本机设备码与已绑定设备
+00:07 +23: /Users/ckkk/dev/code/Go/EasyRemote/client/test/widget_test.dart: 自检页渲染输入与按钮
+00:08 +24: loading /Users/ckkk/dev/code/Go/EasyRemote/client/test/session_restore_test.dart
+00:08 +24: /Users/ckkk/dev/code/Go/EasyRemote/client/test/session_restore_test.dart: 登录并绑定设备后落盘，新实例能恢复登录态
+00:08 +25: /Users/ckkk/dev/code/Go/EasyRemote/client/test/session_restore_test.dart: 令牌过期时清空本地快照并回登录页
+00:08 +26: /Users/ckkk/dev/code/Go/EasyRemote/client/test/session_restore_test.dart: 断网时不踢回登录页，保留本地会话
+00:08 +27: /Users/ckkk/dev/code/Go/EasyRemote/client/test/session_restore_test.dart: 本地身份失效时重新绑定本机，不认领列表第一台
+00:08 +28: /Users/ckkk/dev/code/Go/EasyRemote/client/test/session_restore_test.dart: 没有本地快照时直接回登录页
+00:08 +29: /Users/ckkk/dev/code/Go/EasyRemote/client/test/session_restore_test.dart: 退出登录清掉内存令牌与本地快照
+00:08 +30: loading /Users/ckkk/dev/code/Go/EasyRemote/client/test/auth_expiry_test.dart
+00:08 +30: /Users/ckkk/dev/code/Go/EasyRemote/client/test/auth_expiry_test.dart: 任意接口返回 AUTH_TOKEN_EXPIRED → authExpired 通知一次并清令牌
+00:08 +31: /Users/ckkk/dev/code/Go/EasyRemote/client/test/auth_expiry_test.dart: 同账号免密直连：direct=true 进入请求体
+00:08 +32: /Users/ckkk/dev/code/Go/EasyRemote/client/test/auth_expiry_test.dart: 反向代理回 "bad gateway" 纯文本：转成人话 ApiException，不抛 SyntaxError
+00:08 +33: /Users/ckkk/dev/code/Go/EasyRemote/client/test/auth_expiry_test.dart: 反向代理回 HTML 错误页：提示 HTML 而不是甩一堆标签
+00:08 +34: /Users/ckkk/dev/code/Go/EasyRemote/client/test/auth_expiry_test.dart: device_id 缺失时 ensureDevice 会自动补绑（修 missing session）
+00:08 +35: loading /Users/ckkk/dev/code/Go/EasyRemote/client/test/native_test.dart
+00:09 +35: /Users/ckkk/dev/code/Go/EasyRemote/client/test/native_test.dart: (setUpAll)
+00:09 +35: /Users/ckkk/dev/code/Go/EasyRemote/client/test/native_test.dart: 版本号可读
+00:09 +36: /Users/ckkk/dev/code/Go/EasyRemote/client/test/native_test.dart: 创建会话并读取屏幕尺寸
+00:09 +37: /Users/ckkk/dev/code/Go/EasyRemote/client/test/native_test.dart: 抓帧字节数与尺寸一致
+00:09 +38: /Users/ckkk/dev/code/Go/EasyRemote/client/test/native_test.dart: 隐私屏开启后整帧被抹平
+00:09 +39: /Users/ckkk/dev/code/Go/EasyRemote/client/test/native_test.dart: 编码产出的 H.264 以 Annex-B 起始码开头
+Shell: [OpenH264] this = 0x0x884fa83f0, Warning:ParamValidation(), AdaptiveQuant(1) is not supported yet for screen content, auto turned off
+Shell: [OpenH264] this = 0x0x884fa83f0, Warning:ParamValidation(), BackgroundDetection(1) is not supported yet for screen content, auto turned off
+Shell: [OpenH264] this = 0x0x884fa83f0, Warning:bEnableFrameSkip = 0,bitrate can't be controlled for RC_QUALITY_MODE,RC_BITRATE_MODE and RC_TIMESTAMP_MODE without enabling skip frame.
+00:10 +40: /Users/ckkk/dev/code/Go/EasyRemote/client/test/native_test.dart: ABR 决策可跨边界返回
+00:10 +41: /Users/ckkk/dev/code/Go/EasyRemote/client/test/native_test.dart: 重复 close 安全
+00:10 +42: /Users/ckkk/dev/code/Go/EasyRemote/client/test/native_test.dart: (tearDownAll)
+00:10 +42: loading /Users/ckkk/dev/code/Go/EasyRemote/client/test/net_probe_stun_test.dart
+00:10 +42: /Users/ckkk/dev/code/Go/EasyRemote/client/test/net_probe_stun_test.dart: Binding Request 头部符合 RFC 5389
+00:10 +43: /Users/ckkk/dev/code/Go/EasyRemote/client/test/net_probe_stun_test.dart: 解析 XOR-MAPPED-ADDRESS
+00:10 +44: /Users/ckkk/dev/code/Go/EasyRemote/client/test/net_probe_stun_test.dart: 没有 XOR 属性时回退 MAPPED-ADDRESS
+00:10 +45: /Users/ckkk/dev/code/Go/EasyRemote/client/test/net_probe_stun_test.dart: 非 Binding Success 不误判
+00:10 +46: /Users/ckkk/dev/code/Go/EasyRemote/client/test/net_probe_stun_test.dart: 环回时收到的 Binding Request 可识别（hairpin 自检依据）
+00:10 +47: loading /Users/ckkk/dev/code/Go/EasyRemote/client/test/shell_nav_test.dart
+00:10 +47: /Users/ckkk/dev/code/Go/EasyRemote/client/test/shell_nav_test.dart: 设置导航固定在侧边栏最下方；切页保留页面状态
+00:11 +48: /Users/ckkk/dev/code/Go/EasyRemote/client/test/shell_nav_test.dart: 导航项底色不透明、悬停交回 InkWell，移出时不再闪
+00:11 +49: loading /Users/ckkk/dev/code/Go/EasyRemote/client/test/prefs_test.dart
+00:12 +49: /Users/ckkk/dev/code/Go/EasyRemote/client/test/prefs_test.dart: 默认偏好：跟随系统 / 自动画质 / 隐私屏关 / 防睡眠开 / 允许被控关 / 免密直连关
+00:12 +50: /Users/ckkk/dev/code/Go/EasyRemote/client/test/prefs_test.dart: TestAllowControlDefaultsOff
+00:12 +51: /Users/ckkk/dev/code/Go/EasyRemote/client/test/prefs_test.dart: JSON 往返不丢字段（刷新后能还原用户改过的值）
+00:12 +52: /Users/ckkk/dev/code/Go/EasyRemote/client/test/prefs_test.dart: 脏数据不炸启动：未知枚举值/缺字段回落默认
+00:12 +53: /Users/ckkk/dev/code/Go/EasyRemote/client/test/prefs_test.dart: copyWith 只改目标字段
+00:12 +54: loading /Users/ckkk/dev/code/Go/EasyRemote/client/test/capability_gate_test.dart
+00:12 +54: /Users/ckkk/dev/code/Go/EasyRemote/client/test/capability_gate_test.dart: TestIncompleteCapabilityIsDisabled
+00:12 +55: /Users/ckkk/dev/code/Go/EasyRemote/client/test/capability_gate_test.dart: TestUnknownCapabilityFailsClosed
+00:12 +56: /Users/ckkk/dev/code/Go/EasyRemote/client/test/capability_gate_test.dart: TestPreferenceCannotUnlockExperimentalInRelease
+00:12 +57: /Users/ckkk/dev/code/Go/EasyRemote/client/test/capability_gate_test.dart: 默认通道来自构建类型：测试环境是 debug
+00:12 +58: loading /Users/ckkk/dev/code/Go/EasyRemote/client/test/host_link_test.dart
+00:13 +58: /Users/ckkk/dev/code/Go/EasyRemote/client/test/host_link_test.dart: (setUpAll)
+00:14 +58: /Users/ckkk/dev/code/Go/EasyRemote/client/test/host_link_test.dart: 设备码 + 验证码 的完整会话
+Shell: CODEC: init kind=Software 1920x1080
+Shell: CODEC: prime_frame=false
+Shell: [OpenH264] this = 0x0xaab1a9ec0, Warning:ParamValidation(), AdaptiveQuant(1) is not supported yet for screen content, auto turned off
+Shell: [OpenH264] this = 0x0xaab1a9ec0, Warning:ParamValidation(), BackgroundDetection(1) is not supported yet for screen content, auto turned off
+Shell: [OpenH264] this = 0x0xaab1a9ec0, Warning:bEnableFrameSkip = 0,bitrate can't be controlled for RC_QUALITY_MODE,RC_BITRATE_MODE and RC_TIMESTAMP_MODE without enabling skip frame.
+Shell: CODEC: backend_final=cpu
+00:16 +59: /Users/ckkk/dev/code/Go/EasyRemote/client/test/host_link_test.dart: 错误验证码被拒绝
+00:16 +60: /Users/ckkk/dev/code/Go/EasyRemote/client/test/host_link_test.dart: (tearDownAll)
+00:16 +60: loading /Users/ckkk/dev/code/Go/EasyRemote/client/test/e2e_services_test.dart
+00:16 +60: /Users/ckkk/dev/code/Go/EasyRemote/client/test/e2e_services_test.dart: TestE2EHarnessStartsAndStopsServices
+00:19 +61: /Users/ckkk/dev/code/Go/EasyRemote/client/test/e2e_services_test.dart: TestE2EHarnessUsesExternalServicesWhenProvided
+00:19 +62: All tests passed!
+TEST_EXIT=0

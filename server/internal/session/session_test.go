@@ -72,15 +72,20 @@ func TestConsentTimeout(t *testing.T) {
 	}
 }
 
-func TestActivateAfterAuthWindowFails(t *testing.T) {
+func TestReadyAfterAuthWindowFails(t *testing.T) {
 	s, _ := setup(t)
 	now := time.Now().UTC()
 	s.SetClock(func() time.Time { return now })
 	sess, _ := s.Request(ctx(), "c1", "t1")
 	s.Consent(ctx(), sess.ID, true, "")
+	_, _ = s.Ready(ctx(), sess.ID, "c1")
 	s.SetClock(func() time.Time { return now.Add(13 * time.Hour) })
-	if _, err := s.Activate(ctx(), sess.ID); !errcode.Is(err, errcode.SessionAuthWindowExceeded) {
+	if _, err := s.Ready(ctx(), sess.ID, "t1"); !errcode.Is(err, errcode.SessionAuthWindowExceeded) {
 		t.Fatalf("want auth window exceeded, got %v", err)
+	}
+	got, _ := s.Get(ctx(), sess.ID)
+	if got.State != StateClosed || got.Reason != "auth_window_exceeded" {
+		t.Fatalf("expired window must close session: %+v", got)
 	}
 }
 
@@ -95,9 +100,13 @@ func TestKillByAdmin(t *testing.T) {
 	if closed.State != StateClosed || closed.Reason != "admin: abuse" {
 		t.Fatalf("unexpected: %+v", closed)
 	}
-	// 已关闭会话再次关闭：按「不存在可关闭的会话」处理（而不是语义错误的 SessionExpired）
-	if _, err := s.Kill(ctx(), sess.ID, "again"); !errcode.Is(err, errcode.SessionNotFound) {
-		t.Fatalf("want SESSION_NOT_FOUND for closed session, got %v", err)
+	// 重复关闭是幂等事件：返回已关闭会话，不重复写 state/reason。
+	again, err := s.Kill(ctx(), sess.ID, "again")
+	if err != nil {
+		t.Fatalf("duplicate kill should be idempotent: %v", err)
+	}
+	if again.State != StateClosed || again.Reason != "admin: abuse" {
+		t.Fatalf("duplicate kill changed terminal state: %+v", again)
 	}
 }
 
@@ -119,12 +128,18 @@ func TestActivateTwiceIsRejectedOrIdempotentSafe(t *testing.T) {
 	s, _ := setup(t)
 	sess, _ := s.Request(ctx(), "c1", "t1")
 	s.Consent(ctx(), sess.ID, true, "")
+	_, _ = s.Ready(ctx(), sess.ID, "c1")
+	_, _ = s.Ready(ctx(), sess.ID, "t1")
 	if _, err := s.Activate(ctx(), sess.ID); err != nil {
 		t.Fatalf("first activate: %v", err)
 	}
-	// 第二次激活：active → active 不在白名单，必须失败
-	if _, err := s.Activate(ctx(), sess.ID); err == nil {
-		t.Fatal("second activate must fail")
+	// 第二次激活：active → active 是重复事件，必须幂等成功且不改状态。
+	second, err := s.Activate(ctx(), sess.ID)
+	if err != nil {
+		t.Fatalf("duplicate activate should be idempotent: %v", err)
+	}
+	if second.State != StateActive {
+		t.Fatalf("state=%s, want active", second.State)
 	}
 }
 

@@ -50,11 +50,7 @@ func (w *wsConn) Send(t int, body any) error {
 
 func (w *wsConn) Close() error { return w.c.Close() }
 
-var upgrader = websocket.Upgrader{
-	ReadBufferSize:  4096,
-	WriteBufferSize: 4096,
-	CheckOrigin:     func(*http.Request) bool { return true },
-}
+var upgrader = signal.WSUpgrader(signal.AllowedOriginsFromEnv(os.Getenv("ER_ALLOWED_ORIGINS")))
 
 func main() {
 	addr := flag.String("addr", ":8082", "listen address")
@@ -170,6 +166,11 @@ func main() {
 				_ = conn.Send(signal.TypeHelloAck, map[string]any{
 					"server_time": time.Now().UTC(), "heartbeat_interval_ms": 15000,
 				})
+
+			case signal.TypeHeartbeat:
+				if deviceID != "" {
+					hub.Touch(deviceID, conn)
+				}
 
 			case signal.TypeQueryDevice:
 				var body struct {

@@ -20,6 +20,11 @@ type PG struct {
 
 var _ Store = (*PG)(nil)
 
+// Ping 检查数据库可用性，用于 /readyz。
+func (p *PG) Ping(ctx context.Context) error {
+	return p.pool.Ping(ctx)
+}
+
 // NewPG 建立连接池并校验连通性。
 func NewPG(ctx context.Context, dsn string) (*PG, error) {
 	pool, err := pgxpool.New(ctx, dsn)
@@ -57,8 +62,6 @@ func (p *PG) Migrate(ctx context.Context, ddl string) error {
 	_, err = conn.Exec(ctx, ddl)
 	return err
 }
-
-func (p *PG) Ping(ctx context.Context) error { return p.pool.Ping(ctx) }
 
 func (p *PG) Close() error {
 	p.pool.Close()
@@ -143,9 +146,37 @@ func (p *PG) UpdateAccountStatus(ctx context.Context, id, status string) error {
 
 func (p *PG) ListAccounts(ctx context.Context, page Page) ([]*Account, error) {
 	limit, offset := pageArgs(page, 100)
+	args := []any{}
+	where := ""
+	if page.Status != "" {
+		args = append(args, page.Status)
+		where = fmt.Sprintf(" WHERE status=$%d", len(args))
+	}
+	if q := strings.TrimSpace(page.Query); q != "" {
+		args = append(args, "%"+q+"%")
+		cond := fmt.Sprintf("(id ILIKE $%d OR phone_enc ILIKE $%d OR status ILIKE $%d)", len(args), len(args), len(args))
+		if where == "" {
+			where = " WHERE " + cond
+		} else {
+			where += " AND " + cond
+		}
+	}
+	order := "created_at"
+	switch page.Sort {
+	case "id":
+		order = "id"
+	case "status":
+		order = "status"
+	}
+	if page.Desc {
+		order += " DESC"
+	} else {
+		order += " ASC"
+	}
+	args = append(args, limit, offset)
 	rows, err := p.pool.Query(ctx,
-		`SELECT id, phone_hash, phone_enc, status, created_at FROM accounts ORDER BY created_at ASC LIMIT $1 OFFSET $2`,
-		limit, offset)
+		fmt.Sprintf("SELECT id, phone_hash, phone_enc, status, created_at FROM accounts%s ORDER BY %s LIMIT $%d OFFSET $%d", where, order, len(args)-1, len(args)),
+		args...)
 	if err != nil {
 		return nil, err
 	}
@@ -209,8 +240,37 @@ func (p *PG) ListDevicesByAccount(ctx context.Context, accountID string, page Pa
 
 func (p *PG) ListDevices(ctx context.Context, page Page) ([]*Device, error) {
 	limit, offset := pageArgs(page, 100)
+	args := []any{}
+	where := ""
+	if page.Platform != "" {
+		args = append(args, page.Platform)
+		where = fmt.Sprintf(" WHERE platform=$%d", len(args))
+	}
+	if q := strings.TrimSpace(page.Query); q != "" {
+		args = append(args, "%"+q+"%")
+		cond := fmt.Sprintf("(id ILIKE $%d OR device_code ILIKE $%d OR platform ILIKE $%d OR account_id ILIKE $%d)", len(args), len(args), len(args), len(args))
+		if where == "" {
+			where = " WHERE " + cond
+		} else {
+			where += " AND " + cond
+		}
+	}
+	order := "device_code"
+	switch page.Sort {
+	case "platform":
+		order = "platform"
+	case "last_seen":
+		order = "last_seen_at"
+	}
+	if page.Desc {
+		order += " DESC"
+	} else {
+		order += " ASC"
+	}
+	args = append(args, limit, offset)
 	rows, err := p.pool.Query(ctx,
-		`SELECT `+deviceCols+` FROM devices ORDER BY device_code ASC LIMIT $1 OFFSET $2`, limit, offset)
+		fmt.Sprintf("SELECT %s FROM devices%s ORDER BY %s LIMIT $%d OFFSET $%d", deviceCols, where, order, len(args)-1, len(args)),
+		args...)
 	if err != nil {
 		return nil, err
 	}
@@ -421,16 +481,19 @@ func (p *PG) CreateSession(ctx context.Context, s *Session) error {
 		s.StartedAt = time.Now().UTC()
 	}
 	_, err := p.pool.Exec(ctx, `
-		INSERT INTO sessions (id, controller_id, target_id, state, reason, started_at, ended_at, auth_expire_at)
-		VALUES ($1,$2,$3,$4,$5,$6,NULLIF($7,'0001-01-01 00:00:00+00'::timestamptz),NULLIF($8,'0001-01-01 00:00:00+00'::timestamptz))`,
+		INSERT INTO sessions (id, controller_id, target_id, state, reason, started_at, ended_at, auth_expire_at, version, ready_controller, ready_target)
+		VALUES ($1,$2,$3,$4,$5,$6,NULLIF($7,'0001-01-01 00:00:00+00'::timestamptz),NULLIF($8,'0001-01-01 00:00:00+00'::timestamptz),1,false,false)`,
 		s.ID, s.ControllerID, s.TargetID, s.State, s.Reason, s.StartedAt, s.EndedAt, s.AuthExpireAt)
+	if err == nil {
+		s.Version = 1
+	}
 	return mapErr(err)
 }
 
 func (p *PG) scanSession(row pgx.Row) (*Session, error) {
 	var s Session
 	var endedAt, authExp *time.Time
-	err := row.Scan(&s.ID, &s.ControllerID, &s.TargetID, &s.State, &s.Reason, &s.StartedAt, &endedAt, &authExp)
+	err := row.Scan(&s.ID, &s.ControllerID, &s.TargetID, &s.State, &s.Reason, &s.StartedAt, &endedAt, &authExp, &s.Version, &s.ReadyController, &s.ReadyTarget)
 	if err != nil {
 		return nil, mapErr(err)
 	}
@@ -443,7 +506,49 @@ func (p *PG) scanSession(row pgx.Row) (*Session, error) {
 	return &s, nil
 }
 
-const sessionCols = `id, controller_id, target_id, state, reason, started_at, ended_at, auth_expire_at`
+const sessionCols = `id, controller_id, target_id, state, reason, started_at, ended_at, auth_expire_at, version, ready_controller, ready_target`
+
+func (p *PG) CreateSessionExclusive(ctx context.Context, s *Session) (*Session, bool, error) {
+	tx, err := p.pool.Begin(ctx)
+	if err != nil {
+		return nil, false, mapErr(err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	// 按设备对串行化，避免两个并发首次请求各建一条。
+	lockKey := s.ControllerID + "|" + s.TargetID
+	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtext($1))`, lockKey); err != nil {
+		return nil, false, mapErr(err)
+	}
+	row := tx.QueryRow(ctx, `SELECT `+sessionCols+` FROM sessions
+		WHERE controller_id=$1 AND target_id=$2 AND state <> 'closed'
+		ORDER BY started_at DESC LIMIT 1`, s.ControllerID, s.TargetID)
+	existing, err := p.scanSession(row)
+	if err == nil {
+		return existing, false, mapErr(tx.Commit(ctx))
+	}
+	if err != ErrNotFound {
+		return nil, false, err
+	}
+	if s.ID == "" {
+		s.ID = randomID("ses")
+	}
+	if s.StartedAt.IsZero() {
+		s.StartedAt = time.Now().UTC()
+	}
+	_, err = tx.Exec(ctx, `
+		INSERT INTO sessions (id, controller_id, target_id, state, reason, started_at, ended_at, auth_expire_at, version, ready_controller, ready_target)
+		VALUES ($1,$2,$3,$4,$5,$6,NULLIF($7,'0001-01-01 00:00:00+00'::timestamptz),NULLIF($8,'0001-01-01 00:00:00+00'::timestamptz),1,false,false)`,
+		s.ID, s.ControllerID, s.TargetID, s.State, s.Reason, s.StartedAt, s.EndedAt, s.AuthExpireAt)
+	if err != nil {
+		return nil, false, mapErr(err)
+	}
+	s.Version = 1
+	if err := tx.Commit(ctx); err != nil {
+		return nil, false, mapErr(err)
+	}
+	cp := *s
+	return &cp, true, nil
+}
 
 func (p *PG) GetSession(ctx context.Context, id string) (*Session, error) {
 	return p.scanSession(p.pool.QueryRow(ctx, `SELECT `+sessionCols+` FROM sessions WHERE id=$1`, id))
@@ -452,8 +557,85 @@ func (p *PG) GetSession(ctx context.Context, id string) (*Session, error) {
 func (p *PG) UpdateSession(ctx context.Context, s *Session) error {
 	tag, err := p.pool.Exec(ctx, `
 		UPDATE sessions SET state=$2, reason=$3, ended_at=NULLIF($4,'0001-01-01 00:00:00+00'::timestamptz),
-		       auth_expire_at=NULLIF($5,'0001-01-01 00:00:00+00'::timestamptz)
-		WHERE id=$1`, s.ID, s.State, s.Reason, s.EndedAt, s.AuthExpireAt)
+		       auth_expire_at=NULLIF($5,'0001-01-01 00:00:00+00'::timestamptz),
+		       ready_controller=$6, ready_target=$7, version=version+1
+		WHERE id=$1`, s.ID, s.State, s.Reason, s.EndedAt, s.AuthExpireAt, s.ReadyController, s.ReadyTarget)
+	if err != nil {
+		return mapErr(err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	s.Version++
+	return nil
+}
+
+func (p *PG) UpdateSessionCASWithEvent(ctx context.Context, s *Session, expected int64, ev *SessionEvent) error {
+	tx, err := p.pool.Begin(ctx)
+	if err != nil {
+		return mapErr(err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	tag, err := tx.Exec(ctx, `
+		UPDATE sessions SET state=$2, reason=$3, ended_at=NULLIF($4,'0001-01-01 00:00:00+00'::timestamptz),
+		       auth_expire_at=NULLIF($5,'0001-01-01 00:00:00+00'::timestamptz),
+		       ready_controller=$7, ready_target=$8, version=version+1
+		WHERE id=$1 AND version=$6`, s.ID, s.State, s.Reason, s.EndedAt, s.AuthExpireAt, expected, s.ReadyController, s.ReadyTarget)
+	if err != nil {
+		return mapErr(err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrVersionConflict
+	}
+	s.Version = expected + 1
+	if ev.SessionID == "" {
+		ev.SessionID = s.ID
+	}
+	if ev.Version == 0 {
+		ev.Version = s.Version
+	}
+	if ev.ID == "" {
+		ev.ID = randomID("evt")
+	}
+	if ev.At.IsZero() {
+		ev.At = time.Now().UTC()
+	}
+	_, err = tx.Exec(ctx, `
+		INSERT INTO session_events (id, session_id, from_device, to_device, old_state, new_state, reason, trace_id, version, at)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+		ON CONFLICT (session_id, version) DO NOTHING`,
+		ev.ID, ev.SessionID, ev.FromDevice, ev.ToDevice, ev.OldState, ev.NewState, ev.Reason, ev.TraceID, ev.Version, ev.At)
+	if err != nil {
+		return mapErr(err)
+	}
+	return mapErr(tx.Commit(ctx))
+}
+
+func (p *PG) ListSessionEvents(ctx context.Context, delivered bool, limit int) ([]*SessionEvent, error) {
+	if limit <= 0 || limit > 500 {
+		limit = 100
+	}
+	rows, err := p.pool.Query(ctx, `
+		SELECT id, session_id, from_device, to_device, old_state, new_state, reason, trace_id, version, at, delivered, attempts, last_error
+		FROM session_events WHERE delivered=$1 ORDER BY at ASC LIMIT $2`, delivered, limit)
+	if err != nil {
+		return nil, mapErr(err)
+	}
+	defer rows.Close()
+	var out []*SessionEvent
+	for rows.Next() {
+		var ev SessionEvent
+		if err := rows.Scan(&ev.ID, &ev.SessionID, &ev.FromDevice, &ev.ToDevice, &ev.OldState, &ev.NewState,
+			&ev.Reason, &ev.TraceID, &ev.Version, &ev.At, &ev.Delivered, &ev.Attempts, &ev.LastError); err != nil {
+			return nil, mapErr(err)
+		}
+		out = append(out, &ev)
+	}
+	return out, mapErr(rows.Err())
+}
+
+func (p *PG) MarkSessionEventDelivered(ctx context.Context, id string) error {
+	tag, err := p.pool.Exec(ctx, `UPDATE session_events SET delivered=true, last_error='' WHERE id=$1`, id)
 	if err != nil {
 		return mapErr(err)
 	}
@@ -463,18 +645,66 @@ func (p *PG) UpdateSession(ctx context.Context, s *Session) error {
 	return nil
 }
 
+func (p *PG) MarkSessionEventFailed(ctx context.Context, id, reason string) error {
+	tag, err := p.pool.Exec(ctx, `UPDATE session_events SET attempts=attempts+1, last_error=$2 WHERE id=$1`, id, reason)
+	if err != nil {
+		return mapErr(err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+func (p *PG) UpdateSessionCAS(ctx context.Context, s *Session, expected int64) error {
+	tag, err := p.pool.Exec(ctx, `
+		UPDATE sessions SET state=$2, reason=$3, ended_at=NULLIF($4,'0001-01-01 00:00:00+00'::timestamptz),
+		       auth_expire_at=NULLIF($5,'0001-01-01 00:00:00+00'::timestamptz),
+		       ready_controller=$7, ready_target=$8, version=version+1
+		WHERE id=$1 AND version=$6`, s.ID, s.State, s.Reason, s.EndedAt, s.AuthExpireAt, expected, s.ReadyController, s.ReadyTarget)
+	if err != nil {
+		return mapErr(err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrVersionConflict
+	}
+	s.Version = expected + 1
+	return nil
+}
+
 func (p *PG) ListSessions(ctx context.Context, state string, page Page) ([]*Session, error) {
 	limit, offset := pageArgs(page, 100)
-	var rows pgx.Rows
-	var err error
-	if state == "" {
-		rows, err = p.pool.Query(ctx,
-			`SELECT `+sessionCols+` FROM sessions ORDER BY started_at DESC LIMIT $1 OFFSET $2`, limit, offset)
-	} else {
-		rows, err = p.pool.Query(ctx,
-			`SELECT `+sessionCols+` FROM sessions WHERE state=$1 ORDER BY started_at DESC LIMIT $2 OFFSET $3`,
-			state, limit, offset)
+	args := []any{}
+	where := ""
+	if state != "" {
+		args = append(args, state)
+		where = fmt.Sprintf(" WHERE state=$%d", len(args))
 	}
+	if q := strings.TrimSpace(page.Query); q != "" {
+		args = append(args, "%"+q+"%")
+		cond := fmt.Sprintf("(id ILIKE $%d OR controller_id ILIKE $%d OR target_id ILIKE $%d OR state ILIKE $%d)", len(args), len(args), len(args), len(args))
+		if where == "" {
+			where = " WHERE " + cond
+		} else {
+			where += " AND " + cond
+		}
+	}
+	order := "started_at"
+	switch page.Sort {
+	case "id":
+		order = "id"
+	case "state":
+		order = "state"
+	}
+	if page.Desc {
+		order += " DESC"
+	} else {
+		order += " ASC"
+	}
+	args = append(args, limit, offset)
+	rows, err := p.pool.Query(ctx,
+		fmt.Sprintf("SELECT %s FROM sessions%s ORDER BY %s LIMIT $%d OFFSET $%d", sessionCols, where, order, len(args)-1, len(args)),
+		args...)
 	if err != nil {
 		return nil, err
 	}
@@ -697,4 +927,123 @@ func (p *PG) ListAudit(ctx context.Context, limit int) ([]*AuditLog, error) {
 // normalizeSQL 去掉多余空白，便于在日志里打印迁移语句片段。
 func normalizeSQL(s string) string {
 	return strings.Join(strings.Fields(s), " ")
+}
+func (p *PG) CountAccounts(ctx context.Context, page Page) (int, error) {
+	args := []any{}
+	where := ""
+	if page.Status != "" {
+		args = append(args, page.Status)
+		where = fmt.Sprintf(" WHERE status=$%d", len(args))
+	}
+	if q := strings.TrimSpace(page.Query); q != "" {
+		args = append(args, "%"+q+"%")
+		cond := fmt.Sprintf("(id ILIKE $%d OR phone_enc ILIKE $%d OR status ILIKE $%d)", len(args), len(args), len(args))
+		if where == "" {
+			where = " WHERE " + cond
+		} else {
+			where += " AND " + cond
+		}
+	}
+	var n int
+	err := p.pool.QueryRow(ctx, "SELECT count(*) FROM accounts"+where, args...).Scan(&n)
+	return n, mapErr(err)
+}
+
+func (p *PG) CountDevices(ctx context.Context, page Page) (int, error) {
+	args := []any{}
+	where := ""
+	if page.Platform != "" {
+		args = append(args, page.Platform)
+		where = fmt.Sprintf(" WHERE platform=$%d", len(args))
+	}
+	if q := strings.TrimSpace(page.Query); q != "" {
+		args = append(args, "%"+q+"%")
+		cond := fmt.Sprintf("(id ILIKE $%d OR device_code ILIKE $%d OR platform ILIKE $%d OR account_id ILIKE $%d)", len(args), len(args), len(args), len(args))
+		if where == "" {
+			where = " WHERE " + cond
+		} else {
+			where += " AND " + cond
+		}
+	}
+	var n int
+	err := p.pool.QueryRow(ctx, "SELECT count(*) FROM devices"+where, args...).Scan(&n)
+	return n, mapErr(err)
+}
+
+func (p *PG) CountSessions(ctx context.Context, state string, page Page) (int, error) {
+	args := []any{}
+	where := ""
+	if state != "" {
+		args = append(args, state)
+		where = fmt.Sprintf(" WHERE state=$%d", len(args))
+	}
+	if q := strings.TrimSpace(page.Query); q != "" {
+		args = append(args, "%"+q+"%")
+		cond := fmt.Sprintf("(id ILIKE $%d OR controller_id ILIKE $%d OR target_id ILIKE $%d OR state ILIKE $%d)", len(args), len(args), len(args), len(args))
+		if where == "" {
+			where = " WHERE " + cond
+		} else {
+			where += " AND " + cond
+		}
+	}
+	var n int
+	err := p.pool.QueryRow(ctx, "SELECT count(*) FROM sessions"+where, args...).Scan(&n)
+	return n, mapErr(err)
+}
+
+func (p *PG) ListAuditPage(ctx context.Context, page Page) ([]*AuditLog, error) {
+	limit, offset := pageArgs(page, 100)
+	args := []any{}
+	where := ""
+	if page.Action != "" {
+		args = append(args, page.Action)
+		where = fmt.Sprintf(" WHERE action=$%d", len(args))
+	}
+	if page.Result != "" {
+		args = append(args, page.Result)
+		cond := fmt.Sprintf("result=$%d", len(args))
+		if where == "" {
+			where = " WHERE " + cond
+		} else {
+			where += " AND " + cond
+		}
+	}
+	if q := strings.TrimSpace(page.Query); q != "" {
+		args = append(args, "%"+q+"%")
+		cond := fmt.Sprintf("(actor ILIKE $%d OR action ILIKE $%d OR object ILIKE $%d OR result ILIKE $%d)", len(args), len(args), len(args), len(args))
+		if where == "" {
+			where = " WHERE " + cond
+		} else {
+			where += " AND " + cond
+		}
+	}
+	args = append(args, limit, offset)
+	rows, err := p.pool.Query(ctx,
+		fmt.Sprintf("SELECT id, actor, role, action, object, before, after, ip, result, ts FROM audit_logs%s ORDER BY ts DESC LIMIT $%d OFFSET $%d", where, len(args)-1, len(args)),
+		args...)
+	if err != nil {
+		return nil, mapErr(err)
+	}
+	defer rows.Close()
+	var out []*AuditLog
+	for rows.Next() {
+		var a AuditLog
+		if err := rows.Scan(&a.ID, &a.Actor, &a.Role, &a.Action, &a.Object, &a.Before, &a.After, &a.IP, &a.Result, &a.TS); err != nil {
+			return nil, mapErr(err)
+		}
+		out = append(out, &a)
+	}
+	return out, mapErr(rows.Err())
+}
+
+func (p *PG) CountAudit(ctx context.Context, page Page) (int, error) {
+	args := []any{}
+	where := ""
+	if q := strings.TrimSpace(page.Query); q != "" {
+		args = append(args, "%"+q+"%")
+		where = fmt.Sprintf(" WHERE (actor ILIKE $%d OR action ILIKE $%d OR object ILIKE $%d OR result ILIKE $%d)", len(args), len(args), len(args), len(args))
+	}
+	var n int
+	err := p.pool.QueryRow(ctx, "SELECT count(*) FROM audit_logs"+where, args...).Scan(&n)
+	return n, mapErr(err)
 }

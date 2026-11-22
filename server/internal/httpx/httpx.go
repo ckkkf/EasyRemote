@@ -11,6 +11,7 @@ import (
 	"net/http"
 
 	"github.com/easyremote/server/internal/errcode"
+	"github.com/easyremote/server/internal/trace"
 )
 
 // maxBody 是请求体上限，防止单个请求吃满内存。
@@ -77,6 +78,32 @@ func Err(w http.ResponseWriter, r *http.Request, err error) {
 	})
 }
 
+// ErrStatus 与 Err 相同，但允许调用方指定 HTTP 状态（如 /readyz 统一 503）。
+func ErrStatus(w http.ResponseWriter, r *http.Request, err error, status int) {
+	trace := w.Header().Get("X-Trace-Id")
+	if trace == "" {
+		trace = TraceID()
+		w.Header().Set("X-Trace-Id", trace)
+	}
+	var e *errcode.Error
+	if errors.As(err, &e) {
+		m := errcode.Describe(e.Code)
+		log.Printf("trace=%s code=%d name=%s detail=%s", trace, e.Code, errcode.Name(e.Code), e.Detail)
+		if status == 0 {
+			status = m.Status
+		}
+		JSON(w, status, Envelope{
+			Code:      int(e.Code),
+			Name:      errcode.Name(e.Code),
+			Message:   m.Message,
+			Retryable: m.Retryable,
+			TraceID:   trace,
+		})
+		return
+	}
+	Err(w, r, err)
+}
+
 // Decode 解析 JSON 请求体，带大小上限。
 func Decode(w http.ResponseWriter, r *http.Request, v any) error {
 	defer r.Body.Close()
@@ -89,19 +116,20 @@ func Decode(w http.ResponseWriter, r *http.Request, v any) error {
 // Middleware 负责 trace id、panic 恢复与访问日志。
 func Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		trace := r.Header.Get("X-Trace-Id")
-		if trace == "" {
-			trace = TraceID()
+		traceID := r.Header.Get("X-Trace-Id")
+		if traceID == "" {
+			traceID = TraceID()
 		}
-		w.Header().Set("X-Trace-Id", trace)
+		w.Header().Set("X-Trace-Id", traceID)
+		r = r.WithContext(trace.With(r.Context(), traceID))
 
 		defer func() {
 			if rec := recover(); rec != nil {
-				log.Printf("trace=%s panic: %v", trace, rec)
+				log.Printf("trace=%s panic: %v", traceID, rec)
 				m := errcode.Describe(errcode.SrvInternal)
 				JSON(w, m.Status, Envelope{
 					Code: int(errcode.SrvInternal), Name: errcode.Name(errcode.SrvInternal),
-					Message: m.Message, Retryable: true, TraceID: trace,
+					Message: m.Message, Retryable: true, TraceID: traceID,
 				})
 			}
 		}()

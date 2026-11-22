@@ -106,12 +106,28 @@ func main() {
 				log.Printf("relay: verify failed sid=%s dev=%s err=%v", sid, dev, err)
 				continue
 			}
+			// 关闭传播：会话已撤销时旧票据不能再注册。
+			if relay.IsSessionRevoked(ctx, reg, tk.SessionID) {
+				log.Printf("relay: rejected revoked session sid=%s dev=%s", tk.SessionID, dev)
+				continue
+			}
+			// 重连换票后旧代号立即失效，防止旧 ticket 重放。
+			if !relay.TicketEpochCurrent(ctx, reg, tk) {
+				log.Printf("relay: rejected stale ticket sid=%s dev=%s epoch=%d", tk.SessionID, dev, tk.Epoch)
+				continue
+			}
 			if !fwd.Register(tk, dev, from) {
 				log.Printf("relay: rejected register sid=%s dev=%s", sid, dev)
 				continue
 			}
 			if reg != nil {
 				_ = reg.SetRoute(ctx, tk.SessionID, dev, self, 2*time.Minute)
+			}
+			// 注册确认：客户端必须收到 ACK 才算注册成功，避免“发送成功=已连接”。
+			ackBody := append([]byte("ERACK1"), []byte(dev)...)
+			ack := relay.EncodeFrame(relay.FrameRegisterAck, tk.SessionID, ackBody)
+			if _, err := conn.WriteToUDP(ack, from); err != nil {
+				log.Printf("relay: ack failed sid=%s dev=%s err=%v", tk.SessionID, dev, err)
 			}
 
 		case relay.FrameData:

@@ -39,4 +39,5 @@ Future<Prefs> loadPrefs() async {
   }
 }
 
-Future<void> savePrefs(Prefs prefs) async => _writeRaw(jsonEncode(prefs.toJson()));
+Future<void> savePrefs(Prefs prefs) async =>
+    _writeRaw(jsonEncode(prefs.toJson()));

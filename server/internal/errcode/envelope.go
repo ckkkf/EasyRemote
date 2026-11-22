@@ -47,6 +47,7 @@ var meta = map[Code]Meta{
 
 	SrvInternal:         {Message: "服务异常，请稍后重试", Status: http.StatusInternalServerError, Retryable: true},
 	SrvRouteNotFound:    {Message: "请求的接口不存在", Status: http.StatusNotFound},
+	SrvMethodNotAllowed: {Message: "请求方式不正确", Status: http.StatusMethodNotAllowed},
 	SrvMaintenance:      {Message: "系统维护中", Status: http.StatusServiceUnavailable, Retryable: true},
 	AdminForbidden:      {Message: "没有权限执行该操作", Status: http.StatusForbidden},
 	AdminMfaRequired:    {Message: "请完成二次验证", Status: http.StatusUnauthorized},

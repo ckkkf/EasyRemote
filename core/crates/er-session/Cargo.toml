@@ -6,6 +6,7 @@ license.workspace = true
 description = "会话数据面：中继票据、UDP 帧、分片重组（与 Go relay 协议一致）"
 
 [dependencies]
+er-transport = { path = "../er-transport" }
 hmac = "0.12"
 sha2 = "0.10"
 base64 = "0.22"

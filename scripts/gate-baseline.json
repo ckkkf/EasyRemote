@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "counts": {
+    "bare-map:server/internal/gateway/assist.go": 2,
+    "bare-map:server/internal/gateway/config.go": 2,
+    "bare-map:server/internal/gateway/email.go": 2,
+    "bare-map:server/internal/gateway/files.go": 8,
+    "bare-map:server/internal/gateway/handler.go": 11,
+    "empty-catch:client/lib/native.dart": 1,
+    "empty-catch:client/lib/prefs_store_web.dart": 1,
+    "empty-catch:client/lib/session_store_io.dart": 3,
+    "empty-catch:client/lib/session_store_web.dart": 2,
+    "empty-catch:client/lib/session_video_io.dart": 2,
+    "ffi-pointer-balance:client/lib/host_service_io.dart": 12,
+    "ffi-pointer-balance:client/lib/session_video_io.dart": 10,
+    "fixed-sleep:client/lib/pages/diagnostics_page.dart": 1,
+    "fixed-sleep:client/lib/pages/session_page.dart": 2,
+    "hardcoded-endpoint:client/lib/main.dart": 1,
+    "hardcoded-endpoint:client/lib/net_probe_io.dart": 1,
+    "hardcoded-endpoint:client/lib/pages/device_list_page.dart": 3,
+    "hardcoded-endpoint:client/lib/pages/self_test_page.dart": 2,
+    "hardcoded-endpoint:client/lib/pages/session_page.dart": 2
+  }
+}

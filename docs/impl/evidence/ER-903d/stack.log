@@ -1,0 +1,16 @@
+2026/11/22 18:16:36 stack using postgres + redis sessions, listening on 127.0.0.1:52148
+2026/11/22 18:16:36 stack listening on 127.0.0.1:52148
+redis: 2026/11/22 18:16:37 pool.go:770: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:52147: connect: connection refused
+redis: 2026/11/22 18:16:38 pool.go:770: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:52147: connect: connection refused
+redis: 2026/11/22 18:16:38 pool.go:770: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:52147: connect: connection refused
+redis: 2026/11/22 18:16:39 pool.go:770: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:52147: connect: connection refused
+2026/11/22 18:16:39 trace=n0QBSBG_MLqqeNLL code=700003 name=SRV_CACHE_UNAVAILABLE detail=redis: dial tcp 127.0.0.1:52147: connect: connection refused
+redis: 2026/11/22 18:16:39 pool.go:770: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:52147: connect: connection refused
+redis: 2026/11/22 18:16:40 pool.go:770: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:52147: connect: connection refused
+redis: 2026/11/22 18:16:40 pool.go:770: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:52147: connect: connection refused
+redis: 2026/11/22 18:16:40 pool.go:770: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:52147: connect: connection refused
+2026/11/22 18:16:40 trace=6OzinHtA8gurcbgd code=700007 name=ADMIN_SESSION_EXPIRED detail=unauthorized
+2026/11/22 18:16:42 trace=IbKCykzxIP1hZ0uM code=700007 name=ADMIN_SESSION_EXPIRED detail=unauthorized
+2026/11/22 18:16:43 trace=dPG5GJ-mY8gwfGex code=700002 name=SRV_DB_UNAVAILABLE detail=postgres: failed to connect to `user=postgres database=postgres`: 127.0.0.1:52146 (127.0.0.1): dial error: dial tcp 127.0.0.1:52146: connect: connection refused
+2026/11/22 18:16:43 trace=OLxUWTh-SqaGpGBq unhandled error: failed to connect to `user=postgres database=postgres`: 127.0.0.1:52146 (127.0.0.1): dial error: dial tcp 127.0.0.1:52146: connect: connection refused
+2026/11/22 18:16:44 stack shutting down

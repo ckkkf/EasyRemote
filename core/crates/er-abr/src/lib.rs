@@ -65,6 +65,12 @@ pub struct LinkFeedback {
     pub loss_pct: f32,
     pub rtt_ms: u32,
     pub queue_ms: u32,
+    /// 实测吞吐（kbps）；0 表示未知。
+    pub throughput_kbps: u32,
+    /// 播放缓冲/抖动缓冲（ms）。
+    pub buffer_ms: u32,
+    /// 编码队列积压帧数。
+    pub encode_queue: u32,
 }
 
 /// 一次决策。
@@ -132,19 +138,40 @@ impl AbrController {
     pub fn on_feedback(&mut self, fb: &LinkFeedback) -> Decision {
         self.since_change += 1;
 
-        let severe = fb.loss_pct > 8.0 || fb.queue_ms > 200;
-        let mild = fb.loss_pct > 2.0 || fb.queue_ms > 80 || fb.rtt_ms > 250;
-        let healthy = fb.loss_pct < 1.0 && fb.queue_ms < 40 && fb.rtt_ms < 120;
+        let severe_now =
+            fb.loss_pct > 8.0 || fb.queue_ms > 200 || fb.buffer_ms > 300 || fb.encode_queue > 8;
+        let throughput_low =
+            fb.throughput_kbps > 0 && fb.throughput_kbps < self.current().bitrate_kbps * 80 / 100;
+        let mild_now = fb.loss_pct > 2.0
+            || fb.queue_ms > 80
+            || fb.rtt_ms > 250
+            || fb.buffer_ms > 120
+            || fb.encode_queue > 4
+            || throughput_low;
+        let throughput_ok =
+            fb.throughput_kbps == 0 || fb.throughput_kbps >= self.current().bitrate_kbps * 90 / 100;
+        let healthy = fb.loss_pct < 1.0
+            && fb.queue_ms < 40
+            && fb.rtt_ms < 120
+            && fb.buffer_ms < 60
+            && fb.encode_queue <= 1
+            && throughput_ok;
 
-        // 迟滞：单周期的假丢包（周期边界/乱序）不应触发降档
-        self.severe_streak = if severe { self.severe_streak + 1 } else { 0 };
-        self.mild_streak = if mild && !severe {
+        // 降档激进（PRD 5.2.4）：严重拥塞当周期就降，不等待第二个周期。
+        // severe_streak 仍记录用于诊断，但不再当闸门；轻度拥塞保留两周期迟滞，
+        // 避免单个边界周期的假丢包也触发降档。
+        self.severe_streak = if severe_now {
+            self.severe_streak + 1
+        } else {
+            0
+        };
+        self.mild_streak = if mild_now && !severe_now {
             self.mild_streak + 1
         } else {
             0
         };
-        let severe = severe && self.severe_streak >= 2;
-        let mild = mild && self.mild_streak >= 2;
+        let severe = severe_now;
+        let mild = mild_now && self.mild_streak >= 2;
 
         if severe {
             self.healthy_streak = 0;
@@ -219,6 +246,9 @@ mod tests {
             loss_pct: loss,
             rtt_ms: rtt,
             queue_ms: queue,
+            throughput_kbps: 0,
+            buffer_ms: 0,
+            encode_queue: 0,
         }
     }
 
@@ -232,10 +262,14 @@ mod tests {
     #[test]
     fn severe_loss_drops_two_levels() {
         let mut c = AbrController::new(0);
-        // 迟滞后需连续两周期严重拥塞
-        c.on_feedback(&fb(15.0, 80, 10));
+        // PRD 5.2.4：严重拥塞单周期即降，一次连降两档。
         let d = c.on_feedback(&fb(15.0, 80, 10));
         assert!(d.changed);
+        assert_eq!(c.index(), 2);
+
+        // 同一周期不重复降档：下一次严重反馈要先跨过 min_interval。
+        let again = c.on_feedback(&fb(15.0, 80, 10));
+        assert!(!again.changed, "不允许一个反馈周期连降两次");
         assert_eq!(c.index(), 2);
     }
 
@@ -259,7 +293,7 @@ mod tests {
     #[test]
     fn queue_backlog_is_severe() {
         let mut c = AbrController::new(0);
-        c.on_feedback(&fb(0.5, 60, 250));
+        // 积压 >200ms 属于严重拥塞：单周期即降两档。
         c.on_feedback(&fb(0.5, 60, 250));
         assert_eq!(c.index(), 2);
     }
@@ -308,28 +342,27 @@ mod tests {
         }
     }
 
-    /// 单周期的假丢包（周期边界/乱序）不得触发降档：
-    /// 这是真实会话里 "0% 丢包也掉到最低档" 的直接原因。
+    /// PRD 5.2.4：严重拥塞单周期即降档，恢复后不再继续掉。
     #[test]
-    fn single_cycle_spike_does_not_downgrade() {
+    fn severe_single_cycle_downgrades() {
         let mut c = AbrController::new(0);
-        // 一个周期报 50% 丢包，紧接着恢复正常
-        c.on_feedback(&fb(50.0, 40, 10));
-        assert_eq!(c.index(), 0, "单周期尖峰不应降档");
-        let d = c.on_feedback(&fb(0.0, 40, 10));
-        assert!(!d.changed);
-        assert_eq!(c.index(), 0);
+        let d = c.on_feedback(&fb(20.0, 40, 10));
+        assert!(d.changed, "严重拥塞必须当周期降档");
+        assert_eq!(c.index(), 2);
+        let calm = c.on_feedback(&fb(0.0, 40, 10));
+        assert!(!calm.changed);
+        assert_eq!(c.index(), 2);
     }
 
-    /// 连续两周期严重拥塞才降档。
+    /// 轻度拥塞（2%~8% 丢包 / RTT 偏高）保留两周期迟滞，避免边界假丢包误降。
     #[test]
-    fn sustained_congestion_downgrades() {
+    fn mild_single_cycle_does_not_downgrade() {
         let mut c = AbrController::new(0);
-        c.on_feedback(&fb(20.0, 40, 10));
-        assert_eq!(c.index(), 0);
-        let d = c.on_feedback(&fb(20.0, 40, 10));
+        c.on_feedback(&fb(4.0, 80, 10));
+        assert_eq!(c.index(), 0, "轻度拥塞第一周期不降档");
+        let d = c.on_feedback(&fb(4.0, 80, 10));
         assert!(d.changed);
-        assert_eq!(c.index(), 2);
+        assert_eq!(c.index(), 1);
     }
 
     /// 棘轮回归：健康周期之间夹着单个噪声周期，仍然必须能升档。
@@ -373,5 +406,50 @@ mod tests {
             bottom
         );
         assert!(c.index() < bottom);
+    }
+    #[test]
+    fn low_throughput_blocks_upgrade() {
+        let mut c = AbrController::new(2);
+        for _ in 0..10 {
+            let mut fb = fb(0.0, 30, 10);
+            fb.throughput_kbps = 500;
+            let _ = c.on_feedback(&fb);
+        }
+        assert!(c.index() >= 2, "吞吐不足不得升档");
+    }
+
+    #[test]
+    fn buffer_and_encode_queue_are_congestion() {
+        let mut c = AbrController::new(0);
+        let mut fb = fb(0.0, 30, 10);
+        fb.buffer_ms = 350;
+        assert!(c.on_feedback(&fb).changed, "buffer>300 视为严重拥塞");
+        assert!(c.index() >= 1);
+    }
+
+    #[test]
+    fn property_decisions_stay_in_ladder() {
+        let mut c = AbrController::new(0);
+        let mut seed = 0x1234_5678u64;
+        for _ in 0..2000 {
+            seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1);
+            let loss = ((seed >> 8) % 2000) as f32 / 100.0;
+            let rtt = ((seed >> 16) % 600) as u32;
+            let queue = ((seed >> 24) % 400) as u32;
+            let fb = LinkFeedback {
+                loss_pct: loss,
+                rtt_ms: rtt,
+                queue_ms: queue,
+                throughput_kbps: ((seed >> 32) % 10000) as u32,
+                buffer_ms: ((seed >> 40) % 500) as u32,
+                encode_queue: ((seed >> 48) % 20) as u32,
+            };
+            let before = c.index();
+            let d = c.on_feedback(&fb);
+            assert!(c.index() < LADDER.len());
+            assert!(d.level.name == LADDER[c.index()].name);
+            assert!(c.index().saturating_sub(before) <= 2, "单次最多降两档");
+            assert!(before.saturating_sub(c.index()) <= 1, "单次最多升一档");
+        }
     }
 }

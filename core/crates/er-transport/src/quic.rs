@@ -9,6 +9,7 @@ use std::sync::Arc;
 use bytes::Bytes;
 use er_common::protocol::MediaHeader;
 use quinn::{ClientConfig, Connection, Endpoint, ServerConfig};
+use tokio::io::AsyncReadExt;
 
 use crate::{Channel, Frame, Stats, Transport, TransportError};
 
@@ -172,7 +173,9 @@ pub struct QuicTransport {
     conn: Connection,
     stats: std::sync::Arc<std::sync::Mutex<Stats>>,
     max_datagram: usize,
-    reliable_tx: Option<tokio::sync::mpsc::Sender<Vec<u8>>>,
+    control_tx: Option<tokio::sync::mpsc::Sender<Vec<u8>>>,
+    data_tx: Option<tokio::sync::mpsc::Sender<Vec<u8>>>,
+    reliable_rx: Option<tokio::sync::mpsc::Receiver<Frame>>,
     /// 已入队但尚未写完的可靠帧数，供 flush 等待。
     pending_reliable: std::sync::Arc<std::sync::atomic::AtomicUsize>,
 }
@@ -201,12 +204,16 @@ impl QuicTransport {
             .await
             .map_err(QuicError::Connection)?;
         let max = conn.max_datagram_size().unwrap_or(1200);
+        let stats = std::sync::Arc::new(std::sync::Mutex::new(Stats::default()));
+        let rx = spawn_reader(conn.clone(), stats.clone());
         Ok(Self {
             _endpoint: Some(endpoint),
             conn,
-            stats: std::sync::Arc::new(std::sync::Mutex::new(Stats::default())),
+            stats,
             max_datagram: max,
-            reliable_tx: None,
+            control_tx: None,
+            data_tx: None,
+            reliable_rx: Some(rx),
             pending_reliable: std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0)),
         })
     }
@@ -214,6 +221,11 @@ impl QuicTransport {
     /// 单帧上限（受 MTU 约束）。
     pub fn max_datagram_size(&self) -> usize {
         self.max_datagram
+    }
+
+    /// 当前 QUIC 连接的平滑 RTT（诊断/ADR 用）。
+    pub fn rtt(&self) -> std::time::Duration {
+        self.conn.rtt()
     }
 
     /// 对端地址。
@@ -224,48 +236,76 @@ impl QuicTransport {
     /// 由已建立的连接构造（listener 侧）。
     pub fn from_connection(conn: Connection) -> Self {
         let max = conn.max_datagram_size().unwrap_or(1200);
+        let stats = std::sync::Arc::new(std::sync::Mutex::new(Stats::default()));
+        let rx = spawn_reader(conn.clone(), stats.clone());
         Self {
             _endpoint: None,
             conn,
-            stats: std::sync::Arc::new(std::sync::Mutex::new(Stats::default())),
+            stats,
             max_datagram: max,
-            reliable_tx: None,
+            control_tx: None,
+            data_tx: None,
+            reliable_rx: Some(rx),
             pending_reliable: std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0)),
         }
     }
 
-    /// 惰性启动可靠写任务：保证控制帧按调用顺序发出。
-    fn ensure_writer(&mut self) {
-        if self.reliable_tx.is_some() {
+    /// 控制/数据各自使用一条长驻流，保证可靠有序且互不阻塞。
+    fn ensure_writer(&mut self, channel: Channel) {
+        let target = if channel == Channel::Data {
+            &mut self.data_tx
+        } else {
+            &mut self.control_tx
+        };
+        if target.is_some() {
             return;
         }
-        // 有界队列：对端不读流时不能无限堆内存（审查项 B1）
         let (tx, mut rx) = tokio::sync::mpsc::channel::<Vec<u8>>(RELIABLE_QUEUE_CAP);
         let conn = self.conn.clone();
         let stats = self.stats.clone();
         let pending = self.pending_reliable.clone();
         tokio::spawn(async move {
+            let result = if channel == Channel::Data {
+                match conn.open_bi().await {
+                    Ok((mut send, _recv)) => {
+                        let _ = send.write_all(&[channel as u8]).await;
+                        Some(send)
+                    }
+                    Err(_) => None,
+                }
+            } else {
+                match conn.open_uni().await {
+                    Ok(mut send) => {
+                        let _ = send.write_all(&[channel as u8]).await;
+                        Some(send)
+                    }
+                    Err(_) => None,
+                }
+            };
+            let Some(mut send) = result else {
+                return;
+            };
             while let Some(buf) = rx.recv().await {
-                let result = async {
-                    let mut send = conn.open_uni().await.ok()?;
+                let len = (buf.len() as u32).to_be_bytes();
+                let ok = async {
+                    send.write_all(&len).await.ok()?;
                     send.write_all(&buf).await.ok()?;
-                    send.finish().ok()?;
                     Some(())
                 }
-                .await;
+                .await
+                .is_some();
                 if let Ok(mut st) = stats.lock() {
-                    if result.is_some() {
+                    if ok {
                         st.sent_reliable += 1;
                         st.bytes_sent += buf.len() as u64;
                     } else {
-                        // 写失败必须可观测，不能静默丢帧
                         st.dropped_datagrams += 1;
                     }
                 }
                 pending.fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
             }
         });
-        self.reliable_tx = Some(tx);
+        *target = Some(tx);
     }
 
     /// 等待已入队的可靠帧全部写完（最多等待 timeout）。
@@ -317,25 +357,85 @@ impl QuicTransport {
 
     /// 异步接收一条可靠流（控制/数据）。
     pub async fn recv_reliable(&mut self) -> Option<Frame> {
-        let mut recv = self.conn.accept_uni().await.ok()?;
-        let buf = recv.read_to_end(64 * 1024).await.ok()?;
-        if buf.is_empty() {
-            return None;
+        self.reliable_rx.as_mut()?.recv().await
+    }
+}
+
+fn spawn_reader(
+    conn: Connection,
+    stats: std::sync::Arc<std::sync::Mutex<Stats>>,
+) -> tokio::sync::mpsc::Receiver<Frame> {
+    let (tx, rx) = tokio::sync::mpsc::channel::<Frame>(256);
+    tokio::spawn(async move {
+        loop {
+            tokio::select! {
+                uni = conn.accept_uni() => match uni {
+                    Ok(stream) => {
+                        let tx = tx.clone();
+                        let stats = stats.clone();
+                        tokio::spawn(read_stream(stream, tx, stats));
+                    }
+                    Err(_) => break,
+                },
+                bi = conn.accept_bi() => match bi {
+                    Ok((_send, stream)) => {
+                        let tx = tx.clone();
+                        let stats = stats.clone();
+                        tokio::spawn(read_stream(stream, tx, stats));
+                    }
+                    Err(_) => break,
+                },
+                _ = conn.closed() => break,
+            }
         }
-        let channel = match buf[0] {
-            2 => Channel::Control,
-            3 => Channel::Data,
-            _ => Channel::Control,
-        };
-        if let Ok(mut s) = self.stats.lock() {
+    });
+    rx
+}
+
+async fn read_stream<S>(
+    mut stream: S,
+    tx: tokio::sync::mpsc::Sender<Frame>,
+    stats: std::sync::Arc<std::sync::Mutex<Stats>>,
+) where
+    S: tokio::io::AsyncRead + Unpin + Send + 'static,
+{
+    let mut ch = [0u8; 1];
+    if stream.read_exact(&mut ch).await.is_err() {
+        return;
+    }
+    let channel = match ch[0] {
+        2 => Channel::Control,
+        3 => Channel::Data,
+        _ => return,
+    };
+    loop {
+        let mut len = [0u8; 4];
+        if stream.read_exact(&mut len).await.is_err() {
+            break;
+        }
+        let n = u32::from_be_bytes(len) as usize;
+        if n > 16 * 1024 * 1024 {
+            break;
+        }
+        let mut buf = vec![0u8; n];
+        if stream.read_exact(&mut buf).await.is_err() {
+            break;
+        }
+        if let Ok(mut s) = stats.lock() {
             s.recv_frames += 1;
-            s.bytes_recv += buf.len() as u64;
+            s.bytes_recv += n as u64;
         }
-        Some(Frame {
-            channel,
-            header: None,
-            payload: buf[1..].to_vec(),
-        })
+        if tx
+            .send(Frame {
+                channel,
+                header: None,
+                payload: buf,
+            })
+            .await
+            .is_err()
+        {
+            break;
+        }
     }
 }
 
@@ -373,14 +473,16 @@ impl Transport for QuicTransport {
         if !channel.is_reliable() {
             return Err(TransportError::Backpressure);
         }
-        self.ensure_writer();
-        let mut buf = Vec::with_capacity(1 + payload.len());
-        buf.push(channel as u8);
-        buf.extend_from_slice(&payload);
-        let Some(tx) = self.reliable_tx.as_ref() else {
+        self.ensure_writer(channel);
+        let tx = if channel == Channel::Data {
+            self.data_tx.as_ref()
+        } else {
+            self.control_tx.as_ref()
+        };
+        let Some(tx) = tx else {
             return Err(TransportError::Closed);
         };
-        match tx.try_send(buf) {
+        match tx.try_send(payload) {
             Ok(()) => {
                 self.pending_reliable
                     .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
@@ -488,5 +590,99 @@ mod tests {
             t.send_datagram(Channel::Video, hdr(1), vec![0u8; 32]),
             Err(TransportError::TooLarge)
         );
+    }
+    /// 控制必须可靠有序，且不被视频丢包/拥塞阻塞。
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn control_ordered_under_video_flood() {
+        let (tx, rx) = tokio::sync::oneshot::channel::<(SocketAddr, Vec<u8>)>();
+        let server = tokio::spawn(async move {
+            let listener = QuicListener::bind("127.0.0.1:0".parse().unwrap()).unwrap();
+            let addr = listener.local_addr();
+            let cert = listener.cert_der().to_vec();
+            tx.send((addr, cert)).unwrap();
+            let mut t = listener.accept().await.unwrap();
+            let mut got = Vec::new();
+            while got.len() < 10 {
+                if let Ok(Some(f)) =
+                    tokio::time::timeout(Duration::from_secs(5), t.recv_reliable()).await
+                {
+                    if f.channel == Channel::Control {
+                        got.push(String::from_utf8(f.payload).unwrap());
+                    }
+                }
+            }
+            got
+        });
+        let (addr, cert) = rx.await.unwrap();
+        let mut client = QuicTransport::connect("127.0.0.1:0".parse().unwrap(), addr, cert)
+            .await
+            .unwrap();
+        for i in 0..300u16 {
+            let _ = client.send_datagram(Channel::Video, hdr(i), vec![0u8; 900]);
+        }
+        for i in 0..10 {
+            client
+                .send_reliable(Channel::Control, format!("c{i}").into_bytes())
+                .unwrap();
+        }
+        let got = tokio::time::timeout(Duration::from_secs(5), server)
+            .await
+            .expect("timeout")
+            .unwrap();
+        let want: Vec<String> = (0..10).map(|i| format!("c{i}")).collect();
+        assert_eq!(got, want, "control stream must stay ordered");
+    }
+
+    /// 数据走独立 bidi stream：有背压，但不阻塞控制。
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn data_backpressure_does_not_block_control() {
+        let (tx, rx) = tokio::sync::oneshot::channel::<(SocketAddr, Vec<u8>)>();
+        let server = tokio::spawn(async move {
+            let listener = QuicListener::bind("127.0.0.1:0".parse().unwrap()).unwrap();
+            let addr = listener.local_addr();
+            let cert = listener.cert_der().to_vec();
+            tx.send((addr, cert)).unwrap();
+            let mut t = listener.accept().await.unwrap();
+            let mut data = Vec::new();
+            let mut ctrl = Vec::new();
+            while data.is_empty() || ctrl.is_empty() {
+                if let Ok(Some(f)) =
+                    tokio::time::timeout(Duration::from_secs(5), t.recv_reliable()).await
+                {
+                    match f.channel {
+                        Channel::Data => data.push(f.payload),
+                        Channel::Control => ctrl.push(f.payload),
+                        _ => {}
+                    }
+                }
+            }
+            (data, ctrl)
+        });
+        let (addr, cert) = rx.await.unwrap();
+        let mut client = QuicTransport::connect("127.0.0.1:0".parse().unwrap(), addr, cert)
+            .await
+            .unwrap();
+        client
+            .send_reliable(Channel::Data, b"hello".to_vec())
+            .unwrap();
+        let mut backpressure = 0;
+        for _ in 0..1000 {
+            if client
+                .send_reliable(Channel::Data, vec![7u8; 1024])
+                .is_err()
+            {
+                backpressure += 1;
+            }
+        }
+        assert!(backpressure > 0, "data queue must apply backpressure");
+        client
+            .send_reliable(Channel::Control, b"ping".to_vec())
+            .unwrap();
+        let (data, ctrl) = tokio::time::timeout(Duration::from_secs(5), server)
+            .await
+            .expect("timeout")
+            .unwrap();
+        assert!(data.iter().any(|p| p == b"hello"));
+        assert_eq!(ctrl, vec![b"ping".to_vec()]);
     }
 }

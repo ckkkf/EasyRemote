@@ -1,27 +1,29 @@
-import 'dart:io';
+@Tags(['e2e-desktop'])
+library;
 
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:easyremote_client/native.dart';
 
+import 'support/e2e_services.dart';
+
 /// 真实会话端到端（Dart → FFI → Rust → 真实网关 + 真实中继）。
-/// 需要 ER_GATEWAY_URL / ER_RELAY_ADDR 环境变量指向运行中的服务，
-/// 否则跳过（不算失败）。
+///
+/// 服务由 [E2eServices] 自动启动；缺服务时失败，不再因 env 缺失 skip。
 void main() {
-  final gw = Platform.environment['ER_GATEWAY_URL'];
-  final relay = Platform.environment['ER_RELAY_ADDR'];
-  final enabled = gw != null && relay != null;
+  E2eServices? services;
+  setUpAll(() async {
+    services = await E2eServices.start();
+  });
+  tearDownAll(() async {
+    await services?.stop();
+  });
 
   test('完整会话：登录→建会话→握手→加密→解码', () {
-    if (!enabled) {
-      // ignore: avoid_print
-      print('skip: ER_GATEWAY_URL / ER_RELAY_ADDR not set');
-      return;
-    }
     final runner = ErSessionRunner.load();
     final r = runner.run(
-      gatewayUrl: gw,
-      relayAddr: relay,
+      gatewayUrl: services!.gatewayUrl,
+      relayAddr: services!.relayAddr,
       phoneA: '13700009001',
       phoneB: '13700009002',
     );
@@ -33,6 +35,9 @@ void main() {
     expect(r['width'], greaterThan(0));
     expect(r['height'], greaterThan(0));
     expect(r['sealed_bytes'], greaterThan(r['encoded_bytes'] as int));
+    // ER-502b：回环应走 P2P；失败时明确回落 relay（可观测）。
+    expect(r['link'], anyOf('p2p', 'relay'), reason: 'link 必须上报');
+    expect(r['link'], 'p2p', reason: '回环候选应打洞成功');
   });
 
   test('扁平 JSON 解析正确', () {

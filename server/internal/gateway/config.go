@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/easyremote/server/internal/appconfig"
+	"github.com/easyremote/server/internal/contract"
 )
 
 // clientConfig 把运行时配置下发给客户端。
@@ -30,7 +31,7 @@ func (a *App) clientConfig(w http.ResponseWriter, r *http.Request) {
 		WriteErr(w, err)
 		return
 	}
-	httpx.OK(w, r, map[string]any{"config": nested})
+	httpx.OK(w, r, contract.ClientConfigResult{Config: nested})
 }
 
 // reflect 回显服务端观察到的客户端出口地址。

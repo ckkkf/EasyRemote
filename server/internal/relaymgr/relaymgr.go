@@ -20,6 +20,8 @@ type Ticket struct {
 	Self      string // 持票设备
 	Peer      string // 对端设备
 	ExpiresAt time.Time
+	// Epoch 是该设备最新的票据代号；重连换票后旧代号必须被拒。
+	Epoch int64
 }
 
 // Service 签发与校验票据。
@@ -56,6 +58,11 @@ func (s *Service) mac(payload string) string {
 
 // Issue 为 self 设备签发一张指向 peer 的票据。
 func (s *Service) Issue(sessionID, self, peer string) (string, *Ticket, error) {
+	return s.IssueWithEpoch(sessionID, self, peer, 0)
+}
+
+// IssueWithEpoch 签发带票据代号的票据；epoch=0 表示单机模式（不轮换）。
+func (s *Service) IssueWithEpoch(sessionID, self, peer string, epoch int64) (string, *Ticket, error) {
 	if sessionID == "" || self == "" || peer == "" {
 		return "", nil, errcode.New(errcode.SrvInternal, "issue: empty field")
 	}
@@ -63,9 +70,13 @@ func (s *Service) Issue(sessionID, self, peer string) (string, *Ticket, error) {
 		return "", nil, errcode.New(errcode.SrvInternal, err.Error())
 	}
 	exp := s.now().Add(s.ttl)
-	payload := strings.Join([]string{sessionID, self, peer, strconv.FormatInt(exp.Unix(), 10)}, "|")
+	fields := []string{sessionID, self, peer, strconv.FormatInt(exp.Unix(), 10)}
+	if epoch > 0 {
+		fields = append(fields, strconv.FormatInt(epoch, 10))
+	}
+	payload := strings.Join(fields, "|")
 	token := base64.RawURLEncoding.EncodeToString([]byte(payload)) + "." + s.mac(payload)
-	return token, &Ticket{SessionID: sessionID, Self: self, Peer: peer, ExpiresAt: exp}, nil
+	return token, &Ticket{SessionID: sessionID, Self: self, Peer: peer, ExpiresAt: exp, Epoch: epoch}, nil
 }
 
 // Verify 校验票据。
@@ -83,7 +94,7 @@ func (s *Service) Verify(token string) (*Ticket, error) {
 		return nil, errcode.New(errcode.ConnRelayUnavailable, "bad signature")
 	}
 	f := strings.Split(payload, "|")
-	if len(f) != 4 {
+	if len(f) != 4 && len(f) != 5 {
 		return nil, errcode.New(errcode.ConnRelayUnavailable, "bad fields")
 	}
 	exp, err := strconv.ParseInt(f[3], 10, 64)
@@ -93,5 +104,12 @@ func (s *Service) Verify(token string) (*Ticket, error) {
 	if s.now().Unix() > exp {
 		return nil, errcode.New(errcode.ConnRelayUnavailable, "ticket expired")
 	}
-	return &Ticket{SessionID: f[0], Self: f[1], Peer: f[2], ExpiresAt: time.Unix(exp, 0).UTC()}, nil
+	var epoch int64
+	if len(f) == 5 {
+		epoch, err = strconv.ParseInt(f[4], 10, 64)
+		if err != nil {
+			return nil, errcode.New(errcode.ConnRelayUnavailable, "bad epoch")
+		}
+	}
+	return &Ticket{SessionID: f[0], Self: f[1], Peer: f[2], ExpiresAt: time.Unix(exp, 0).UTC(), Epoch: epoch}, nil
 }

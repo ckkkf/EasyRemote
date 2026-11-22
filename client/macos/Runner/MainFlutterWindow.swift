@@ -9,6 +9,11 @@ class MainFlutterWindow: NSWindow {
     self.setFrame(windowFrame, display: true)
 
     RegisterGeneratedPlugins(registry: flutterViewController)
+    if let registrar = flutterViewController.engine.registrar(
+      forPlugin: "VideoTexturePlugin")
+    {
+      VideoTexturePlugin.register(with: registrar)
+    }
 
     super.awakeFromNib()
   }

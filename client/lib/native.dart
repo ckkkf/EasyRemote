@@ -14,8 +14,16 @@ typedef _SessionNewDart = Pointer<Void> Function();
 typedef _SessionFreeC = Void Function(Pointer<Void>);
 typedef _SessionFreeDart = void Function(Pointer<Void>);
 
-typedef _ScreenSizeC = Int32 Function(Pointer<Void>, Pointer<Uint32>, Pointer<Uint32>);
-typedef _ScreenSizeDart = int Function(Pointer<Void>, Pointer<Uint32>, Pointer<Uint32>);
+typedef _ScreenSizeC = Int32 Function(
+  Pointer<Void>,
+  Pointer<Uint32>,
+  Pointer<Uint32>,
+);
+typedef _ScreenSizeDart = int Function(
+  Pointer<Void>,
+  Pointer<Uint32>,
+  Pointer<Uint32>,
+);
 
 typedef _FrameSizeC = Int32 Function(Pointer<Void>);
 typedef _FrameSizeDart = int Function(Pointer<Void>);
@@ -25,12 +33,6 @@ typedef _GrabDart = int Function(Pointer<Void>, Pointer<Uint8>, int);
 
 typedef _EncodeC = Int32 Function(Pointer<Void>, Pointer<Uint8>, Size);
 typedef _EncodeDart = int Function(Pointer<Void>, Pointer<Uint8>, int);
-
-typedef _PrivacyC = Int32 Function(Pointer<Void>, Int32);
-typedef _PrivacyDart = int Function(Pointer<Void>, int);
-
-typedef _UniformC = Int32 Function(Pointer<Void>);
-typedef _UniformDart = int Function(Pointer<Void>);
 
 typedef _AbrC = Pointer<Utf8> Function(Pointer<Void>, Float, Uint32, Uint32);
 typedef _AbrDart = Pointer<Utf8> Function(Pointer<Void>, double, int, int);
@@ -62,25 +64,40 @@ typedef _BackendDart = Pointer<Utf8> Function(Pointer<Void>);
 
 class ErNative {
   ErNative._(this._lib)
-      : _new = _lib.lookupFunction<_SessionNewC, _SessionNewDart>('er_session_new'),
-        _free = _lib.lookupFunction<_SessionFreeC, _SessionFreeDart>('er_session_free'),
-        _screenSize = _lib.lookupFunction<_ScreenSizeC, _ScreenSizeDart>('er_screen_size'),
-        _frameSize = _lib.lookupFunction<_FrameSizeC, _FrameSizeDart>('er_frame_size'),
-        _grab = _lib.lookupFunction<_GrabC, _GrabDart>('er_grab_frame'),
-        _encode = _lib.lookupFunction<_EncodeC, _EncodeDart>('er_encode_last_frame'),
-        _privacy = _lib.lookupFunction<_PrivacyC, _PrivacyDart>('er_set_privacy'),
-        _uniform = _lib.lookupFunction<_UniformC, _UniformDart>('er_last_frame_uniform'),
-        _abr = _lib.lookupFunction<_AbrC, _AbrDart>('er_abr_update'),
-        _lastError = _lib.lookupFunction<_StrC, _StrDart>('er_last_error'),
-        _version = _lib.lookupFunction<_VersionC, _VersionDart>('er_version'),
-        _freeString = _lib.lookupFunction<_FreeStrC, _FreeStrDart>('er_free_string'),
-        _hwEncoder = _lib.lookupFunction<_HwEncoderC, _HwEncoderDart>(
-            'er_hardware_encoder_available'),
-        _encoderKind =
-            _lib.lookupFunction<_EncoderKindC, _EncoderKindDart>('er_encoder_kind'),
-        _grabAndEncode =
-            _lib.lookupFunction<_GrabEncodeC, _GrabEncodeDart>('er_grab_and_encode'),
-        _backend = _lib.lookupFunction<_BackendC, _BackendDart>('er_encoder_backend');
+    : _new = _lib.lookupFunction<_SessionNewC, _SessionNewDart>(
+        'er_session_new',
+      ),
+      _free = _lib.lookupFunction<_SessionFreeC, _SessionFreeDart>(
+        'er_session_free',
+      ),
+      _screenSize = _lib.lookupFunction<_ScreenSizeC, _ScreenSizeDart>(
+        'er_screen_size',
+      ),
+      _frameSize = _lib.lookupFunction<_FrameSizeC, _FrameSizeDart>(
+        'er_frame_size',
+      ),
+      _grab = _lib.lookupFunction<_GrabC, _GrabDart>('er_grab_frame'),
+      _encode = _lib.lookupFunction<_EncodeC, _EncodeDart>(
+        'er_encode_last_frame',
+      ),
+      _abr = _lib.lookupFunction<_AbrC, _AbrDart>('er_abr_update'),
+      _lastError = _lib.lookupFunction<_StrC, _StrDart>('er_last_error'),
+      _version = _lib.lookupFunction<_VersionC, _VersionDart>('er_version'),
+      _freeString = _lib.lookupFunction<_FreeStrC, _FreeStrDart>(
+        'er_free_string',
+      ),
+      _hwEncoder = _lib.lookupFunction<_HwEncoderC, _HwEncoderDart>(
+        'er_hardware_encoder_available',
+      ),
+      _encoderKind = _lib.lookupFunction<_EncoderKindC, _EncoderKindDart>(
+        'er_encoder_kind',
+      ),
+      _grabAndEncode = _lib.lookupFunction<_GrabEncodeC, _GrabEncodeDart>(
+        'er_grab_and_encode',
+      ),
+      _backend = _lib.lookupFunction<_BackendC, _BackendDart>(
+        'er_encoder_backend',
+      );
 
   final DynamicLibrary _lib;
 
@@ -92,8 +109,6 @@ class ErNative {
   final _FrameSizeDart _frameSize;
   final _GrabDart _grab;
   final _EncodeDart _encode;
-  final _PrivacyDart _privacy;
-  final _UniformDart _uniform;
   final _AbrDart _abr;
   final _StrDart _lastError;
   final _VersionDart _version;
@@ -113,7 +128,8 @@ class ErNative {
     // Contents/Frameworks/（或 Contents/MacOS/），必须按可执行文件位置定位。
     final bundleLib = _bundleDylibPath();
     final candidates = <String>[
-      if (Platform.environment['ER_CORE_LIB'] != null) Platform.environment['ER_CORE_LIB']!,
+      if (Platform.environment['ER_CORE_LIB'] != null)
+        Platform.environment['ER_CORE_LIB']!,
       if (bundleLib != null) bundleLib,
       if (isWindows) ...<String>[
         'er_ffi.dll',
@@ -132,7 +148,9 @@ class ErNative {
         }
       }
     }
-    throw StateError('er_ffi library not found; tried ' + candidates.join(', '));
+    throw StateError(
+      'er_ffi library not found; tried ' + candidates.join(', '),
+    );
   }
 
   String version() {
@@ -193,7 +211,12 @@ class NativeSession {
     try {
       final written = _native._grab(_handle, buf, size);
       if (written < 0) {
-        throw StateError('grab failed (' + written.toString() + '): ' + _native.lastErrorOf(_handle));
+        throw StateError(
+          'grab failed (' +
+              written.toString() +
+              '): ' +
+              _native.lastErrorOf(_handle),
+        );
       }
       return Uint8List.fromList(buf.asTypedList(written));
     } finally {
@@ -207,7 +230,12 @@ class NativeSession {
     try {
       final n = _native._encode(_handle, buf, capacity);
       if (n < 0) {
-        throw StateError('encode failed (' + n.toString() + '): ' + _native.lastErrorOf(_handle));
+        throw StateError(
+          'encode failed (' +
+              n.toString() +
+              '): ' +
+              _native.lastErrorOf(_handle),
+        );
       }
       return Uint8List.fromList(buf.asTypedList(n));
     } finally {
@@ -216,12 +244,6 @@ class NativeSession {
   }
 
   /// 开关隐私屏。
-  void setPrivacy(bool enabled) {
-    _native._privacy(_handle, enabled ? 1 : 0);
-  }
-
-  /// 最近一帧是否已被抹平（隐私屏自检）。
-  bool lastFrameUniform() => _native._uniform(_handle) == 1;
 
   /// 喂一次链路反馈，返回 ABR 决策。
   Map<String, dynamic> updateAbr({
@@ -234,7 +256,10 @@ class NativeSession {
     _native._freeString(p);
     final name = RegExp('"name":"([^"]+)"').firstMatch(raw)?.group(1) ?? '';
     final bitrate =
-        int.tryParse(RegExp('"bitrate_kbps":([0-9]+)').firstMatch(raw)?.group(1) ?? '') ?? 0;
+        int.tryParse(
+          RegExp('"bitrate_kbps":([0-9]+)').firstMatch(raw)?.group(1) ?? '',
+        ) ??
+        0;
     final changed = raw.contains('"changed":true');
     return {'name': name, 'bitrate_kbps': bitrate, 'changed': changed};
   }
@@ -248,7 +273,12 @@ class NativeSession {
     try {
       final n = _native._grabAndEncode(_handle, buf, capacity);
       if (n < 0) {
-        throw StateError('grab+encode failed (' + n.toString() + '): ' + _native.lastErrorOf(_handle));
+        throw StateError(
+          'grab+encode failed (' +
+              n.toString() +
+              '): ' +
+              _native.lastErrorOf(_handle),
+        );
       }
       return Uint8List.fromList(buf.asTypedList(n));
     } finally {
@@ -287,20 +317,41 @@ class NativeSession {
 /// 它不持有任何句柄，调用完即返回结果。
 class ErSessionRunner {
   ErSessionRunner._(this._lib)
-      : _runPair = _lib.lookupFunction<
-            Pointer<Utf8> Function(Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>,
-                Pointer<Utf8>),
-            Pointer<Utf8> Function(Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>,
-                Pointer<Utf8>)>('er_run_pair_session'),
-        _freeString = _lib.lookupFunction<Void Function(Pointer<Utf8>), void Function(Pointer<Utf8>)>(
-            'er_free_string');
+    : _runPair = _lib
+          .lookupFunction<
+            Pointer<Utf8> Function(
+              Pointer<Utf8>,
+              Pointer<Utf8>,
+              Pointer<Utf8>,
+              Pointer<Utf8>,
+              Pointer<Utf8>,
+            ),
+            Pointer<Utf8> Function(
+              Pointer<Utf8>,
+              Pointer<Utf8>,
+              Pointer<Utf8>,
+              Pointer<Utf8>,
+              Pointer<Utf8>,
+            )
+          >('er_run_pair_session'),
+      _freeString = _lib
+          .lookupFunction<
+            Void Function(Pointer<Utf8>),
+            void Function(Pointer<Utf8>)
+          >('er_free_string');
 
   final DynamicLibrary _lib;
 
   /// 供其他绑定复用同一个动态库句柄。
   DynamicLibrary get libHandle => _lib;
-  final Pointer<Utf8> Function(Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>,
-      Pointer<Utf8>) _runPair;
+  final Pointer<Utf8> Function(
+    Pointer<Utf8>,
+    Pointer<Utf8>,
+    Pointer<Utf8>,
+    Pointer<Utf8>,
+    Pointer<Utf8>,
+  )
+  _runPair;
   final void Function(Pointer<Utf8>) _freeString;
 
   static ErSessionRunner load() {
@@ -316,9 +367,13 @@ class ErSessionRunner {
     required String phoneB,
     String smsCode = '123456',
   }) {
-    final args = [gatewayUrl, relayAddr, phoneA, phoneB, smsCode]
-        .map((s) => s.toNativeUtf8())
-        .toList();
+    final args = [
+      gatewayUrl,
+      relayAddr,
+      phoneA,
+      phoneB,
+      smsCode,
+    ].map((s) => s.toNativeUtf8()).toList();
     try {
       final p = _runPair(args[0], args[1], args[2], args[3], args[4]);
       final raw = p.toDartString();
@@ -357,30 +412,82 @@ class ErSessionRunner {
 ///
 /// 被控端通过信令自行发现会话；主控不需要知道 host_id。
 class ErHostLink {
-  ErHostLink._(this._lib)
-      : _prepare = _lib.lookupFunction<
-            Pointer<Utf8> Function(Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>),
-            Pointer<Utf8> Function(Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>,
-                Pointer<Utf8>)>('er_host_prepare'),
-        _serve = _lib.lookupFunction<
-            Pointer<Utf8> Function(Pointer<Utf8>, Pointer<Utf8>, Uint32, Uint32),
-            Pointer<Utf8> Function(Pointer<Utf8>, Pointer<Utf8>, int,
-                int)>('er_host_serve'),
-        _connect = _lib.lookupFunction<
-            Pointer<Utf8> Function(Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>,
-                Pointer<Utf8>, Pointer<Utf8>, Uint32),
-            Pointer<Utf8> Function(Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>,
-                Pointer<Utf8>, Pointer<Utf8>, int)>('er_device_connect'),
-        _release = _lib.lookupFunction<Int32 Function(Pointer<Utf8>), int Function(Pointer<Utf8>)>(
-            'er_host_release'),
-        _freeString = _lib.lookupFunction<Void Function(Pointer<Utf8>), void Function(Pointer<Utf8>)>(
-            'er_free_string');
+  ErHostLink._(DynamicLibrary lib)
+    : _prepare = lib
+          .lookupFunction<
+            Pointer<Utf8> Function(
+              Pointer<Utf8>,
+              Pointer<Utf8>,
+              Pointer<Utf8>,
+              Pointer<Utf8>,
+            ),
+            Pointer<Utf8> Function(
+              Pointer<Utf8>,
+              Pointer<Utf8>,
+              Pointer<Utf8>,
+              Pointer<Utf8>,
+            )
+          >('er_host_prepare'),
+      _serve = lib
+          .lookupFunction<
+            Pointer<Utf8> Function(
+              Pointer<Utf8>,
+              Pointer<Utf8>,
+              Uint32,
+              Uint32,
+            ),
+            Pointer<Utf8> Function(Pointer<Utf8>, Pointer<Utf8>, int, int)
+          >('er_host_serve'),
+      _connect = lib
+          .lookupFunction<
+            Pointer<Utf8> Function(
+              Pointer<Utf8>,
+              Pointer<Utf8>,
+              Pointer<Utf8>,
+              Pointer<Utf8>,
+              Pointer<Utf8>,
+              Pointer<Utf8>,
+              Uint32,
+            ),
+            Pointer<Utf8> Function(
+              Pointer<Utf8>,
+              Pointer<Utf8>,
+              Pointer<Utf8>,
+              Pointer<Utf8>,
+              Pointer<Utf8>,
+              Pointer<Utf8>,
+              int,
+            )
+          >('er_device_connect'),
+      _release = lib
+          .lookupFunction<
+            Int32 Function(Pointer<Utf8>),
+            int Function(Pointer<Utf8>)
+          >('er_host_release'),
+      _freeString = lib
+          .lookupFunction<
+            Void Function(Pointer<Utf8>),
+            void Function(Pointer<Utf8>)
+          >('er_free_string');
 
-  final DynamicLibrary _lib;
-  final Pointer<Utf8> Function(Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>) _prepare;
+  final Pointer<Utf8> Function(
+    Pointer<Utf8>,
+    Pointer<Utf8>,
+    Pointer<Utf8>,
+    Pointer<Utf8>,
+  )
+  _prepare;
   final Pointer<Utf8> Function(Pointer<Utf8>, Pointer<Utf8>, int, int) _serve;
-  final Pointer<Utf8> Function(Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>,
-      Pointer<Utf8>, Pointer<Utf8>, int) _connect;
+  final Pointer<Utf8> Function(
+    Pointer<Utf8>,
+    Pointer<Utf8>,
+    Pointer<Utf8>,
+    Pointer<Utf8>,
+    Pointer<Utf8>,
+    Pointer<Utf8>,
+    int,
+  )
+  _connect;
   final int Function(Pointer<Utf8>) _release;
   final void Function(Pointer<Utf8>) _freeString;
 
@@ -396,7 +503,8 @@ class ErHostLink {
     final args = _args([gatewayUrl, relayAddr, phone, smsCode]);
     try {
       return ErSessionRunner.parseFlatJson(
-          _call(() => _prepare(args[0], args[1], args[2], args[3])));
+        _call(() => _prepare(args[0], args[1], args[2], args[3])),
+      );
     } finally {
       _free(args);
     }
@@ -412,7 +520,8 @@ class ErHostLink {
     final args = _args([hostId, signalBase]);
     try {
       return ErSessionRunner.parseFlatJson(
-          _call(() => _serve(args[0], args[1], frames, timeoutSecs)));
+        _call(() => _serve(args[0], args[1], frames, timeoutSecs)),
+      );
     } finally {
       _free(args);
     }
@@ -428,10 +537,28 @@ class ErHostLink {
     String smsCode = '123456',
     int frames = 5,
   }) {
-    final args = _args([gatewayUrl, relayAddr, phone, deviceCode, captcha, smsCode]);
+    final args = _args([
+      gatewayUrl,
+      relayAddr,
+      phone,
+      deviceCode,
+      captcha,
+      smsCode,
+    ]);
     try {
       return ErSessionRunner.parseFlatJson(
-          _call(() => _connect(args[0], args[1], args[2], args[3], args[4], args[5], frames)));
+        _call(
+          () => _connect(
+            args[0],
+            args[1],
+            args[2],
+            args[3],
+            args[4],
+            args[5],
+            frames,
+          ),
+        ),
+      );
     } finally {
       _free(args);
     }

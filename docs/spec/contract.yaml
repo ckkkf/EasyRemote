@@ -3,7 +3,8 @@
 # 规则：
 #   1. 这份文件是接口形状的唯一来源。改接口先改这里，再跑 node scripts/gen-contract.mjs。
 #   2. 生成物：server/internal/contract/types_gen.go / web-admin/src/contract.ts / client/lib/contract.dart
-#   3. 类型写法：string | int | bool | time | map<string> | any | 类型名 | list<类型>，末尾加 ? 表示可选。
+#   3. 类型写法：string | int | int64 | bool | time | map<值类型> | 类型名 | list<类型>，末尾加 ? 表示可选。
+#      端点 response 额外允许 binary（文件字节流，不是 JSON 信封）。any 是待收敛占位，禁止出现在完成态。
 #   4. 成功响应统一信封 {code:0, name:"OK", data, trace_id}；错误信封见 docs/spec/error-codes.md。
 #   5. any 是待收敛的占位：网关侧业务体尚未逐个定型，先用 any 登记路由与信封，类型后续逐条替换。
 #   6. 路由清单必须与代码一致（scripts/check-routes.mjs 会校验，--strict 下不一致即红）。
@@ -69,7 +70,13 @@ types:
     token: string
     username: string
     role: string
+    permissions: list<string>
     expires_at: time
+  KillSessionResult:
+    closed: bool
+    propagated: bool
+    audited: bool
+    warning: string?
   ConfigField:
     key: string
     kind: string
@@ -83,8 +90,119 @@ types:
   ConfigPutResult:
     config: map<string>
     audited: bool
+  LoginResult:
+    token: string
+    account_id: string
+  DeviceItem:
+    device_code: string
+    raw_code: string
+    platform: string
+    online: bool
+    last_seen: time
+  DeviceListResult:
+    devices: list<DeviceItem>
+  VerifyCodeResult:
+    code: string
+    expires_at: time
+  # GW-06 请求成功只表示会话已登记；authorized 由被控端本机同意后产生。
+  ConnectResult:
+    session_id: string
+    state: string
+    trusted: bool
+  ConsentResult:
+    session_id: string
+    state: string
+    auth_expire_at: time
+  SessionStateResult:
+    session_id: string
+    state: string
+    reason: string
+  SessionKeysResult:
+    session_id: string
+    controller_id: string
+    target_id: string
+    controller_pubkey: string
+    target_pubkey: string
+  RelayTicketResult:
+    ticket: string
+    self_device: string
+  EmailCodeResult:
+    ok: bool
+    email: string
+  EmailLoginResult:
+    token: string
+    account_id: string
+    email: string
+  AssistCreateResult:
+    code: string
+    expires_at: time
+    target_device_id: string
+    ttl_seconds: int
+  AssistRedeemResult:
+    session_id: string
+    state: string
+    target_id: string
+  ReflectResult:
+    ip: string
+    port: int
+    source: string
+    via: string
+    at_unix: int64
+  FileRow:
+    id: string
+    account_id: string
+    device_id: string
+    name: string
+    size: int64
+    sha256: string
+    created_at: time
+  FileUploadResult:
+    file: FileRow
+  # GET /v1/files 列表（契约端点待 ER-013 补登记）。
+  FileListResult:
+    files: list<FileRow>
+    limit: int
+    offset: int
+  FileDeletedResult:
+    ok: bool
+    deleted: bool
+  FileTicketResult:
+    url: string
+    expires_at: time
+    name: string
+  SessionLimits:
+    max_minutes: int
+  FileLimits:
+    max_bytes: int64
+  DiagConfig:
+    auto_refresh_secs: int
+  ClientFlags:
+    force_update: bool
+  # capabilities: 能力台账的只读布尔表，key 来自 docs/spec/capabilities.yaml。
+  RuntimeEndpoints:
+    gateway_url: string
+    signal_url: string
+    relay_addr: string
+    stun_url: string
+    webtransport_url: string
+    tls_required: bool
+  ClientRuntimeConfig:
+    endpoints: RuntimeEndpoints
+    session: SessionLimits
+    file: FileLimits
+    diag: DiagConfig
+    client: ClientFlags
+    capabilities: map<bool>
+  ClientConfigResult:
+    config: ClientRuntimeConfig
 
 endpoints:
+  SYS-02:
+    method: GET
+    path: /readyz
+    auth: none
+    response: OkResult
+    errors: SRV_DB_UNAVAILABLE, SRV_CACHE_UNAVAILABLE
   SYS-01:
     method: GET
     path: /healthz
@@ -137,7 +255,7 @@ endpoints:
     method: POST
     path: /admin/v1/sessions/kill
     auth: admin
-    response: OkResult
+    response: KillSessionResult
     errors: ADMIN_SESSION_EXPIRED, ADMIN_FORBIDDEN, ADMIN_REASON_REQUIRED
   ADM-09:
     method: GET
@@ -167,13 +285,13 @@ endpoints:
     method: POST
     path: /v1/auth/login
     auth: none
-    response: any
+    response: LoginResult
     errors: AUTH_INVALID_CREDENTIAL, AUTH_TOO_MANY_ATTEMPTS
   GW-03:
     method: GET
     path: /v1/devices
     auth: bearer
-    response: any
+    response: DeviceListResult
     errors: AUTH_TOKEN_EXPIRED, SRV_INTERNAL
   # 请求体：BindRequest（platform 必填语义见上；device_id/device_token 可选，用于幂等复用）。
   GW-04:
@@ -186,91 +304,97 @@ endpoints:
     method: POST
     path: /v1/devices/verify-code
     auth: device
-    response: any
+    response: VerifyCodeResult
     errors: CONN_DEVICE_NOT_FOUND, ADMIN_FORBIDDEN
   GW-06:
     method: POST
     path: /v1/connect/request
     auth: bearer
-    response: any
+    response: ConnectResult
     errors: CONN_DEVICE_NOT_FOUND, CONN_DEVICE_OFFLINE, CONN_CAPTCHA_INVALID, CONN_RATE_LIMITED
   GW-07:
     method: POST
     path: /v1/connect/consent
     auth: device
-    response: any
+    response: ConsentResult
     errors: CONN_DEVICE_NOT_FOUND, ADMIN_FORBIDDEN
+  # 状态查询是只读 GET（客户端/核心均按 query 读取）。
   GW-08:
-    method: POST
+    method: GET
     path: /v1/connect/status
     auth: bearer
-    response: any
+    response: SessionStateResult
     errors: SESSION_NOT_FOUND, AUTH_TOKEN_EXPIRED
   GW-09:
     method: POST
     path: /v1/devices/identity
     auth: device
-    response: any
+    response: OkResult
     errors: CONN_DEVICE_NOT_FOUND, ADMIN_FORBIDDEN
+  # 公钥读取是只读 GET（会话双方凭设备凭证查询）。
   GW-10:
-    method: POST
+    method: GET
     path: /v1/connect/keys
     auth: bearer
-    response: any
+    response: SessionKeysResult
     errors: SESSION_NOT_FOUND, AUTH_TOKEN_EXPIRED
   GW-11:
     method: POST
     path: /v1/relay/ticket
     auth: device
-    response: any
+    response: RelayTicketResult
     errors: SESSION_NOT_FOUND, SESSION_AUTH_WINDOW_EXCEEDED, ADMIN_FORBIDDEN
   GW-12:
     method: POST
     path: /v1/auth/email/code
     auth: none
-    response: any
+    response: EmailCodeResult
     errors: AUTH_INVALID_CREDENTIAL, AUTH_SMS_RATE_LIMITED
   GW-13:
     method: POST
     path: /v1/auth/email/login
     auth: none
-    response: any
+    response: EmailLoginResult
     errors: AUTH_INVALID_CREDENTIAL, AUTH_TOO_MANY_ATTEMPTS
   GW-14:
     method: POST
     path: /v1/files
     auth: bearer
-    response: any
+    response: FileUploadResult
     errors: AUTH_TOKEN_EXPIRED, FILE_READ_FAILED, CONN_RATE_LIMITED
   GW-15:
     method: GET
     path: /v1/files/
     auth: bearer
-    response: any
+    # 下载返回文件字节流（octet-stream），不是 JSON 信封；见文件下载实现。
+    response: binary
     errors: AUTH_TOKEN_EXPIRED, FILE_NOT_FOUND, ADMIN_FORBIDDEN
   GW-16:
     method: POST
     path: /v1/assist/create
     auth: bearer
-    response: any
+    response: AssistCreateResult
     errors: CONN_DEVICE_NOT_FOUND, ADMIN_FORBIDDEN, CONN_RATE_LIMITED
   GW-17:
     method: POST
     path: /v1/assist/redeem
     auth: bearer
-    response: any
+    response: AssistRedeemResult
     errors: CONN_ASSIST_CODE_INVALID, CONN_ASSIST_CODE_USED, CONN_ASSIST_CODE_EXPIRED, CONN_SELF_CONNECT
+  # data.config.capabilities 是只读布尔表，key 来自 docs/spec/capabilities.yaml
+  # 生成物；服务端只能报告/关闭，不能打开未成熟能力。
   GW-18:
     method: GET
     path: /v1/config
     auth: none
-    response: any
+    response: ClientConfigResult
     errors: SRV_INTERNAL
+  # 出口地址回显是只读 GET（客户端诊断页直接查询）。
   GW-19:
-    method: POST
+    method: GET
     path: /v1/net/reflect
     auth: none
-    response: any
+    response: ReflectResult
     errors: SRV_INTERNAL
   GW-20:
     # 被控端设置「临时密码」：长期有效、校验不消费（对比 GW-07 的一次性验证码）。
@@ -278,5 +402,39 @@ endpoints:
     method: POST
     path: /v1/devices/password
     auth: bearer
-    response: any
+    response: OkResult
     errors: CONN_DEVICE_NOT_FOUND, CONN_CAPTCHA_INVALID, AUTH_TOKEN_EXPIRED
+  # 会话内任一端主动结束；服务端写 closed 并向双方传播。
+  GW-25:
+    method: POST
+    path: /v1/sessions/close
+    auth: device
+    response: SessionStateResult
+    errors: SESSION_NOT_FOUND, ADMIN_FORBIDDEN
+  # 数据面就绪：双方各自在握手完成后调用；两端都 ready 才进入 active。
+  GW-24:
+    method: POST
+    path: /v1/sessions/ready
+    auth: device
+    response: SessionStateResult
+    errors: SESSION_NOT_FOUND, ADMIN_FORBIDDEN, SESSION_AUTH_WINDOW_EXCEEDED
+  # 文件列表（与 GW-14 同路径不同方法）；分页由存储层完成，limit/offset 透传。
+  GW-21:
+    method: GET
+    path: /v1/files
+    auth: bearer
+    response: FileListResult
+    errors: AUTH_TOKEN_EXPIRED, SRV_INTERNAL
+  # 文件子资源（路径带 {id}；契约用集合前缀 + method 表达）。
+  GW-22:
+    method: DELETE
+    path: /v1/files/
+    auth: bearer
+    response: FileDeletedResult
+    errors: AUTH_TOKEN_EXPIRED, FILE_NOT_FOUND, ADMIN_FORBIDDEN
+  GW-23:
+    method: POST
+    path: /v1/files/
+    auth: bearer
+    response: FileTicketResult
+    errors: AUTH_TOKEN_EXPIRED, FILE_NOT_FOUND, CONN_DEVICE_NOT_FOUND

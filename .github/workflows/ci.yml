@@ -35,10 +35,20 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
-      - name: 生成物一致性（错误码 / 契约）
+      - name: 生成物一致性（错误码 / 契约 / 能力台账）
         run: |
           node scripts/gen-errors.mjs --check
           node scripts/gen-contract.mjs --check
+          node scripts/gen-capabilities.mjs --check
+
+      - name: 闸门自测（步骤清单与 CI 对照）
+        run: node --test scripts/tests/*.test.mjs
+
+      - name: 禁止模式（httpx / 裸 map，存量基线只减不增）
+        run: node scripts/check-forbidden.mjs
+
+      - name: 版本一致性
+        run: node scripts/check-version.mjs
 
       - name: 路由清单 vs 契约
         run: node scripts/check-routes.mjs --strict
@@ -77,6 +87,8 @@ jobs:
           done
       - name: 单元测试
         run: cd server && go test -race -coverprofile=cover.out ./...
+      - name: 响应信封契约（严格）
+        run: cd server && ER_ENVELOPE_STRICT=1 go test ./internal/adminhttp/ -run TestAdminEnvelopeContract
       - name: 覆盖率摘要
         run: |
           cd server
@@ -108,10 +120,8 @@ jobs:
             libwayland-dev libpipewire-0.3-dev libgbm-dev libdrm-dev
       - name: 格式
         run: cargo fmt --all --manifest-path core/Cargo.toml -- --check
-      - name: Clippy
-        # 存量代码尚有约 30 处 lint（未使用 import、可简写表达式等），暂不阻塞 CI；
-        # 治理完成后改成 -- -D warnings
-        run: cargo clippy --manifest-path core/Cargo.toml --workspace --all-targets
+      - name: Clippy（严格：warning 即失败）
+        run: cargo clippy --manifest-path core/Cargo.toml --workspace --all-targets -- -D warnings
       - name: 测试
         run: cargo test --manifest-path core/Cargo.toml --workspace
 
@@ -132,8 +142,35 @@ jobs:
       - run: npm ci
       - name: 类型检查
         run: npx tsc --noEmit
+      - name: 单元测试
+        run: npm test -- --run
       - name: 构建
         run: npm run build
+
+  # ---------------------------------------------------------------- Flutter 客户端
+  flutter:
+    name: Flutter 客户端
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: client
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: server/go.sum
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - name: 格式（生成物除外）
+        run: find lib test -name '*.dart' ! -name '*_gen.dart' ! -name 'contract.dart' -print0 | xargs -0 dart format --output=none --set-exit-if-changed
+      - name: 静态分析（error/warning 必须为 0）
+        run: flutter analyze
+      - name: 单元与组件测试（Linux 排除桌面 E2E）
+        run: flutter test --concurrency=1 --exclude-tags e2e-desktop
       - uses: actions/upload-artifact@v7
         with:
           name: web-admin-dist

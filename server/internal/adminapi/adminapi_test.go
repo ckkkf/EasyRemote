@@ -84,10 +84,10 @@ func TestKillSessionRequiresReasonAndAudits(t *testing.T) {
 	se, _ := sess.Request(ctx(), "c1", "t1")
 	_, _ = sess.Consent(ctx(), se.ID, true, "")
 
-	if err := s.KillSession(ctx(), act, se.ID, ""); !errcode.Is(err, errcode.AdminReasonRequired) {
+	if _, err := s.KillSession(ctx(), act, se.ID, ""); !errcode.Is(err, errcode.AdminReasonRequired) {
 		t.Fatalf("want reason required, got %v", err)
 	}
-	if err := s.KillSession(ctx(), act, se.ID, "user report"); err != nil {
+	if _, err := s.KillSession(ctx(), act, se.ID, "user report"); err != nil {
 		t.Fatal(err)
 	}
 	got, _ := sess.Get(ctx(), se.ID)
@@ -102,7 +102,7 @@ func TestKillSessionRequiresReasonAndAudits(t *testing.T) {
 func TestUserListMasksPhone(t *testing.T) {
 	s, _, _ := setup(t)
 	act := Actor{Username: "ops", Role: RoleOps}
-	list, err := s.ListUsers(ctx(), act)
+	list, err := s.ListUsers(ctx(), act, store.Page{Limit: 200})
 	if err != nil {
 		t.Fatal(err)
 	}

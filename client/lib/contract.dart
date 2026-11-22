@@ -212,19 +212,43 @@ class AdminSession {
     required this.token,
     required this.username,
     required this.role,
+    required this.permissions,
     required this.expiresAt,
   });
 
   final String token;
   final String username;
   final String role;
+  final List<String> permissions;
   final String expiresAt;
 
   factory AdminSession.fromJson(Map<String, dynamic> json) => AdminSession(
     token: json['token'] as String,
     username: json['username'] as String,
     role: json['role'] as String,
+    permissions: (json['permissions'] as List<dynamic>? ?? const []).map((e) => e as String).toList(),
     expiresAt: json['expires_at'] as String,
+  );
+}
+
+class KillSessionResult {
+  const KillSessionResult({
+    required this.closed,
+    required this.propagated,
+    required this.audited,
+    this.warning,
+  });
+
+  final bool closed;
+  final bool propagated;
+  final bool audited;
+  final String? warning;
+
+  factory KillSessionResult.fromJson(Map<String, dynamic> json) => KillSessionResult(
+    closed: json['closed'] as bool,
+    propagated: json['propagated'] as bool,
+    audited: json['audited'] as bool,
+    warning: json['warning'] as String?,
   );
 }
 
@@ -285,6 +309,468 @@ class ConfigPutResult {
   );
 }
 
+class LoginResult {
+  const LoginResult({
+    required this.token,
+    required this.accountID,
+  });
+
+  final String token;
+  final String accountID;
+
+  factory LoginResult.fromJson(Map<String, dynamic> json) => LoginResult(
+    token: json['token'] as String,
+    accountID: json['account_id'] as String,
+  );
+}
+
+class DeviceItem {
+  const DeviceItem({
+    required this.deviceCode,
+    required this.rawCode,
+    required this.platform,
+    required this.online,
+    required this.lastSeen,
+  });
+
+  final String deviceCode;
+  final String rawCode;
+  final String platform;
+  final bool online;
+  final String lastSeen;
+
+  factory DeviceItem.fromJson(Map<String, dynamic> json) => DeviceItem(
+    deviceCode: json['device_code'] as String,
+    rawCode: json['raw_code'] as String,
+    platform: json['platform'] as String,
+    online: json['online'] as bool,
+    lastSeen: json['last_seen'] as String,
+  );
+}
+
+class DeviceListResult {
+  const DeviceListResult({
+    required this.devices,
+  });
+
+  final List<DeviceItem> devices;
+
+  factory DeviceListResult.fromJson(Map<String, dynamic> json) => DeviceListResult(
+    devices: (json['devices'] as List<dynamic>? ?? const []).map((e) => e as DeviceItem).toList(),
+  );
+}
+
+class VerifyCodeResult {
+  const VerifyCodeResult({
+    required this.code,
+    required this.expiresAt,
+  });
+
+  final String code;
+  final String expiresAt;
+
+  factory VerifyCodeResult.fromJson(Map<String, dynamic> json) => VerifyCodeResult(
+    code: json['code'] as String,
+    expiresAt: json['expires_at'] as String,
+  );
+}
+
+class ConnectResult {
+  const ConnectResult({
+    required this.sessionID,
+    required this.state,
+    required this.trusted,
+  });
+
+  final String sessionID;
+  final String state;
+  final bool trusted;
+
+  factory ConnectResult.fromJson(Map<String, dynamic> json) => ConnectResult(
+    sessionID: json['session_id'] as String,
+    state: json['state'] as String,
+    trusted: json['trusted'] as bool,
+  );
+}
+
+class ConsentResult {
+  const ConsentResult({
+    required this.sessionID,
+    required this.state,
+    required this.authExpireAt,
+  });
+
+  final String sessionID;
+  final String state;
+  final String authExpireAt;
+
+  factory ConsentResult.fromJson(Map<String, dynamic> json) => ConsentResult(
+    sessionID: json['session_id'] as String,
+    state: json['state'] as String,
+    authExpireAt: json['auth_expire_at'] as String,
+  );
+}
+
+class SessionStateResult {
+  const SessionStateResult({
+    required this.sessionID,
+    required this.state,
+    required this.reason,
+  });
+
+  final String sessionID;
+  final String state;
+  final String reason;
+
+  factory SessionStateResult.fromJson(Map<String, dynamic> json) => SessionStateResult(
+    sessionID: json['session_id'] as String,
+    state: json['state'] as String,
+    reason: json['reason'] as String,
+  );
+}
+
+class SessionKeysResult {
+  const SessionKeysResult({
+    required this.sessionID,
+    required this.controllerID,
+    required this.targetID,
+    required this.controllerPubkey,
+    required this.targetPubkey,
+  });
+
+  final String sessionID;
+  final String controllerID;
+  final String targetID;
+  final String controllerPubkey;
+  final String targetPubkey;
+
+  factory SessionKeysResult.fromJson(Map<String, dynamic> json) => SessionKeysResult(
+    sessionID: json['session_id'] as String,
+    controllerID: json['controller_id'] as String,
+    targetID: json['target_id'] as String,
+    controllerPubkey: json['controller_pubkey'] as String,
+    targetPubkey: json['target_pubkey'] as String,
+  );
+}
+
+class RelayTicketResult {
+  const RelayTicketResult({
+    required this.ticket,
+    required this.selfDevice,
+  });
+
+  final String ticket;
+  final String selfDevice;
+
+  factory RelayTicketResult.fromJson(Map<String, dynamic> json) => RelayTicketResult(
+    ticket: json['ticket'] as String,
+    selfDevice: json['self_device'] as String,
+  );
+}
+
+class EmailCodeResult {
+  const EmailCodeResult({
+    required this.oK,
+    required this.email,
+  });
+
+  final bool oK;
+  final String email;
+
+  factory EmailCodeResult.fromJson(Map<String, dynamic> json) => EmailCodeResult(
+    oK: json['ok'] as bool,
+    email: json['email'] as String,
+  );
+}
+
+class EmailLoginResult {
+  const EmailLoginResult({
+    required this.token,
+    required this.accountID,
+    required this.email,
+  });
+
+  final String token;
+  final String accountID;
+  final String email;
+
+  factory EmailLoginResult.fromJson(Map<String, dynamic> json) => EmailLoginResult(
+    token: json['token'] as String,
+    accountID: json['account_id'] as String,
+    email: json['email'] as String,
+  );
+}
+
+class AssistCreateResult {
+  const AssistCreateResult({
+    required this.code,
+    required this.expiresAt,
+    required this.targetDeviceID,
+    required this.ttlSeconds,
+  });
+
+  final String code;
+  final String expiresAt;
+  final String targetDeviceID;
+  final int ttlSeconds;
+
+  factory AssistCreateResult.fromJson(Map<String, dynamic> json) => AssistCreateResult(
+    code: json['code'] as String,
+    expiresAt: json['expires_at'] as String,
+    targetDeviceID: json['target_device_id'] as String,
+    ttlSeconds: json['ttl_seconds'] as int,
+  );
+}
+
+class AssistRedeemResult {
+  const AssistRedeemResult({
+    required this.sessionID,
+    required this.state,
+    required this.targetID,
+  });
+
+  final String sessionID;
+  final String state;
+  final String targetID;
+
+  factory AssistRedeemResult.fromJson(Map<String, dynamic> json) => AssistRedeemResult(
+    sessionID: json['session_id'] as String,
+    state: json['state'] as String,
+    targetID: json['target_id'] as String,
+  );
+}
+
+class ReflectResult {
+  const ReflectResult({
+    required this.iP,
+    required this.port,
+    required this.source,
+    required this.via,
+    required this.atUnix,
+  });
+
+  final String iP;
+  final int port;
+  final String source;
+  final String via;
+  final int atUnix;
+
+  factory ReflectResult.fromJson(Map<String, dynamic> json) => ReflectResult(
+    iP: json['ip'] as String,
+    port: json['port'] as int,
+    source: json['source'] as String,
+    via: json['via'] as String,
+    atUnix: json['at_unix'] as int,
+  );
+}
+
+class FileRow {
+  const FileRow({
+    required this.iD,
+    required this.accountID,
+    required this.deviceID,
+    required this.name,
+    required this.size,
+    required this.sha256,
+    required this.createdAt,
+  });
+
+  final String iD;
+  final String accountID;
+  final String deviceID;
+  final String name;
+  final int size;
+  final String sha256;
+  final String createdAt;
+
+  factory FileRow.fromJson(Map<String, dynamic> json) => FileRow(
+    iD: json['id'] as String,
+    accountID: json['account_id'] as String,
+    deviceID: json['device_id'] as String,
+    name: json['name'] as String,
+    size: json['size'] as int,
+    sha256: json['sha256'] as String,
+    createdAt: json['created_at'] as String,
+  );
+}
+
+class FileUploadResult {
+  const FileUploadResult({
+    required this.file,
+  });
+
+  final FileRow file;
+
+  factory FileUploadResult.fromJson(Map<String, dynamic> json) => FileUploadResult(
+    file: json['file'] as FileRow,
+  );
+}
+
+class FileListResult {
+  const FileListResult({
+    required this.files,
+    required this.limit,
+    required this.offset,
+  });
+
+  final List<FileRow> files;
+  final int limit;
+  final int offset;
+
+  factory FileListResult.fromJson(Map<String, dynamic> json) => FileListResult(
+    files: (json['files'] as List<dynamic>? ?? const []).map((e) => e as FileRow).toList(),
+    limit: json['limit'] as int,
+    offset: json['offset'] as int,
+  );
+}
+
+class FileDeletedResult {
+  const FileDeletedResult({
+    required this.oK,
+    required this.deleted,
+  });
+
+  final bool oK;
+  final bool deleted;
+
+  factory FileDeletedResult.fromJson(Map<String, dynamic> json) => FileDeletedResult(
+    oK: json['ok'] as bool,
+    deleted: json['deleted'] as bool,
+  );
+}
+
+class FileTicketResult {
+  const FileTicketResult({
+    required this.uRL,
+    required this.expiresAt,
+    required this.name,
+  });
+
+  final String uRL;
+  final String expiresAt;
+  final String name;
+
+  factory FileTicketResult.fromJson(Map<String, dynamic> json) => FileTicketResult(
+    uRL: json['url'] as String,
+    expiresAt: json['expires_at'] as String,
+    name: json['name'] as String,
+  );
+}
+
+class SessionLimits {
+  const SessionLimits({
+    required this.maxMinutes,
+  });
+
+  final int maxMinutes;
+
+  factory SessionLimits.fromJson(Map<String, dynamic> json) => SessionLimits(
+    maxMinutes: json['max_minutes'] as int,
+  );
+}
+
+class FileLimits {
+  const FileLimits({
+    required this.maxBytes,
+  });
+
+  final int maxBytes;
+
+  factory FileLimits.fromJson(Map<String, dynamic> json) => FileLimits(
+    maxBytes: json['max_bytes'] as int,
+  );
+}
+
+class DiagConfig {
+  const DiagConfig({
+    required this.autoRefreshSecs,
+  });
+
+  final int autoRefreshSecs;
+
+  factory DiagConfig.fromJson(Map<String, dynamic> json) => DiagConfig(
+    autoRefreshSecs: json['auto_refresh_secs'] as int,
+  );
+}
+
+class ClientFlags {
+  const ClientFlags({
+    required this.forceUpdate,
+  });
+
+  final bool forceUpdate;
+
+  factory ClientFlags.fromJson(Map<String, dynamic> json) => ClientFlags(
+    forceUpdate: json['force_update'] as bool,
+  );
+}
+
+class RuntimeEndpoints {
+  const RuntimeEndpoints({
+    required this.gatewayURL,
+    required this.signalURL,
+    required this.relayAddr,
+    required this.stunURL,
+    required this.webtransportURL,
+    required this.tlsRequired,
+  });
+
+  final String gatewayURL;
+  final String signalURL;
+  final String relayAddr;
+  final String stunURL;
+  final String webtransportURL;
+  final bool tlsRequired;
+
+  factory RuntimeEndpoints.fromJson(Map<String, dynamic> json) => RuntimeEndpoints(
+    gatewayURL: json['gateway_url'] as String,
+    signalURL: json['signal_url'] as String,
+    relayAddr: json['relay_addr'] as String,
+    stunURL: json['stun_url'] as String,
+    webtransportURL: json['webtransport_url'] as String,
+    tlsRequired: json['tls_required'] as bool,
+  );
+}
+
+class ClientRuntimeConfig {
+  const ClientRuntimeConfig({
+    required this.endpoints,
+    required this.session,
+    required this.file,
+    required this.diag,
+    required this.client,
+    required this.capabilities,
+  });
+
+  final RuntimeEndpoints endpoints;
+  final SessionLimits session;
+  final FileLimits file;
+  final DiagConfig diag;
+  final ClientFlags client;
+  final Map<String, bool> capabilities;
+
+  factory ClientRuntimeConfig.fromJson(Map<String, dynamic> json) => ClientRuntimeConfig(
+    endpoints: json['endpoints'] as RuntimeEndpoints,
+    session: json['session'] as SessionLimits,
+    file: json['file'] as FileLimits,
+    diag: json['diag'] as DiagConfig,
+    client: json['client'] as ClientFlags,
+    capabilities: Map<String, bool>.from(json['capabilities'] as Map? ?? const {}),
+  );
+}
+
+class ClientConfigResult {
+  const ClientConfigResult({
+    required this.config,
+  });
+
+  final ClientRuntimeConfig config;
+
+  factory ClientConfigResult.fromJson(Map<String, dynamic> json) => ClientConfigResult(
+    config: json['config'] as ClientRuntimeConfig,
+  );
+}
+
 class EndpointSpec {
   const EndpointSpec({required this.id, required this.method, required this.path, required this.auth, required this.response, required this.errors});
 
@@ -304,29 +790,35 @@ const List<EndpointSpec> endpoints = <EndpointSpec>[
   EndpointSpec(id: 'ADM-05', method: 'POST', path: '/admin/v1/users/ban', auth: 'admin', response: 'OkResult', errors: <String>['ADMIN_SESSION_EXPIRED', 'ADMIN_FORBIDDEN', 'ADMIN_REASON_REQUIRED']),
   EndpointSpec(id: 'ADM-06', method: 'GET', path: '/admin/v1/devices', auth: 'admin', response: 'list<DeviceRow>', errors: <String>['ADMIN_SESSION_EXPIRED', 'ADMIN_FORBIDDEN']),
   EndpointSpec(id: 'ADM-07', method: 'GET', path: '/admin/v1/sessions', auth: 'admin', response: 'list<SessionRow>', errors: <String>['ADMIN_SESSION_EXPIRED', 'ADMIN_FORBIDDEN']),
-  EndpointSpec(id: 'ADM-08', method: 'POST', path: '/admin/v1/sessions/kill', auth: 'admin', response: 'OkResult', errors: <String>['ADMIN_SESSION_EXPIRED', 'ADMIN_FORBIDDEN', 'ADMIN_REASON_REQUIRED']),
+  EndpointSpec(id: 'ADM-08', method: 'POST', path: '/admin/v1/sessions/kill', auth: 'admin', response: 'KillSessionResult', errors: <String>['ADMIN_SESSION_EXPIRED', 'ADMIN_FORBIDDEN', 'ADMIN_REASON_REQUIRED']),
   EndpointSpec(id: 'ADM-09', method: 'GET', path: '/admin/v1/config', auth: 'admin', response: 'ConfigView', errors: <String>['ADMIN_SESSION_EXPIRED', 'ADMIN_FORBIDDEN']),
   EndpointSpec(id: 'ADM-10', method: 'PUT', path: '/admin/v1/config', auth: 'admin', response: 'ConfigPutResult', errors: <String>['ADMIN_SESSION_EXPIRED', 'ADMIN_FORBIDDEN', 'ADMIN_CONFIG_INVALID']),
   EndpointSpec(id: 'ADM-11', method: 'GET', path: '/admin/v1/audit', auth: 'admin', response: 'list<AuditRow>', errors: <String>['ADMIN_SESSION_EXPIRED', 'ADMIN_FORBIDDEN']),
   EndpointSpec(id: 'GW-01', method: 'POST', path: '/v1/auth/sms', auth: 'none', response: 'OkResult', errors: <String>['AUTH_INVALID_CREDENTIAL', 'AUTH_SMS_RATE_LIMITED']),
-  EndpointSpec(id: 'GW-02', method: 'POST', path: '/v1/auth/login', auth: 'none', response: 'any', errors: <String>['AUTH_INVALID_CREDENTIAL', 'AUTH_TOO_MANY_ATTEMPTS']),
-  EndpointSpec(id: 'GW-03', method: 'GET', path: '/v1/devices', auth: 'bearer', response: 'any', errors: <String>['AUTH_TOKEN_EXPIRED', 'SRV_INTERNAL']),
+  EndpointSpec(id: 'GW-02', method: 'POST', path: '/v1/auth/login', auth: 'none', response: 'LoginResult', errors: <String>['AUTH_INVALID_CREDENTIAL', 'AUTH_TOO_MANY_ATTEMPTS']),
+  EndpointSpec(id: 'GW-03', method: 'GET', path: '/v1/devices', auth: 'bearer', response: 'DeviceListResult', errors: <String>['AUTH_TOKEN_EXPIRED', 'SRV_INTERNAL']),
   EndpointSpec(id: 'GW-04', method: 'POST', path: '/v1/devices/bind', auth: 'bearer', response: 'BindResult', errors: <String>['AUTH_TOKEN_EXPIRED', 'SRV_INTERNAL']),
-  EndpointSpec(id: 'GW-05', method: 'POST', path: '/v1/devices/verify-code', auth: 'device', response: 'any', errors: <String>['CONN_DEVICE_NOT_FOUND', 'ADMIN_FORBIDDEN']),
-  EndpointSpec(id: 'GW-06', method: 'POST', path: '/v1/connect/request', auth: 'bearer', response: 'any', errors: <String>['CONN_DEVICE_NOT_FOUND', 'CONN_DEVICE_OFFLINE', 'CONN_CAPTCHA_INVALID', 'CONN_RATE_LIMITED']),
-  EndpointSpec(id: 'GW-07', method: 'POST', path: '/v1/connect/consent', auth: 'device', response: 'any', errors: <String>['CONN_DEVICE_NOT_FOUND', 'ADMIN_FORBIDDEN']),
-  EndpointSpec(id: 'GW-08', method: 'POST', path: '/v1/connect/status', auth: 'bearer', response: 'any', errors: <String>['SESSION_NOT_FOUND', 'AUTH_TOKEN_EXPIRED']),
-  EndpointSpec(id: 'GW-09', method: 'POST', path: '/v1/devices/identity', auth: 'device', response: 'any', errors: <String>['CONN_DEVICE_NOT_FOUND', 'ADMIN_FORBIDDEN']),
-  EndpointSpec(id: 'GW-10', method: 'POST', path: '/v1/connect/keys', auth: 'bearer', response: 'any', errors: <String>['SESSION_NOT_FOUND', 'AUTH_TOKEN_EXPIRED']),
-  EndpointSpec(id: 'GW-11', method: 'POST', path: '/v1/relay/ticket', auth: 'device', response: 'any', errors: <String>['SESSION_NOT_FOUND', 'SESSION_AUTH_WINDOW_EXCEEDED', 'ADMIN_FORBIDDEN']),
-  EndpointSpec(id: 'GW-12', method: 'POST', path: '/v1/auth/email/code', auth: 'none', response: 'any', errors: <String>['AUTH_INVALID_CREDENTIAL', 'AUTH_SMS_RATE_LIMITED']),
-  EndpointSpec(id: 'GW-13', method: 'POST', path: '/v1/auth/email/login', auth: 'none', response: 'any', errors: <String>['AUTH_INVALID_CREDENTIAL', 'AUTH_TOO_MANY_ATTEMPTS']),
-  EndpointSpec(id: 'GW-14', method: 'POST', path: '/v1/files', auth: 'bearer', response: 'any', errors: <String>['AUTH_TOKEN_EXPIRED', 'FILE_READ_FAILED', 'CONN_RATE_LIMITED']),
-  EndpointSpec(id: 'GW-15', method: 'GET', path: '/v1/files/', auth: 'bearer', response: 'any', errors: <String>['AUTH_TOKEN_EXPIRED', 'FILE_NOT_FOUND', 'ADMIN_FORBIDDEN']),
-  EndpointSpec(id: 'GW-16', method: 'POST', path: '/v1/assist/create', auth: 'bearer', response: 'any', errors: <String>['CONN_DEVICE_NOT_FOUND', 'ADMIN_FORBIDDEN', 'CONN_RATE_LIMITED']),
-  EndpointSpec(id: 'GW-17', method: 'POST', path: '/v1/assist/redeem', auth: 'bearer', response: 'any', errors: <String>['CONN_ASSIST_CODE_INVALID', 'CONN_ASSIST_CODE_USED', 'CONN_ASSIST_CODE_EXPIRED', 'CONN_SELF_CONNECT']),
-  EndpointSpec(id: 'GW-18', method: 'GET', path: '/v1/config', auth: 'none', response: 'any', errors: <String>['SRV_INTERNAL']),
-  EndpointSpec(id: 'GW-19', method: 'POST', path: '/v1/net/reflect', auth: 'none', response: 'any', errors: <String>['SRV_INTERNAL']),
-  EndpointSpec(id: 'GW-20', method: 'POST', path: '/v1/devices/password', auth: 'bearer', response: 'any', errors: <String>['CONN_DEVICE_NOT_FOUND', 'CONN_CAPTCHA_INVALID', 'AUTH_TOKEN_EXPIRED']),
+  EndpointSpec(id: 'GW-05', method: 'POST', path: '/v1/devices/verify-code', auth: 'device', response: 'VerifyCodeResult', errors: <String>['CONN_DEVICE_NOT_FOUND', 'ADMIN_FORBIDDEN']),
+  EndpointSpec(id: 'GW-06', method: 'POST', path: '/v1/connect/request', auth: 'bearer', response: 'ConnectResult', errors: <String>['CONN_DEVICE_NOT_FOUND', 'CONN_DEVICE_OFFLINE', 'CONN_CAPTCHA_INVALID', 'CONN_RATE_LIMITED']),
+  EndpointSpec(id: 'GW-07', method: 'POST', path: '/v1/connect/consent', auth: 'device', response: 'ConsentResult', errors: <String>['CONN_DEVICE_NOT_FOUND', 'ADMIN_FORBIDDEN']),
+  EndpointSpec(id: 'GW-08', method: 'GET', path: '/v1/connect/status', auth: 'bearer', response: 'SessionStateResult', errors: <String>['SESSION_NOT_FOUND', 'AUTH_TOKEN_EXPIRED']),
+  EndpointSpec(id: 'GW-09', method: 'POST', path: '/v1/devices/identity', auth: 'device', response: 'OkResult', errors: <String>['CONN_DEVICE_NOT_FOUND', 'ADMIN_FORBIDDEN']),
+  EndpointSpec(id: 'GW-10', method: 'GET', path: '/v1/connect/keys', auth: 'bearer', response: 'SessionKeysResult', errors: <String>['SESSION_NOT_FOUND', 'AUTH_TOKEN_EXPIRED']),
+  EndpointSpec(id: 'GW-11', method: 'POST', path: '/v1/relay/ticket', auth: 'device', response: 'RelayTicketResult', errors: <String>['SESSION_NOT_FOUND', 'SESSION_AUTH_WINDOW_EXCEEDED', 'ADMIN_FORBIDDEN']),
+  EndpointSpec(id: 'GW-12', method: 'POST', path: '/v1/auth/email/code', auth: 'none', response: 'EmailCodeResult', errors: <String>['AUTH_INVALID_CREDENTIAL', 'AUTH_SMS_RATE_LIMITED']),
+  EndpointSpec(id: 'GW-13', method: 'POST', path: '/v1/auth/email/login', auth: 'none', response: 'EmailLoginResult', errors: <String>['AUTH_INVALID_CREDENTIAL', 'AUTH_TOO_MANY_ATTEMPTS']),
+  EndpointSpec(id: 'GW-14', method: 'POST', path: '/v1/files', auth: 'bearer', response: 'FileUploadResult', errors: <String>['AUTH_TOKEN_EXPIRED', 'FILE_READ_FAILED', 'CONN_RATE_LIMITED']),
+  EndpointSpec(id: 'GW-15', method: 'GET', path: '/v1/files/', auth: 'bearer', response: 'binary', errors: <String>['AUTH_TOKEN_EXPIRED', 'FILE_NOT_FOUND', 'ADMIN_FORBIDDEN']),
+  EndpointSpec(id: 'GW-16', method: 'POST', path: '/v1/assist/create', auth: 'bearer', response: 'AssistCreateResult', errors: <String>['CONN_DEVICE_NOT_FOUND', 'ADMIN_FORBIDDEN', 'CONN_RATE_LIMITED']),
+  EndpointSpec(id: 'GW-17', method: 'POST', path: '/v1/assist/redeem', auth: 'bearer', response: 'AssistRedeemResult', errors: <String>['CONN_ASSIST_CODE_INVALID', 'CONN_ASSIST_CODE_USED', 'CONN_ASSIST_CODE_EXPIRED', 'CONN_SELF_CONNECT']),
+  EndpointSpec(id: 'GW-18', method: 'GET', path: '/v1/config', auth: 'none', response: 'ClientConfigResult', errors: <String>['SRV_INTERNAL']),
+  EndpointSpec(id: 'GW-19', method: 'GET', path: '/v1/net/reflect', auth: 'none', response: 'ReflectResult', errors: <String>['SRV_INTERNAL']),
+  EndpointSpec(id: 'GW-20', method: 'POST', path: '/v1/devices/password', auth: 'bearer', response: 'OkResult', errors: <String>['CONN_DEVICE_NOT_FOUND', 'CONN_CAPTCHA_INVALID', 'AUTH_TOKEN_EXPIRED']),
+  EndpointSpec(id: 'GW-21', method: 'GET', path: '/v1/files', auth: 'bearer', response: 'FileListResult', errors: <String>['AUTH_TOKEN_EXPIRED', 'SRV_INTERNAL']),
+  EndpointSpec(id: 'GW-22', method: 'DELETE', path: '/v1/files/', auth: 'bearer', response: 'FileDeletedResult', errors: <String>['AUTH_TOKEN_EXPIRED', 'FILE_NOT_FOUND', 'ADMIN_FORBIDDEN']),
+  EndpointSpec(id: 'GW-23', method: 'POST', path: '/v1/files/', auth: 'bearer', response: 'FileTicketResult', errors: <String>['AUTH_TOKEN_EXPIRED', 'FILE_NOT_FOUND', 'CONN_DEVICE_NOT_FOUND']),
+  EndpointSpec(id: 'GW-24', method: 'POST', path: '/v1/sessions/ready', auth: 'device', response: 'SessionStateResult', errors: <String>['SESSION_NOT_FOUND', 'ADMIN_FORBIDDEN', 'SESSION_AUTH_WINDOW_EXCEEDED']),
+  EndpointSpec(id: 'GW-25', method: 'POST', path: '/v1/sessions/close', auth: 'device', response: 'SessionStateResult', errors: <String>['SESSION_NOT_FOUND', 'ADMIN_FORBIDDEN']),
   EndpointSpec(id: 'SYS-01', method: 'GET', path: '/healthz', auth: 'none', response: 'OkResult', errors: <String>['[]']),
+  EndpointSpec(id: 'SYS-02', method: 'GET', path: '/readyz', auth: 'none', response: 'OkResult', errors: <String>['SRV_DB_UNAVAILABLE', 'SRV_CACHE_UNAVAILABLE']),
 ];

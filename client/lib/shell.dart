@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'api.dart';
+import 'capabilities.dart';
 import 'models.dart';
 import 'pages/connect_page.dart';
 import 'pages/device_list_page.dart';
@@ -44,11 +45,13 @@ const _mainNavItems = <_ErNavItem>[
 
 const _settingsNav = _ErNavItem(Icons.tune_rounded, '设置', '外观、画质与安全');
 
-/// 侧边栏/底部导航的完整顺序：业务导航 + 设置（设置永远是这一组的最后一项）。
-const _navItems = <_ErNavItem>[..._mainNavItems, _settingsNav];
-
-/// 设置页在列表中的下标（永远最后）。
-final _settingsIndex = _mainNavItems.length;
+/// 一条「导航项 + 页面」绑定；capability 非空时按能力门决定是否出现。
+class _PageEntry {
+  const _PageEntry(this.nav, this.page, {this.capability});
+  final _ErNavItem nav;
+  final Widget page;
+  final String? capability;
+}
 
 class _HomeShellState extends State<HomeShell> {
   int _index = 0;
@@ -117,37 +120,58 @@ class _HomeShellState extends State<HomeShell> {
     );
   }
 
-  // 顺序必须与 _mainNavItems + _settingsNav 一致。
-  List<Widget> get _pages => <Widget>[
-    DeviceListPage(
-      client: widget.client,
-      ownDevice: widget.device,
-      onConnect: _goToConnect,
-      onSessionStarted: _openSession,
-    ),
-    ConnectPage(
-      client: widget.client,
-      initialCode: _connectPrefill,
-      recents: _recents,
-      onCodeUsed: _rememberCode,
-      onSessionStarted: _openSession,
-    ),
-    DiagnosticsPage(client: widget.client, config: _config),
-    const SelfTestPage(),
-    FilesPage(client: widget.client, config: _config),
-    SettingsPage(device: widget.device, config: _config, onLogout: _logout),
-  ];
+  /// 页面 + 导航的唯一装配点。能力未闭环的入口直接不出现（不是画个灰按钮）。
+  List<_PageEntry> get _entries {
+    final gate = CapabilityGate.instance;
+    return <_PageEntry>[
+      _PageEntry(
+        _mainNavItems[0],
+        DeviceListPage(
+          client: widget.client,
+          ownDevice: widget.device,
+          onConnect: _goToConnect,
+          onSessionStarted: _openSession,
+        ),
+      ),
+      _PageEntry(
+        _mainNavItems[1],
+        ConnectPage(
+          client: widget.client,
+          initialCode: _connectPrefill,
+          recents: _recents,
+          onCodeUsed: _rememberCode,
+          onSessionStarted: _openSession,
+        ),
+      ),
+      _PageEntry(
+        _mainNavItems[2],
+        DiagnosticsPage(client: widget.client, config: _config),
+      ),
+      _PageEntry(_mainNavItems[3], const SelfTestPage()),
+      if (gate.isAvailable('file_transfer'))
+        _PageEntry(
+          _mainNavItems[4],
+          FilesPage(client: widget.client, config: _config),
+          capability: 'file_transfer',
+        ),
+      // 设置永远在导航组最后，且不受能力门影响。
+      _PageEntry(
+        _settingsNav,
+        SettingsPage(device: widget.device, config: _config, onLogout: _logout),
+      ),
+    ];
+  }
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final wide = MediaQuery.sizeOf(context).width >= ErTokens.mobileBreakpoint;
 
-    final pages = _pages;
-    assert(
-      _navItems.length == pages.length && _settingsIndex == _navItems.length - 1,
-      '导航项必须与页面一一对应，且设置永远是导航组最后一项',
-    );
+    final entries = _entries;
+    final pages = <Widget>[for (final e in entries) e.page];
+    final navItems = <_ErNavItem>[for (final e in entries) e.nav];
+    final index = _index.clamp(0, pages.length - 1);
+    assert(entries.last.nav == _settingsNav, '设置永远是导航组最后一项（能力门不得把它挤走）');
 
     if (!wide) {
       return Scaffold(
@@ -157,16 +181,16 @@ class _HomeShellState extends State<HomeShell> {
         body: SafeArea(
           bottom: false,
           child: IndexedStack(
-            index: _index,
+            index: index,
             sizing: StackFit.expand,
             children: pages,
           ),
         ),
         bottomNavigationBar: NavigationBar(
-          selectedIndex: _index,
+          selectedIndex: index,
           onDestinationSelected: (i) => setState(() => _index = i),
           destinations: [
-            for (final item in _navItems)
+            for (final item in navItems)
               NavigationDestination(
                 icon: Icon(item.icon, size: 22),
                 label: item.label,
@@ -181,9 +205,10 @@ class _HomeShellState extends State<HomeShell> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _Sidebar(
-            index: _index,
+            index: index,
             onSelect: (i) => setState(() => _index = i),
             ownDevice: widget.device,
+            navItems: navItems,
           ),
           VerticalDivider(
             width: 1,
@@ -191,7 +216,7 @@ class _HomeShellState extends State<HomeShell> {
           ),
           Expanded(
             child: IndexedStack(
-              index: _index,
+              index: index,
               sizing: StackFit.expand,
               children: pages,
             ),
@@ -207,11 +232,13 @@ class _Sidebar extends StatelessWidget {
     required this.index,
     required this.onSelect,
     required this.ownDevice,
+    required this.navItems,
   });
 
   final int index;
   final ValueChanged<int> onSelect;
   final DeviceInfo ownDevice;
+  final List<_ErNavItem> navItems;
 
   @override
   Widget build(BuildContext context) {
@@ -273,10 +300,10 @@ class _Sidebar extends StatelessWidget {
           const SizedBox(height: 20),
           Expanded(
             child: ListView.separated(
-              itemCount: _navItems.length,
+              itemCount: navItems.length,
               separatorBuilder: (_, _) => const SizedBox(height: 4),
               itemBuilder: (context, i) {
-                final item = _navItems[i];
+                final item = navItems[i];
                 return _NavButton(
                   icon: item.icon,
                   label: item.label,

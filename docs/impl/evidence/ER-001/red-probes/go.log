@@ -1,0 +1,42 @@
+
+== 1/1 go: go test -race ==
+?   	github.com/easyremote/server/cmd/admin	[no test files]
+?   	github.com/easyremote/server/cmd/gateway	[no test files]
+?   	github.com/easyremote/server/cmd/lossyproxy	[no test files]
+?   	github.com/easyremote/server/cmd/relay	[no test files]
+?   	github.com/easyremote/server/cmd/rendezvous	[no test files]
+?   	github.com/easyremote/server/cmd/stack	[no test files]
+?   	github.com/easyremote/server/cmd/udptun	[no test files]
+ok  	github.com/easyremote/server/internal/adminapi	(cached)
+ok  	github.com/easyremote/server/internal/adminhttp	(cached)
+ok  	github.com/easyremote/server/internal/adminsession	(cached)
+?   	github.com/easyremote/server/internal/appconfig	[no test files]
+ok  	github.com/easyremote/server/internal/auth	(cached)
+--- FAIL: TestDeliberateRedProbe (0.00s)
+    red_probe_test.go:6: deliberate red probe
+FAIL
+FAIL	github.com/easyremote/server/internal/capability	0.807s
+ok  	github.com/easyremote/server/internal/config	(cached)
+?   	github.com/easyremote/server/internal/contract	[no test files]
+ok  	github.com/easyremote/server/internal/device	(cached)
+ok  	github.com/easyremote/server/internal/errcode	(cached)
+ok  	github.com/easyremote/server/internal/gateway	(cached)
+ok  	github.com/easyremote/server/internal/httpx	(cached)
+ok  	github.com/easyremote/server/internal/netdiag	(cached)
+ok  	github.com/easyremote/server/internal/password	(cached)
+ok  	github.com/easyremote/server/internal/ratelimit	(cached)
+ok  	github.com/easyremote/server/internal/relay	(cached)
+ok  	github.com/easyremote/server/internal/relaymgr	(cached)
+ok  	github.com/easyremote/server/internal/serve	(cached)
+ok  	github.com/easyremote/server/internal/session	(cached)
+ok  	github.com/easyremote/server/internal/signal	(cached)
+ok  	github.com/easyremote/server/internal/stack	(cached)
+ok  	github.com/easyremote/server/internal/store	(cached)
+?   	github.com/easyremote/server/internal/store/storetest	[no test files]
+FAIL
+  FAIL (exit 1)
+
+== 汇总 ==
+  go        FAIL (go-test)
+
+GATE: FAIL

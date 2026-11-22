@@ -95,6 +95,7 @@ const (
 	AdminReasonRequired         Code = 700009
 	AdminConfigInvalid          Code = 700010
 	SrvRouteNotFound            Code = 700011
+	SrvMethodNotAllowed         Code = 700012
 	Unknown                     Code = 999999
 )
 
@@ -191,6 +192,7 @@ var generatedNames = map[Code]string{
 	700009: "ADMIN_REASON_REQUIRED",
 	700010: "ADMIN_CONFIG_INVALID",
 	700011: "SRV_ROUTE_NOT_FOUND",
+	700012: "SRV_METHOD_NOT_ALLOWED",
 	999999: "UNKNOWN",
 }
 
@@ -287,5 +289,6 @@ var generatedAll = []Entry{
 	{AdminReasonRequired, "ADMIN_REASON_REQUIRED"},
 	{AdminConfigInvalid, "ADMIN_CONFIG_INVALID"},
 	{SrvRouteNotFound, "SRV_ROUTE_NOT_FOUND"},
+	{SrvMethodNotAllowed, "SRV_METHOD_NOT_ALLOWED"},
 	{Unknown, "UNKNOWN"},
 }

@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
 import 'api.dart';
@@ -19,10 +18,8 @@ const String _erGatewayDefine = String.fromEnvironment('ER_GATEWAY');
 /// - Web（浏览器）：默认**空串**，所有请求走相对路径（/v1/...），由同源代理
 ///   scripts/serve-client-web.mjs 转发到一体化服务端，浏览器不会触发 CORS。
 ///   浏览器里绝不能烧绝对地址，否则 8091 页面请求 8090 就是跨源，预检必被拦。
-/// - 原生桌面：默认本机 8080，可用 --dart-define=ER_GATEWAY=http://127.0.0.1:8090 覆盖。
-final String erGatewayBaseUrl = _erGatewayDefine.isNotEmpty
-    ? _erGatewayDefine
-    : (kIsWeb ? '' : 'http://127.0.0.1:8080');
+/// - 原生桌面：必须显式 --dart-define=ER_GATEWAY=https://...；不再内置本机地址。
+final String erGatewayBaseUrl = _erGatewayDefine;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -34,7 +31,14 @@ Future<void> main() async {
   if (q != null) {
     erThemeMode.value = themeModeFromPrefs(q);
   }
-  runApp(ErApp(client: GatewayClient(baseUrl: erGatewayBaseUrl)));
+  final client = GatewayClient(baseUrl: erGatewayBaseUrl);
+  try {
+    await client.loadRuntimeConfig();
+  } on ApiException catch (e) {
+    // 配置不可达不应阻塞启动；需要端点能力的入口会因空值被禁用。
+    debugPrint('[config] runtime endpoints unavailable: ${e.name}');
+  }
+  runApp(ErApp(client: client));
 }
 
 class ErApp extends StatefulWidget {

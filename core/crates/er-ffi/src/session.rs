@@ -48,7 +48,7 @@ pub unsafe extern "C" fn er_run_pair_session(
         match run_pair(&gw, addr, &pa, &pb, &code) {
             Ok(report) => {
                 let json = format!(
-                    "{{\"ok\":true,\"session_id\":\"{}\",\"encoded_bytes\":{},\"sealed_bytes\":{},\"width\":{},\"height\":{},\"keys_match\":{},\"handshake_verified\":{},\"plaintext_absent\":{}}}",
+                    "{{\"ok\":true,\"session_id\":\"{}\",\"encoded_bytes\":{},\"sealed_bytes\":{},\"width\":{},\"height\":{},\"keys_match\":{},\"handshake_verified\":{},\"plaintext_absent\":{},\"link\":\"{}\"}}",
                     report.session_id,
                     report.encoded_bytes,
                     report.sealed_bytes,
@@ -56,7 +56,8 @@ pub unsafe extern "C" fn er_run_pair_session(
                     report.decoded_height,
                     report.keys_match_registered,
                     report.handshake_verified,
-                    report.plaintext_marker_absent
+                    report.plaintext_marker_absent,
+                    report.link
                 );
                 into_c_string(&json)
             }
@@ -155,11 +156,35 @@ pub unsafe extern "C" fn er_ctrl_info(session_id: *const c_char) -> *mut c_char 
     let Some(sess) = sess else {
         return into_c_string("{\"connected\":false,\"error\":\"unknown session\"}");
     };
-    let (connected, frames, err) = sess
-        .stats
-        .lock()
-        .map(|s| (s.connected, s.frames, s.last_error.clone()))
-        .unwrap_or((false, 0, "stats poisoned".to_string()));
+    let (connected, frames, fps, decode_ms, dropped, bitrate, loss, input_acks, input_p95, err) =
+        sess.stats
+            .lock()
+            .map(|s| {
+                (
+                    s.connected,
+                    s.frames,
+                    s.decode_fps,
+                    s.decode_ms,
+                    s.dropped_frames,
+                    s.bitrate_kbps,
+                    s.loss_pct,
+                    s.input_acks,
+                    s.input_p95_ms,
+                    s.last_error.clone(),
+                )
+            })
+            .unwrap_or((
+                false,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0.0,
+                0,
+                0,
+                "stats poisoned".to_string(),
+            ));
     let (w, h) = sess
         .latest
         .lock()
@@ -167,9 +192,16 @@ pub unsafe extern "C" fn er_ctrl_info(session_id: *const c_char) -> *mut c_char 
         .and_then(|g| g.as_ref().map(|f| (f.width, f.height)))
         .unwrap_or((0, 0));
     into_c_string(&format!(
-        "{{\"connected\":{},\"frames\":{},\"width\":{},\"height\":{},\"error\":\"{}\"}}",
+        "{{\"connected\":{},\"frames\":{},\"fps\":{},\"decode_ms\":{},\"dropped\":{},\"bitrate_kbps\":{},\"loss_pct\":{:.1},\"input_acks\":{},\"input_p95_ms\":{},\"width\":{},\"height\":{},\"error\":\"{}\"}}",
         connected,
         frames,
+        fps,
+        decode_ms,
+        dropped,
+        bitrate,
+        loss,
+        input_acks,
+        input_p95,
         w,
         h,
         escape_json(&err)

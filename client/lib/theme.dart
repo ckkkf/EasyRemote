@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 const seedColor = Color(0xFF1E4BDB);
 
 /// 全局外观模式：跟随系统 / 浅色 / 深色。设置页与侧边栏共用。
-final ValueNotifier<ThemeMode> erThemeMode = ValueNotifier<ThemeMode>(ThemeMode.system);
+final ValueNotifier<ThemeMode> erThemeMode = ValueNotifier<ThemeMode>(
+  ThemeMode.system,
+);
 
 /// 设计令牌（取自 design/tokens.json，避免运行时依赖生成文件）。
 class ErTokens {
@@ -131,24 +133,75 @@ ColorScheme _scheme(Brightness brightness) {
 }
 
 TextTheme _text(TextTheme base) => base.copyWith(
-      displaySmall: base.displaySmall?.copyWith(fontSize: 36, height: 1.22, fontWeight: FontWeight.w600, letterSpacing: -0.6),
-      headlineMedium: base.headlineMedium?.copyWith(fontSize: 28, height: 1.28, fontWeight: FontWeight.w600, letterSpacing: -0.4),
-      headlineSmall: base.headlineSmall?.copyWith(fontSize: 22, height: 1.3, fontWeight: FontWeight.w600, letterSpacing: -0.3),
-      titleLarge: base.titleLarge?.copyWith(fontSize: 17, height: 1.4, fontWeight: FontWeight.w600, letterSpacing: -0.1),
-      titleMedium: base.titleMedium?.copyWith(fontSize: 15, height: 1.4, fontWeight: FontWeight.w600),
-      titleSmall: base.titleSmall?.copyWith(fontSize: 13, height: 1.4, fontWeight: FontWeight.w600),
-      bodyLarge: base.bodyLarge?.copyWith(fontSize: 15, height: 1.55, fontWeight: FontWeight.w400),
-      bodyMedium: base.bodyMedium?.copyWith(fontSize: 14, height: 1.55, fontWeight: FontWeight.w400),
-      bodySmall: base.bodySmall?.copyWith(fontSize: 12.5, height: 1.5, fontWeight: FontWeight.w400),
-      labelLarge: base.labelLarge?.copyWith(fontSize: 13.5, fontWeight: FontWeight.w600),
-      // 只保留 w400 / w600 两档。
-      //
-      // 之前标签用 w500、正文用默认 w400、标题用 w600：拉丁字形能凑出 500，
-      // 中文回退字体往往只有 Regular/Bold，w500 会被渲染成 Regular、w600 被
-      // 渲染成 Bold，于是同一行里「有的字粗有的字细」。两档是最稳的语义层级。
-      labelMedium: base.labelMedium?.copyWith(fontSize: 12, fontWeight: FontWeight.w400, letterSpacing: 0.2),
-      labelSmall: base.labelSmall?.copyWith(fontSize: 11, fontWeight: FontWeight.w400, letterSpacing: 0.3),
-    );
+  displaySmall: base.displaySmall?.copyWith(
+    fontSize: 36,
+    height: 1.22,
+    fontWeight: FontWeight.w600,
+    letterSpacing: -0.6,
+  ),
+  headlineMedium: base.headlineMedium?.copyWith(
+    fontSize: 28,
+    height: 1.28,
+    fontWeight: FontWeight.w600,
+    letterSpacing: -0.4,
+  ),
+  headlineSmall: base.headlineSmall?.copyWith(
+    fontSize: 22,
+    height: 1.3,
+    fontWeight: FontWeight.w600,
+    letterSpacing: -0.3,
+  ),
+  titleLarge: base.titleLarge?.copyWith(
+    fontSize: 17,
+    height: 1.4,
+    fontWeight: FontWeight.w600,
+    letterSpacing: -0.1,
+  ),
+  titleMedium: base.titleMedium?.copyWith(
+    fontSize: 15,
+    height: 1.4,
+    fontWeight: FontWeight.w600,
+  ),
+  titleSmall: base.titleSmall?.copyWith(
+    fontSize: 13,
+    height: 1.4,
+    fontWeight: FontWeight.w600,
+  ),
+  bodyLarge: base.bodyLarge?.copyWith(
+    fontSize: 15,
+    height: 1.55,
+    fontWeight: FontWeight.w400,
+  ),
+  bodyMedium: base.bodyMedium?.copyWith(
+    fontSize: 14,
+    height: 1.55,
+    fontWeight: FontWeight.w400,
+  ),
+  bodySmall: base.bodySmall?.copyWith(
+    fontSize: 12.5,
+    height: 1.5,
+    fontWeight: FontWeight.w400,
+  ),
+  labelLarge: base.labelLarge?.copyWith(
+    fontSize: 13.5,
+    fontWeight: FontWeight.w600,
+  ),
+  // 只保留 w400 / w600 两档。
+  //
+  // 之前标签用 w500、正文用默认 w400、标题用 w600：拉丁字形能凑出 500，
+  // 中文回退字体往往只有 Regular/Bold，w500 会被渲染成 Regular、w600 被
+  // 渲染成 Bold，于是同一行里「有的字粗有的字细」。两档是最稳的语义层级。
+  labelMedium: base.labelMedium?.copyWith(
+    fontSize: 12,
+    fontWeight: FontWeight.w400,
+    letterSpacing: 0.2,
+  ),
+  labelSmall: base.labelSmall?.copyWith(
+    fontSize: 11,
+    fontWeight: FontWeight.w400,
+    letterSpacing: 0.3,
+  ),
+);
 
 ThemeData buildTheme(Brightness brightness) {
   final scheme = _scheme(brightness);
@@ -169,7 +222,8 @@ ThemeData buildTheme(Brightness brightness) {
   );
   final text = _text(base.textTheme);
 
-  OutlineInputBorder border(Color color, [double width = 1]) => OutlineInputBorder(
+  OutlineInputBorder border(Color color, [double width = 1]) =>
+      OutlineInputBorder(
         borderRadius: BorderRadius.circular(ErTokens.radiusMd),
         borderSide: BorderSide(color: color, width: width),
       );
@@ -177,7 +231,11 @@ ThemeData buildTheme(Brightness brightness) {
   return base.copyWith(
     textTheme: text,
     scaffoldBackgroundColor: scheme.surface,
-    dividerTheme: DividerThemeData(color: scheme.outlineVariant, thickness: 1, space: 1),
+    dividerTheme: DividerThemeData(
+      color: scheme.outlineVariant,
+      thickness: 1,
+      space: 1,
+    ),
     cardTheme: CardThemeData(
       elevation: 0,
       color: scheme.surfaceContainerLow,
@@ -219,7 +277,9 @@ ThemeData buildTheme(Brightness brightness) {
       border: border(scheme.outlineVariant),
       enabledBorder: border(scheme.outlineVariant),
       focusedBorder: border(scheme.primary, 1.6),
-      hintStyle: text.bodyMedium?.copyWith(color: scheme.onSurfaceVariant.withValues(alpha: 0.7)),
+      hintStyle: text.bodyMedium?.copyWith(
+        color: scheme.onSurfaceVariant.withValues(alpha: 0.7),
+      ),
       labelStyle: text.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
     ),
     chipTheme: ChipThemeData(
@@ -231,11 +291,21 @@ ThemeData buildTheme(Brightness brightness) {
     ),
     listTileTheme: ListTileThemeData(
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(ErTokens.radiusMd)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(ErTokens.radiusMd),
+      ),
     ),
     switchTheme: SwitchThemeData(
-      thumbColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected) ? scheme.onPrimary : scheme.outline),
-      trackColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected) ? scheme.primary : scheme.surfaceContainerHighest),
+      thumbColor: WidgetStateProperty.resolveWith(
+        (s) => s.contains(WidgetState.selected)
+            ? scheme.onPrimary
+            : scheme.outline,
+      ),
+      trackColor: WidgetStateProperty.resolveWith(
+        (s) => s.contains(WidgetState.selected)
+            ? scheme.primary
+            : scheme.surfaceContainerHighest,
+      ),
     ),
     navigationBarTheme: NavigationBarThemeData(
       height: 68,
@@ -245,19 +315,28 @@ ThemeData buildTheme(Brightness brightness) {
       labelTextStyle: WidgetStateProperty.resolveWith(
         (s) => text.labelSmall?.copyWith(
           fontSize: 12,
-          fontWeight: s.contains(WidgetState.selected) ? FontWeight.w600 : FontWeight.w400,
-          color: s.contains(WidgetState.selected) ? scheme.onPrimaryContainer : scheme.onSurfaceVariant,
+          fontWeight: s.contains(WidgetState.selected)
+              ? FontWeight.w600
+              : FontWeight.w400,
+          color: s.contains(WidgetState.selected)
+              ? scheme.onPrimaryContainer
+              : scheme.onSurfaceVariant,
         ),
       ),
     ),
     snackBarTheme: SnackBarThemeData(
       behavior: SnackBarBehavior.floating,
       backgroundColor: scheme.inverseSurface,
-      contentTextStyle: text.bodyMedium?.copyWith(color: scheme.onInverseSurface),
+      contentTextStyle: text.bodyMedium?.copyWith(
+        color: scheme.onInverseSurface,
+      ),
     ),
     tooltipTheme: TooltipThemeData(
       textStyle: text.bodySmall?.copyWith(color: scheme.onInverseSurface),
-      decoration: BoxDecoration(color: scheme.inverseSurface, borderRadius: BorderRadius.circular(ErTokens.radiusSm)),
+      decoration: BoxDecoration(
+        color: scheme.inverseSurface,
+        borderRadius: BorderRadius.circular(ErTokens.radiusSm),
+      ),
     ),
   );
 }

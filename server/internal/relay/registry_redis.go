@@ -18,6 +18,40 @@ type RedisRegistry struct {
 
 var _ Registry = (*RedisRegistry)(nil)
 
+// NextTicketEpoch 分配新的票据代号（与网关共享命名）。
+func (r *RedisRegistry) NextTicketEpoch(ctx context.Context, sessionID, deviceID string) (int64, error) {
+	key := "er:ticket:epoch:" + sessionID + ":" + deviceID
+	n, err := r.rdb.Incr(ctx, key).Result()
+	if err != nil {
+		return 0, err
+	}
+	_ = r.rdb.Expire(ctx, key, 2*time.Hour).Err()
+	return n, nil
+}
+
+// TicketEpoch 读取当前票据代号。
+func (r *RedisRegistry) TicketEpoch(ctx context.Context, sessionID, deviceID string) (int64, error) {
+	v, err := r.rdb.Get(ctx, "er:ticket:epoch:"+sessionID+":"+deviceID).Int64()
+	if err == redis.Nil {
+		return 0, nil
+	}
+	return v, err
+}
+
+// Revoke 写入会话撤销键（与网关共享命名）。
+func (r *RedisRegistry) Revoke(ctx context.Context, sessionID string, ttl time.Duration) error {
+	return r.rdb.Set(ctx, "er:revoked:session:"+sessionID, "1", ttl).Err()
+}
+
+// IsRevoked 判断会话是否已被关闭（与网关共享 er:revoked:session:<id> 键）。
+func (r *RedisRegistry) IsRevoked(ctx context.Context, sessionID string) (bool, error) {
+	n, err := r.rdb.Exists(ctx, "er:revoked:session:"+sessionID).Result()
+	if err != nil {
+		return false, err
+	}
+	return n > 0, nil
+}
+
 // NewRedisRegistryFromURL 解析 redis:// 或 host:port 并校验连通。
 func NewRedisRegistryFromURL(ctx context.Context, raw string) (*RedisRegistry, error) {
 	addr, password, db := raw, "", 0

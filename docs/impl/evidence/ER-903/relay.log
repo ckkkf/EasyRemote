@@ -1,0 +1,56 @@
+
+running 41 tests
+test backoff::tests::attempt_limit_respected ... ok
+test backoff::tests::zero_base_means_no_wait ... ok
+test backoff::tests::fast_policy_is_quick_but_capped ... ok
+test backoff::tests::schedule_is_monotonic_non_decreasing ... ok
+test backoff::tests::delay_is_capped ... ok
+test backoff::tests::default_schedule_matches_prd ... ok
+test crypto::tests::ciphertext_differs_from_plaintext ... ok
+test crypto::tests::tampering_detected ... ok
+test crypto::tests::wrong_direction_key_fails ... ok
+test identity::tests::encoding_roundtrip ... ok
+test crypto::tests::different_session_aad_breaks_decryption ... ok
+test crypto::tests::keys_are_directional ... ok
+test identity::tests::fingerprint_is_stable_and_distinct ... ok
+test crypto::tests::roundtrip_both_directions ... ok
+test identity::tests::different_peer_ephemeral_yields_different_keys ... ok
+test crypto::tests::truncated_rejected ... ok
+test crypto::tests::replay_rejected ... ok
+test relay_client::tests::activate_p2p_requires_both_sides ... ok
+test ticket::tests::expired_rejected ... ok
+test identity::tests::mitm_ephemeral_substitution_rejected ... ok
+test ticket::tests::issue_and_verify_roundtrip ... ok
+test relay_client::tests::register_waits_for_ack ... ok
+test ticket::tests::malformed_rejected ... ok
+test wire::tests::arbitrary_sid_length ... ok
+test ticket::tests::payload_layout_matches_go ... ok
+test ticket::tests::wrong_secret_rejected ... ok
+test wire::tests::empty_payload_roundtrip ... ok
+test wire::tests::frame_roundtrip ... ok
+test wire::tests::fragmentation_and_reassembly ... ok
+test wire::tests::oversized_fragment_count_rejected ... ok
+test wire::tests::inflight_messages_are_bounded ... ok
+test ticket::tests::tampered_signature_rejected ... ok
+test wire::tests::out_of_order_reassembly ... ok
+test identity::tests::role_binding_prevents_role_swap ... ok
+test wire::tests::register_roundtrip ... ok
+test wire::tests::short_frames_rejected ... ok
+test identity::tests::session_binding_prevents_replay_elsewhere ... ok
+test identity::tests::impostor_signature_rejected ... ok
+test identity::tests::signature_verifies ... ok
+test relay_client::tests::register_without_ack_is_not_registered ... ok
+test relay_client::tests::register_recovers_after_relay_restart ... ok
+
+test result: ok. 41 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.52s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

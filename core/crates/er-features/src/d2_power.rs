@@ -68,6 +68,134 @@ impl<T: SleepInhibitor> Drop for SleepGuard<'_, T> {
     }
 }
 
+/// 真实平台防睡眠实现：会话期间持有 OS 抑制，Drop/释放时撤销。
+///
+/// macOS: caffeinate -dimsu 子进程；
+/// Linux: systemd-inhibit ... sleep infinity；
+/// Windows: SetThreadExecutionState（ES_CONTINUOUS|SYSTEM_REQUIRED|DISPLAY_REQUIRED）。
+pub struct PlatformInhibitor {
+    child: Option<std::process::Child>,
+    held: bool,
+    #[cfg(windows)]
+    win_held: bool,
+}
+
+impl Default for PlatformInhibitor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl PlatformInhibitor {
+    pub fn new() -> Self {
+        Self {
+            child: None,
+            held: false,
+            #[cfg(windows)]
+            win_held: false,
+        }
+    }
+
+    fn command() -> Option<(&'static str, Vec<&'static str>)> {
+        #[cfg(target_os = "macos")]
+        {
+            return Some(("caffeinate", vec!["-dimsu"]));
+        }
+        #[cfg(target_os = "linux")]
+        {
+            return Some((
+                "systemd-inhibit",
+                vec![
+                    "--what=idle:sleep",
+                    "--who=EasyRemote",
+                    "--why=remote_session",
+                    "--mode=block",
+                    "sleep",
+                    "infinity",
+                ],
+            ));
+        }
+        #[cfg(windows)]
+        {
+            return None; // Windows 走 SetThreadExecutionState
+        }
+        #[allow(unreachable_code)]
+        None
+    }
+}
+
+#[cfg(windows)]
+mod win {
+    #[link(name = "kernel32")]
+    extern "system" {
+        pub fn SetThreadExecutionState(flags: u32) -> u32;
+    }
+    pub const ES_CONTINUOUS: u32 = 0x8000_0000;
+    pub const ES_SYSTEM_REQUIRED: u32 = 0x0000_0001;
+    pub const ES_DISPLAY_REQUIRED: u32 = 0x0000_0002;
+}
+
+impl SleepInhibitor for PlatformInhibitor {
+    fn acquire(&mut self, keep_display: bool) -> Result<(), PowerError> {
+        if self.held {
+            return Ok(());
+        }
+        #[cfg(windows)]
+        {
+            let mut flags = win::ES_CONTINUOUS | win::ES_SYSTEM_REQUIRED;
+            if keep_display {
+                flags |= win::ES_DISPLAY_REQUIRED;
+            }
+            if unsafe { win::SetThreadExecutionState(flags) } == 0 {
+                return Err(PowerError::Denied);
+            }
+            self.win_held = true;
+            self.held = true;
+            return Ok(());
+        }
+        #[cfg(not(windows))]
+        {
+            let _ = keep_display;
+            let Some((program, args)) = Self::command() else {
+                return Err(PowerError::Unsupported);
+            };
+            let child = std::process::Command::new(program)
+                .args(args)
+                .spawn()
+                .map_err(|_| PowerError::Denied)?;
+            self.child = Some(child);
+            self.held = true;
+            Ok(())
+        }
+    }
+
+    fn release(&mut self) -> Result<(), PowerError> {
+        if !self.held {
+            return Ok(());
+        }
+        #[cfg(windows)]
+        {
+            let _ = unsafe { win::SetThreadExecutionState(win::ES_CONTINUOUS) };
+            self.win_held = false;
+            self.held = false;
+            return Ok(());
+        }
+        #[cfg(not(windows))]
+        {
+            if let Some(mut child) = self.child.take() {
+                let _ = child.kill();
+                let _ = child.wait();
+            }
+            self.held = false;
+            Ok(())
+        }
+    }
+
+    fn is_held(&self) -> bool {
+        self.held
+    }
+}
+
 /// 假实现：记录调用次数，用于验证生命周期语义。
 #[derive(Debug, Default)]
 pub struct FakeInhibitor {
@@ -130,15 +258,16 @@ mod tests {
 
     #[test]
     fn guard_releases_on_early_return() {
-        fn run(fake: &mut FakeInhibitor) {
+        fn run(fake: &mut FakeInhibitor, early: bool) -> u8 {
             let _g = SleepGuard::new(fake, false).unwrap();
-            // 模拟提前 return
-            if true {
-                return;
+            // 模拟提前 return（条件来自参数，避免恒真分支）
+            if early {
+                return 1;
             }
+            2
         }
         let mut fake = FakeInhibitor::new();
-        run(&mut fake);
+        assert_eq!(run(&mut fake, true), 1);
         assert!(!fake.is_held());
         assert_eq!(fake.release_count(), 1);
     }
@@ -166,5 +295,24 @@ mod tests {
     fn release_without_acquire_is_ok() {
         let mut fake = FakeInhibitor::new();
         assert!(fake.release().is_ok(), "release must be idempotent");
+    }
+}
+#[cfg(test)]
+mod platform_tests {
+    use super::*;
+
+    #[test]
+    fn platform_inhibitor_is_idempotent() {
+        let mut i = PlatformInhibitor::new();
+        // 不真正 acquire：只验证未持有 release 幂等。
+        assert!(!i.is_held());
+        assert!(i.release().is_ok());
+        assert!(!i.is_held());
+    }
+
+    #[cfg(not(windows))]
+    #[test]
+    fn command_is_defined_on_unix() {
+        assert!(PlatformInhibitor::command().is_some());
     }
 }

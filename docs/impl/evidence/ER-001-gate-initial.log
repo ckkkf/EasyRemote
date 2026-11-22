@@ -1,0 +1,823 @@
+
+== 1/18 scripts: 闸门自测 ==
+TAP version 13
+# Subtest: TestGateMatchesCIJobs
+ok 1 - TestGateMatchesCIJobs
+  ---
+  duration_ms: 0.87925
+  type: 'test'
+  ...
+# Subtest: TestGateFailsWhenAnyStackFails
+ok 2 - TestGateFailsWhenAnyStackFails
+  ---
+  duration_ms: 1.081125
+  type: 'test'
+  ...
+# Subtest: TestGateStepsHaveUniqueIds
+ok 3 - TestGateStepsHaveUniqueIds
+  ---
+  duration_ms: 0.068167
+  type: 'test'
+  ...
+# Subtest: TestReportModeOnlyReports
+ok 4 - TestReportModeOnlyReports
+  ---
+  duration_ms: 0.149
+  type: 'test'
+  ...
+# Subtest: TestAnalyzeRejectsWarningsButAllowsInfo
+ok 5 - TestAnalyzeRejectsWarningsButAllowsInfo
+  ---
+  duration_ms: 0.134666
+  type: 'test'
+  ...
+1..5
+# tests 5
+# suites 0
+# pass 5
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 81.742125
+  PASS
+
+== 2/18 contract: 生成物一致性（错误码/契约/能力台账） ==
+✓ server/internal/errcode/codes_gen.go
+✓ core/crates/er-common/src/errors_gen.rs
+✔ 三端错误码与文档一致
+✗ client/lib/contract.dart 与契约不一致（首个差异行 5）
+  磁盘: "  const Envelope({"
+  期望: "  const Envelope({required this.code, required this.name, required this.data, required this.traceId});"
+契约漂移：先改 docs/spec/contract.yaml 再跑 node scripts/gen-contract.mjs
+  FAIL (exit 1)
+
+== 3/18 contract: 路由清单 vs 契约 ==
+✓ 路由清单与契约一致（31 条）
+  PASS
+
+== 4/18 contract: 禁止模式（httpx / 裸 map） ==
+无新增违规（存量 5 个文件待迁移）
+  PASS
+
+== 5/18 contract: 版本一致性 ==
+  VERSION: 0.2.8
+  core/Cargo.toml (workspace.package.version): 0.2.8
+  web-admin/package.json: 0.2.8
+  client/pubspec.yaml: 0.2.8
+  client/lib/version_gen.dart: 0.2.8
+
+✓ 各处版本一致：0.2.8
+  PASS
+
+== 6/18 go: gofmt ==
+  PASS
+
+== 7/18 go: go vet ==
+  PASS
+
+== 8/18 go: go test -race ==
+?   	github.com/easyremote/server/cmd/admin	[no test files]
+?   	github.com/easyremote/server/cmd/gateway	[no test files]
+?   	github.com/easyremote/server/cmd/lossyproxy	[no test files]
+?   	github.com/easyremote/server/cmd/relay	[no test files]
+?   	github.com/easyremote/server/cmd/rendezvous	[no test files]
+?   	github.com/easyremote/server/cmd/stack	[no test files]
+?   	github.com/easyremote/server/cmd/udptun	[no test files]
+ok  	github.com/easyremote/server/internal/adminapi	17.702s
+ok  	github.com/easyremote/server/internal/adminhttp	8.319s
+ok  	github.com/easyremote/server/internal/adminsession	(cached)
+?   	github.com/easyremote/server/internal/appconfig	[no test files]
+ok  	github.com/easyremote/server/internal/auth	3.308s
+ok  	github.com/easyremote/server/internal/capability	2.006s
+ok  	github.com/easyremote/server/internal/config	(cached)
+?   	github.com/easyremote/server/internal/contract	[no test files]
+ok  	github.com/easyremote/server/internal/device	3.974s
+ok  	github.com/easyremote/server/internal/errcode	(cached)
+ok  	github.com/easyremote/server/internal/gateway	2.528s
+ok  	github.com/easyremote/server/internal/httpx	(cached)
+ok  	github.com/easyremote/server/internal/netdiag	(cached)
+ok  	github.com/easyremote/server/internal/password	(cached)
+ok  	github.com/easyremote/server/internal/ratelimit	(cached)
+ok  	github.com/easyremote/server/internal/relay	(cached)
+ok  	github.com/easyremote/server/internal/relaymgr	(cached)
+ok  	github.com/easyremote/server/internal/serve	(cached)
+ok  	github.com/easyremote/server/internal/session	4.400s
+ok  	github.com/easyremote/server/internal/signal	(cached)
+ok  	github.com/easyremote/server/internal/stack	7.666s
+ok  	github.com/easyremote/server/internal/store	4.350s
+?   	github.com/easyremote/server/internal/store/storetest	[no test files]
+  PASS
+
+== 9/18 go: 响应信封契约（严格） ==
+ok  	github.com/easyremote/server/internal/adminhttp	(cached)
+  PASS
+
+== 10/18 rust: cargo fmt --check ==
+Diff in /Users/ckkk/dev/code/Go/EasyRemote/core/crates/er-abr/src/lib.rs:139:
+         // 降档激进（PRD 5.2.4）：严重拥塞当周期就降，不等待第二个周期。
+         // severe_streak 仍记录用于诊断，但不再当闸门；轻度拥塞保留两周期迟滞，
+         // 避免单个边界周期的假丢包也触发降档。
+-        self.severe_streak = if severe_now { self.severe_streak + 1 } else { 0 };
++        self.severe_streak = if severe_now {
++            self.severe_streak + 1
++        } else {
++            0
++        };
+         self.mild_streak = if mild_now && !severe_now {
+             self.mild_streak + 1
+         } else {
+  FAIL (exit 1)
+
+== 11/18 rust: cargo clippy -D warnings ==
+    Checking er-capture v0.2.8 (/Users/ckkk/dev/code/Go/EasyRemote/core/crates/er-capture)
+    Checking er-codec v0.2.8 (/Users/ckkk/dev/code/Go/EasyRemote/core/crates/er-codec)
+    Checking er-abr v0.2.8 (/Users/ckkk/dev/code/Go/EasyRemote/core/crates/er-abr)
+    Checking egui-winit v0.29.1
+    Checking glutin-winit v0.5.0
+    Checking quinn v0.11.12
+    Checking er-session v0.2.8 (/Users/ckkk/dev/code/Go/EasyRemote/core/crates/er-session)
+    Checking er-input v0.2.8 (/Users/ckkk/dev/code/Go/EasyRemote/core/crates/er-input)
+error: field `cfg` is never read
+   --> crates/er-codec/src/lib.rs:253:5
+    |
+252 | pub struct FakeEncoder {
+    |            ----------- field in this struct
+253 |     cfg: EncodeConfig,
+    |     ^^^
+    |
+    = note: `FakeEncoder` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+    = note: `-D dead-code` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[expect(dead_code)]` or `#[allow(dead_code)]`
+
+    Checking er-features v0.2.8 (/Users/ckkk/dev/code/Go/EasyRemote/core/crates/er-features)
+error: unused variable: `timeout_ms`
+   --> crates/er-capture/src/lib.rs:297:30
+    |
+297 |     fn next_frame(&mut self, timeout_ms: u32) -> Result<Option<RawFrame>, CaptureError> {
+    |                              ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_timeout_ms`
+    |
+    = note: `-D unused-variables` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(unused_variables)]`
+
+error: using `chunks_exact_mut` with a constant chunk size
+  --> crates/er-capture/src/privacy.rs:32:26
+   |
+32 |     for px in frame.data.chunks_exact_mut(4) {
+   |                          ^^^^^^^^^^^^^^^^^^^ help: consider using `as_chunks_mut` instead: `as_chunks_mut::<4>().0`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.100.0/index.html#chunks_exact_to_as_chunks
+   = note: `-D clippy::chunks-exact-to-as-chunks` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(clippy::chunks_exact_to_as_chunks)]`
+
+error: using `chunks_exact` with a constant chunk size
+  --> crates/er-capture/src/privacy.rs:42:29
+   |
+42 |     let mut it = frame.data.chunks_exact(4);
+   |                             ^^^^^^^^^^^^^^^
+   |
+help: consider using `as_chunks::<4>()` instead
+  --> crates/er-capture/src/privacy.rs:42:29
+   |
+42 |     let mut it = frame.data.chunks_exact(4);
+   |                             ^^^^^^^^^^^^^^^
+   = note: you can access the chunks using `it.0.iter()`, and the remainder using `it.1`
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.100.0/index.html#chunks_exact_to_as_chunks
+
+error: could not compile `er-codec` (lib) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+error: using `chunks_exact` with a constant chunk size
+  --> crates/er-capture/src/privacy.rs:92:20
+   |
+92 |             f.data.chunks_exact(4).all(|px| px == [10, 20, 30, 255]),
+   |                    ^^^^^^^^^^^^^^^ help: consider using `as_chunks` instead: `as_chunks::<4>().0.iter()`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.100.0/index.html#chunks_exact_to_as_chunks
+
+error: using `chunks_exact_mut` with a constant chunk size
+   --> crates/er-capture/src/lib.rs:155:20
+    |
+155 |     for px in data.chunks_exact_mut(4) {
+    |                    ^^^^^^^^^^^^^^^^^^^ help: consider using `as_chunks_mut` instead: `as_chunks_mut::<4>().0`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.100.0/index.html#chunks_exact_to_as_chunks
+
+error: could not compile `er-capture` (lib) due to 4 previous errors
+error: could not compile `er-capture` (lib test) due to 5 previous errors
+error: unneeded `return` statement
+   --> crates/er-features/src/d2_power.rs:137:17
+    |
+137 |                 return;
+    |                 ^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.100.0/index.html#needless_return
+    = note: `-D clippy::needless-return` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::needless_return)]`
+help: remove `return`
+    |
+136 -             if true {
+137 -                 return;
+136 +             if true {
+    |
+
+error: could not compile `er-features` (lib test) due to 1 previous error
+  FAIL (exit 101)
+
+== 12/18 rust: cargo test ==
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on build directory
+   Compiling er-common v0.2.8 (/Users/ckkk/dev/code/Go/EasyRemote/core/crates/er-common)
+   Compiling er-capture v0.2.8 (/Users/ckkk/dev/code/Go/EasyRemote/core/crates/er-capture)
+   Compiling er-session v0.2.8 (/Users/ckkk/dev/code/Go/EasyRemote/core/crates/er-session)
+   Compiling er-input v0.2.8 (/Users/ckkk/dev/code/Go/EasyRemote/core/crates/er-input)
+   Compiling core-foundation-sys v0.8.7
+   Compiling objc-sys v0.3.5
+   Compiling ttf-parser v0.25.1
+   Compiling parking_lot_core v0.9.12
+   Compiling emath v0.29.1
+   Compiling lock_api v0.4.14
+   Compiling objc2 v0.5.3
+warning: unused variable: `timeout_ms`
+   --> crates/er-capture/src/lib.rs:297:30
+    |
+297 |     fn next_frame(&mut self, timeout_ms: u32) -> Result<Option<RawFrame>, CaptureError> {
+    |                              ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_timeout_ms`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+   Compiling core-foundation v0.9.4
+   Compiling er-codec v0.2.8 (/Users/ckkk/dev/code/Go/EasyRemote/core/crates/er-codec)
+   Compiling ab_glyph_rasterizer v0.1.10
+   Compiling foreign-types-shared v0.3.1
+   Compiling bitflags v1.3.2
+warning: field `cfg` is never read
+   --> crates/er-codec/src/lib.rs:253:5
+    |
+252 | pub struct FakeEncoder {
+    |            ----------- field in this struct
+253 |     cfg: EncodeConfig,
+    |     ^^^
+    |
+    = note: `FakeEncoder` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+   Compiling dispatch v0.2.0
+   Compiling foreign-types v0.5.0
+   Compiling ecolor v0.29.1
+   Compiling parking_lot v0.12.5
+   Compiling ahash v0.8.12
+   Compiling er-client v0.2.8 (/Users/ckkk/dev/code/Go/EasyRemote/core/crates/er-client)
+   Compiling core-graphics-types v0.1.3
+warning: `er-codec` (lib) generated 1 warning
+   Compiling nohash-hasher v0.2.0
+   Compiling epaint_default_fonts v0.29.1
+warning: `er-capture` (lib) generated 1 warning (run `cargo fix --lib -p er-capture` to apply 1 suggestion)
+   Compiling raw-window-handle v0.6.2
+   Compiling quinn-proto v0.11.19
+   Compiling core-graphics v0.23.2
+   Compiling smol_str v0.2.2
+   Compiling dpi v0.1.2
+   Compiling cursor-icon v1.2.0
+   Compiling cgl v0.3.2
+   Compiling libloading v0.8.9
+   Compiling memoffset v0.9.1
+   Compiling webbrowser v1.2.7
+   Compiling arboard v3.7.0
+warning: variable does not need to be mutable
+   --> crates/er-client/src/agent.rs:237:13
+    |
+237 |         let mut relay = RelayClient::new(self.relay_addr, session_id, &self.device.device_id)
+    |             ----^^^^^
+    |             |
+    |             help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+   Compiling glow v0.14.2
+warning: variable does not need to be mutable
+   --> crates/er-client/src/agent.rs:705:13
+    |
+705 |         let mut relay = RelayClient::new(self.relay_addr, session_id, &self.device.device_id)
+    |             ----^^^^^
+    |             |
+    |             help: remove this `mut`
+
+   Compiling glutin v0.32.3
+warning: unused variable: `arrival_ms`
+   --> crates/er-client/src/link.rs:218:34
+    |
+218 |     pub fn take_cycle(&mut self, arrival_ms: u32, frag: ReassemblyStats) -> Option<FeedbackReport> {
+    |                                  ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_arrival_ms`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+   Compiling er-features v0.2.8 (/Users/ckkk/dev/code/Go/EasyRemote/core/crates/er-features)
+warning: field `gateway_base` is never read
+  --> crates/er-client/src/agent.rs:94:5
+   |
+88 | pub struct TargetAgent {
+   |            ----------- field in this struct
+...
+94 |     gateway_base: String,
+   |     ^^^^^^^^^^^^
+   |
+   = note: `TargetAgent` has a derived impl for the trait `Clone`, but this is intentionally ignored during dead code analysis
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: function `classify_gpu_result` is never used
+  --> crates/er-client/src/encoder.rs:31:15
+   |
+31 | pub(crate) fn classify_gpu_result(
+   |               ^^^^^^^^^^^^^^^^^^^
+
+   Compiling block2 v0.5.1
+   Compiling web-time v1.1.0
+   Compiling static_assertions v1.1.0
+   Compiling er-channels v0.2.8 (/Users/ckkk/dev/code/Go/EasyRemote/core/crates/er-channels)
+   Compiling objc2-foundation v0.2.2
+warning: `er-codec` (lib test) generated 1 warning (1 duplicate)
+   Compiling owned_ttf_parser v0.25.1
+warning: unused import: `Capture`
+ --> crates/er-capture/examples/privacy_check.rs:4:22
+  |
+4 |     use er_capture::{Capture, ScreenCapture};
+  |                      ^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+   Compiling ab_glyph v0.2.32
+warning: struct `CountingEncoder` is never constructed
+   --> crates/er-client/src/encoder.rs:287:12
+    |
+287 |     struct CountingEncoder {
+    |            ^^^^^^^^^^^^^^^
+
+warning: unused import: `Encoder`
+ --> crates/er-codec/examples/pipeline_latency.rs:7:30
+  |
+7 | use er_codec::{EncodeConfig, Encoder, OpenH264Codec};
+  |                              ^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+   Compiling epaint v0.29.1
+warning: `er-capture` (example "privacy_check") generated 1 warning (run `cargo fix --example "privacy_check" -p er-capture` to apply 1 suggestion)
+warning: unused import: `Capture`
+  --> crates/er-codec/examples/nvenc_bench.rs:12:18
+   |
+12 | use er_capture::{Capture, ScreenCapture};
+   |                  ^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `er-codec` (example "pipeline_latency") generated 1 warning (run `cargo fix --example "pipeline_latency" -p er-codec` to apply 1 suggestion)
+warning: `er-client` (lib) generated 5 warnings (run `cargo fix --lib -p er-client` to apply 3 suggestions)
+   Compiling er-ffi v0.2.8 (/Users/ckkk/dev/code/Go/EasyRemote/core/crates/er-ffi)
+warning: `er-codec` (example "nvenc_bench") generated 1 warning (run `cargo fix --example "nvenc_bench" -p er-codec` to apply 1 suggestion)
+warning: unused import: `CStr`
+ --> crates/er-ffi/src/lib.rs:9:31
+  |
+9 | use std::ffi::{c_char, c_int, CStr, CString};
+  |                               ^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `er-client` (lib test) generated 6 warnings (5 duplicates)
+   Compiling quinn v0.11.12
+   Compiling egui v0.29.1
+warning: `er-ffi` (lib) generated 1 warning (run `cargo fix --lib -p er-ffi` to apply 1 suggestion)
+   Compiling er-transport v0.2.8 (/Users/ckkk/dev/code/Go/EasyRemote/core/crates/er-transport)
+warning: `er-ffi` (lib test) generated 1 warning (1 duplicate)
+warning: unused import: `Encoder`
+  --> crates/er-client/examples/weaknet_send.rs:17:46
+   |
+17 | use er_codec::{create_encoder, EncodeConfig, Encoder};
+   |                                              ^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `decode_pubkey`
+  --> crates/er-client/examples/full_session_e2e.rs:11:17
+   |
+11 | use er_client::{decode_pubkey, encode_pubkey, Gateway};
+   |                 ^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `Encoder`
+  --> crates/er-client/examples/full_session_e2e.rs:12:30
+   |
+12 | use er_codec::{EncodeConfig, Encoder, H264Decoder, OpenH264Codec};
+   |                              ^^^^^^^
+
+warning: `er-client` (example "weaknet_send") generated 1 warning
+warning: unused import: `Encoder`
+  --> crates/er-client/examples/xmachine_controller.rs:19:46
+   |
+19 | use er_codec::{create_encoder, EncodeConfig, Encoder};
+   |                                              ^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: variable does not need to be mutable
+   --> crates/er-client/examples/xmachine_controller.rs:124:12
+    |
+124 |         Ok(mut cap) => {
+    |            ----^^^
+    |            |
+    |            help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: `er-client` (example "full_session_e2e") generated 2 warnings (run `cargo fix --example "full_session_e2e" -p er-client` to apply 1 suggestion)
+warning: unused import: `MSG_VIDEO`
+  --> crates/er-client/examples/mac_controller.rs:18:42
+   |
+18 | use er_client::agent::{encode_video_msg, MSG_VIDEO};
+   |                                          ^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `er-client` (example "xmachine_controller") generated 2 warnings (run `cargo fix --example "xmachine_controller" -p er-client` to apply 1 suggestion)
+   Compiling objc2-app-kit v0.2.2
+warning: `er-client` (example "mac_controller") generated 1 warning (run `cargo fix --example "mac_controller" -p er-client` to apply 1 suggestion)
+warning: `er-capture` (lib test) generated 1 warning (1 duplicate)
+   Compiling egui_glow v0.29.1
+   Compiling winit v0.30.13
+   Compiling glutin-winit v0.5.0
+   Compiling egui-winit v0.29.1
+   Compiling eframe v0.29.1
+   Compiling er-winapp v0.2.8 (/Users/ckkk/dev/code/Go/EasyRemote/core/crates/er-winapp)
+warning: fields `width` and `height` are never read
+  --> crates/er-winapp/src/main.rs:32:9
+   |
+31 |     Ready {
+   |     ----- fields in this variant
+32 |         width: usize,
+   |         ^^^^^
+33 |         height: usize,
+   |         ^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `er-winapp` (bin "er-winapp" test) generated 1 warning
+warning: unused dependency `er-features`
+  --> crates/er-ffi/Cargo.toml:15:1
+   |
+15 | er-features = { path = "../er-features" }
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `cargo::unused_dependencies` is set to `warn` by default
+help: consider removing the dependency on `er-features`
+warning: `er-ffi` (manifest) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 13.30s
+     Running unittests src/lib.rs (target/debug/build/er-abr/f6553d128d958d98/out/er_abr-f6553d128d958d98)
+
+running 13 tests
+test tests::cannot_exceed_top_or_bottom ... ok
+test tests::downgrade_then_recover ... ok
+test tests::mild_loss_drops_one_level ... ok
+test tests::mild_single_cycle_does_not_downgrade ... ok
+test tests::queue_backlog_is_severe ... ok
+test tests::noisy_healthy_streak_still_upgrades ... ok
+test tests::ladder_is_monotonic ... ok
+test tests::healthy_streak_required_to_upgrade ... ok
+test tests::high_rtt_counts_as_congestion ... ok
+test tests::neutral_feedback_makes_no_change ... ok
+test tests::severe_loss_drops_two_levels ... ok
+test tests::severe_single_cycle_downgrades ... ok
+test tests::starts_at_requested_level ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/build/er-capture/27f02566326ad7e0/out/er_capture-27f02566326ad7e0)
+
+running 8 tests
+test tests::permission_and_lost_are_distinguishable ... ok
+test privacy::tests::frame_shape_preserved ... ok
+test privacy::tests::no_residual_original_bytes ... ok
+test tests::frame_layout_is_bgra ... ok
+test tests::static_desktop_returns_none ... ok
+test tests::malformed_frame_detected ... ok
+test privacy::tests::privacy_blacks_out_every_pixel ... ok
+test tests::real_capture_produces_well_formed_frame ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.31s
+
+     Running unittests src/lib.rs (target/debug/build/er-channels/79f83edf2ad07c4b/out/er_channels-79f83edf2ad07c4b)
+
+running 13 tests
+test clipboard::tests::kind_whitelist ... ok
+test clipboard::tests::text_syncs_both_ways ... ok
+test clipboard::tests::duplicate_content_not_evaluated ... ok
+test clipboard::tests::no_echo_loop ... ok
+test clipboard::tests::same_hash_different_kind_still_dedups ... ok
+test file_transfer::tests::chunk_count_and_boundaries ... ok
+test file_transfer::tests::duplicate_chunk_is_idempotent ... ok
+test file_transfer::tests::corrupt_chunk_detected_with_index ... ok
+test clipboard::tests::oversized_content_rejected ... ok
+test file_transfer::tests::incomplete_finish_rejected ... ok
+test file_transfer::tests::wrong_file_hash_rejected ... ok
+test file_transfer::tests::resume_from_contiguous_prefix ... ok
+test file_transfer::tests::full_transfer_roundtrip ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+     Running unittests src/lib.rs (target/debug/build/er-client/7982a3e69cabe8be/out/er_client-7982a3e69cabe8be)
+
+running 24 tests
+test encoder::tests::downscale_rejects_short_input ... ok
+test encoder::tests::absent_gpu_result_uses_cpu ... ok
+test encoder::tests::gpu_success_skips_cpu ... ok
+test encoder::tests::no_frame_keeps_gpu_backend_and_skips_cpu ... ok
+test encoder::tests::real_error_falls_back_to_cpu ... ok
+[OpenH264] this = 0x0x1052536c0, Warning:ParamValidation(), AdaptiveQuant(1) is not supported yet for screen content, auto turned off
+[OpenH264] this = 0x0x1052536c0, Warning:ParamValidation(), BackgroundDetection(1) is not supported yet for screen content, auto turned off
+test encoder::tests::downscale_shrinks_and_keeps_channels ... ok
+[OpenH264] this = 0x0x1052536c0, Warning:bEnableFrameSkip = 0,bitrate can't be controlled for RC_QUALITY_MODE,RC_BITRATE_MODE and RC_TIMESTAMP_MODE without enabling skip frame.
+test encoder::tests::no_frame_then_error_transition ... ok
+test gpu_policy::tests::matching_dims_keep_gpu_path ... ok
+test gpu_policy::tests::dimension_mismatch_falls_back_and_reports_both_sizes ... ok
+test gpu_policy::tests::no_fallback_reason_panics ... ok
+test gpu_policy::tests::no_hardware_encoder_falls_back_without_retry ... ok
+test gpu_policy::tests::register_failure_retries_then_falls_back ... ok
+test gpu_policy::tests::state_machine_transitions ... ok
+test link::tests::abr_uses_datagram_loss_not_frame_loss ... ok
+test link::tests::config_uses_source_dims_not_previous_level ... ok
+test link::tests::cumulative_counts_survive_cycles ... ok
+test link::tests::driver_keeps_level_without_loss ... ok
+test link::tests::empty_cycle_reports_nothing ... ok
+test link::tests::feedback_roundtrip ... ok
+test link::tests::loss_is_counted_from_seq_gaps ... ok
+test link::tests::low_fps_does_not_look_like_congestion ... ok
+test link::tests::video_header_roundtrip ... ok
+test link::tests::driver_downgrades_on_loss ... FAILED
+test encoder::tests::reconfigure_applies_new_config ... ok
+
+failures:
+
+---- link::tests::driver_downgrades_on_loss stdout ----
+
+thread 'link::tests::driver_downgrades_on_loss' (19434689) panicked at crates/er-client/src/link.rs:520:9:
+首周期不应立刻降档
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    link::tests::driver_downgrades_on_loss
+
+test result: FAILED. 23 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p er-client --lib`
+  FAIL (exit 101)
+
+== 13/18 flutter: dart format --set-exit-if-changed ==
+Formatted 63 files (0 changed) in 0.21 seconds.
+  PASS
+
+== 14/18 flutter: flutter analyze（error/warning=0） ==
+Analyzing client...                                             
+
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • lib/api.dart:74:9 • prefer_interpolation_to_compose_strings
+   info • Unnecessary use of getter and setter to wrap a field. Try removing the getter and setter and renaming the field • lib/api.dart:433:14 • unnecessary_getters_setters
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • lib/host_service_io.dart:130:7 • prefer_interpolation_to_compose_strings
+   info • 'package:flutter/material.dart' is deprecated and shouldn't be used. Use package:material_ui/material_ui.dart instead. This feature was deprecated after v3.47.0-0.0.pre. Try replacing the use of the deprecated member with the replacement • lib/main.dart:2:1 • deprecated_member_use
+   info • Use the null-aware marker '?' rather than a null check via an 'if'. Try using '?' • lib/native.dart:145:7 • use_null_aware_elements
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • lib/native.dart:164:7 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • lib/native.dart:220:24 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • lib/native.dart:227:11 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • lib/native.dart:229:15 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • lib/native.dart:246:11 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • lib/native.dart:248:15 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • lib/native.dart:295:11 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • lib/native.dart:297:15 • prefer_interpolation_to_compose_strings
+   info • Missing type annotation. Try adding a type annotation • lib/native.dart:433:16 • strict_top_level_inference
+   info • Unnecessary braces in a string interpolation. Try removing the braces • lib/net_probe_io.dart:196:30 • unnecessary_brace_in_string_interps
+   info • Unnecessary braces in a string interpolation. Try removing the braces • lib/net_probe_io.dart:229:26 • unnecessary_brace_in_string_interps
+   info • 'package:flutter/material.dart' is deprecated and shouldn't be used. Use package:material_ui/material_ui.dart instead. This feature was deprecated after v3.47.0-0.0.pre. Try replacing the use of the deprecated member with the replacement • lib/pages/connect_page.dart:3:1 • deprecated_member_use
+   info • Statements in an if should be enclosed in a block. Try wrapping the statement in a block • lib/pages/connect_page.dart:72:7 • curly_braces_in_flow_control_structures
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • lib/pages/connect_page.dart:144:12 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • lib/pages/connect_page.dart:146:9 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • lib/pages/connect_page.dart:407:37 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • lib/pages/connect_page.dart:408:37 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • lib/pages/connect_page.dart:818:19 • prefer_interpolation_to_compose_strings
+   info • 'package:flutter/material.dart' is deprecated and shouldn't be used. Use package:material_ui/material_ui.dart instead. This feature was deprecated after v3.47.0-0.0.pre. Try replacing the use of the deprecated member with the replacement • lib/pages/device_list_page.dart:3:1 • deprecated_member_use
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • lib/pages/device_list_page.dart:201:48 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • lib/pages/device_list_page.dart:205:48 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • lib/pages/device_list_page.dart:228:46 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • lib/pages/device_list_page.dart:289:60 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • lib/pages/device_list_page.dart:301:48 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • lib/pages/device_list_page.dart:305:48 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • lib/pages/device_list_page.dart:424:21 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • lib/pages/device_list_page.dart:492:27 • prefer_interpolation_to_compose_strings
+   info • 'package:flutter/material.dart' is deprecated and shouldn't be used. Use package:material_ui/material_ui.dart instead. This feature was deprecated after v3.47.0-0.0.pre. Try replacing the use of the deprecated member with the replacement • lib/pages/diagnostics_page.dart:3:1 • deprecated_member_use
+   info • Unnecessary braces in a string interpolation. Try removing the braces • lib/pages/diagnostics_page.dart:143:52 • unnecessary_brace_in_string_interps
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • lib/pages/diagnostics_page.dart:193:33 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • lib/pages/diagnostics_page.dart:208:33 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • lib/pages/diagnostics_page.dart:211:33 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • lib/pages/diagnostics_page.dart:213:37 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • lib/pages/diagnostics_page.dart:310:29 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • lib/pages/diagnostics_page.dart:312:33 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • lib/pages/diagnostics_page.dart:322:35 • prefer_interpolation_to_compose_strings
+   info • 'package:flutter/material.dart' is deprecated and shouldn't be used. Use package:material_ui/material_ui.dart instead. This feature was deprecated after v3.47.0-0.0.pre. Try replacing the use of the deprecated member with the replacement • lib/pages/files_page.dart:4:1 • deprecated_member_use
+   info • Statements in an if should be enclosed in a block. Try wrapping the statement in a block • lib/pages/files_page.dart:1460:5 • curly_braces_in_flow_control_structures
+   info • 'package:flutter/material.dart' is deprecated and shouldn't be used. Use package:material_ui/material_ui.dart instead. This feature was deprecated after v3.47.0-0.0.pre. Try replacing the use of the deprecated member with the replacement • lib/pages/login_page.dart:1:1 • deprecated_member_use
+   info • 'package:flutter/material.dart' is deprecated and shouldn't be used. Use package:material_ui/material_ui.dart instead. This feature was deprecated after v3.47.0-0.0.pre. Try replacing the use of the deprecated member with the replacement • lib/pages/self_test_page.dart:3:1 • deprecated_member_use
+   info • 'package:flutter/material.dart' is deprecated and shouldn't be used. Use package:material_ui/material_ui.dart instead. This feature was deprecated after v3.47.0-0.0.pre. Try replacing the use of the deprecated member with the replacement • lib/pages/session_page.dart:4:1 • deprecated_member_use
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • lib/pages/session_page.dart:204:12 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • lib/pages/session_page.dart:206:9 • prefer_interpolation_to_compose_strings
+   info • Statements in an if should be enclosed in a block. Try wrapping the statement in a block • lib/pages/session_page.dart:216:7 • curly_braces_in_flow_control_structures
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • lib/pages/session_page.dart:216:14 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • lib/pages/session_page.dart:216:40 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • lib/pages/session_page.dart:250:31 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • lib/pages/session_page.dart:250:60 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • lib/pages/session_page.dart:251:12 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • lib/pages/session_page.dart:317:19 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • lib/pages/session_page.dart:396:23 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • lib/pages/session_page.dart:433:17 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • lib/pages/session_page.dart:488:16 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • lib/pages/session_page.dart:593:21 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • lib/pages/session_page.dart:688:19 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • lib/pages/session_page.dart:731:17 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • lib/pages/session_page.dart:1046:15 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • lib/pages/session_page.dart:1220:7 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • lib/pages/session_page.dart:1221:7 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • lib/pages/session_page.dart:1223:11 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • lib/pages/session_page.dart:1225:11 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • lib/pages/session_page.dart:1228:7 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • lib/pages/session_page.dart:1230:11 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • lib/pages/session_page.dart:1231:30 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • lib/pages/session_page.dart:1232:11 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • lib/pages/session_page.dart:1235:7 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • lib/pages/session_page.dart:1237:7 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • lib/pages/session_page.dart:1313:33 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • lib/pages/session_page.dart:1315:37 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • lib/pages/session_page.dart:1371:43 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • lib/pages/session_page.dart:1398:43 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • lib/pages/session_page.dart:1400:47 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • lib/pages/session_page.dart:1417:33 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • lib/pages/session_page.dart:1420:40 • prefer_interpolation_to_compose_strings
+   info • 'package:flutter/material.dart' is deprecated and shouldn't be used. Use package:material_ui/material_ui.dart instead. This feature was deprecated after v3.47.0-0.0.pre. Try replacing the use of the deprecated member with the replacement • lib/pages/settings_page.dart:1:1 • deprecated_member_use
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • lib/pages/settings_page.dart:62:16 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • lib/pages/settings_page.dart:316:43 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • lib/pages/settings_page.dart:325:36 • prefer_interpolation_to_compose_strings
+   info • 'package:flutter/material.dart' is deprecated and shouldn't be used. Use package:material_ui/material_ui.dart instead. This feature was deprecated after v3.47.0-0.0.pre. Try replacing the use of the deprecated member with the replacement • lib/prefs.dart:9:1 • deprecated_member_use
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • lib/prefs_store_io.dart:18:15 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • lib/session_video_io.dart:83:22 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • lib/session_video_io.dart:84:22 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • lib/session_video_io.dart:101:7 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • lib/session_video_io.dart:139:20 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • lib/session_video_io.dart:143:18 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • lib/session_video_io.dart:146:18 • prefer_interpolation_to_compose_strings
+   info • 'package:flutter/material.dart' is deprecated and shouldn't be used. Use package:material_ui/material_ui.dart instead. This feature was deprecated after v3.47.0-0.0.pre. Try replacing the use of the deprecated member with the replacement • lib/shell.dart:1:1 • deprecated_member_use
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • lib/shell.dart:289:25 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • lib/shell.dart:350:25 • prefer_interpolation_to_compose_strings
+   info • 'package:flutter/material.dart' is deprecated and shouldn't be used. Use package:material_ui/material_ui.dart instead. This feature was deprecated after v3.47.0-0.0.pre. Try replacing the use of the deprecated member with the replacement • lib/theme.dart:1:1 • deprecated_member_use
+   info • 'package:flutter/material.dart' is deprecated and shouldn't be used. Use package:material_ui/material_ui.dart instead. This feature was deprecated after v3.47.0-0.0.pre. Try replacing the use of the deprecated member with the replacement • test/connect_code_input_test.dart:8:1 • deprecated_member_use
+   info • 'package:flutter/material.dart' is deprecated and shouldn't be used. Use package:material_ui/material_ui.dart instead. This feature was deprecated after v3.47.0-0.0.pre. Try replacing the use of the deprecated member with the replacement • test/connect_pending_test.dart:7:1 • deprecated_member_use
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • test/native_test.dart:17:13 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • test/native_test.dart:95:15 • prefer_interpolation_to_compose_strings
+   info • 'package:flutter/material.dart' is deprecated and shouldn't be used. Use package:material_ui/material_ui.dart instead. This feature was deprecated after v3.47.0-0.0.pre. Try replacing the use of the deprecated member with the replacement • test/p2_login_files_test.dart:3:1 • deprecated_member_use
+   info • 'package:flutter/material.dart' is deprecated and shouldn't be used. Use package:material_ui/material_ui.dart instead. This feature was deprecated after v3.47.0-0.0.pre. Try replacing the use of the deprecated member with the replacement • test/settings_prefs_test.dart:8:1 • deprecated_member_use
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • test/settings_prefs_test.dart:22:38 • prefer_interpolation_to_compose_strings
+   info • 'package:flutter/material.dart' is deprecated and shouldn't be used. Use package:material_ui/material_ui.dart instead. This feature was deprecated after v3.47.0-0.0.pre. Try replacing the use of the deprecated member with the replacement • test/shell_nav_test.dart:8:1 • deprecated_member_use
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • test/shell_nav_test.dart:56:17 • prefer_interpolation_to_compose_strings
+   info • 'package:flutter/material.dart' is deprecated and shouldn't be used. Use package:material_ui/material_ui.dart instead. This feature was deprecated after v3.47.0-0.0.pre. Try replacing the use of the deprecated member with the replacement • test/widget_test.dart:1:1 • deprecated_member_use
+   info • 'package:flutter/material.dart' is deprecated and shouldn't be used. Use package:material_ui/material_ui.dart instead. This feature was deprecated after v3.47.0-0.0.pre. Try replacing the use of the deprecated member with the replacement • test/zz_dbg_test.dart:1:1 • deprecated_member_use
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • test/zz_dbg_test.dart:41:16 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • test/zz_dbg_test.dart:43:7 • prefer_interpolation_to_compose_strings
+   info • Don't invoke 'print' in production code. Try using a logging framework • test/zz_plain_test.dart:19:5 • avoid_print
+   info • Don't invoke 'print' in production code. Try using a logging framework • test/zz_plain_test.dart:23:5 • avoid_print
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • test/zz_plain_test.dart:23:11 • prefer_interpolation_to_compose_strings
+
+111 issues found. (ran in 1.3s)
+  → 111 个存量 info
+  PASS
+
+== 15/18 flutter: flutter test ==
+00:00 +0: loading /Users/ckkk/dev/code/Go/EasyRemote/client/test/connect_code_input_test.dart
+00:00 +0: /Users/ckkk/dev/code/Go/EasyRemote/client/test/connect_code_input_test.dart: 每格都是真 TextField，且光标可见
+00:00 +0: /Users/ckkk/dev/code/Go/EasyRemote/client/test/session_e2e_test.dart: 完整会话：登录→建会话→握手→加密→解码
+skip: ER_GATEWAY_URL / ER_RELAY_ADDR not set
+00:00 +1: /Users/ckkk/dev/code/Go/EasyRemote/client/test/connect_code_input_test.dart: 每格都是真 TextField，且光标可见
+00:00 +2: /Users/ckkk/dev/code/Go/EasyRemote/client/test/connect_code_input_test.dart: 每格都是真 TextField，且光标可见
+00:00 +3: /Users/ckkk/dev/code/Go/EasyRemote/client/test/settings_prefs_test.dart: 隐私屏/防休眠未接入：没有开关，点了也不改偏好
+00:01 +4: /Users/ckkk/dev/code/Go/EasyRemote/client/test/p2_login_files_test.dart: 登录页是原型单表单：没有手机号/邮箱大 Tab，邮箱入口可点开弹窗
+00:01 +5: /Users/ckkk/dev/code/Go/EasyRemote/client/test/p2_login_files_test.dart: 登录页是原型单表单：没有手机号/邮箱大 Tab，邮箱入口可点开弹窗
+00:01 +6: /Users/ckkk/dev/code/Go/EasyRemote/client/test/connect_pending_test.dart: 请求中显示等待条与取消，取消后回到可操作状态
+00:01 +7: /Users/ckkk/dev/code/Go/EasyRemote/client/test/connect_pending_test.dart: 请求中显示等待条与取消，取消后回到可操作状态
+00:01 +8: /Users/ckkk/dev/code/Go/EasyRemote/client/test/connect_pending_test.dart: 请求中显示等待条与取消，取消后回到可操作状态
+00:01 +9: /Users/ckkk/dev/code/Go/EasyRemote/client/test/connect_pending_test.dart: 请求中显示等待条与取消，取消后回到可操作状态
+00:01 +10: /Users/ckkk/dev/code/Go/EasyRemote/client/test/connect_pending_test.dart: 请求中显示等待条与取消，取消后回到可操作状态
+00:01 +11: /Users/ckkk/dev/code/Go/EasyRemote/client/test/connect_pending_test.dart: 请求中显示等待条与取消，取消后回到可操作状态
+00:01 +12: /Users/ckkk/dev/code/Go/EasyRemote/client/test/connect_pending_test.dart: 请求中显示等待条与取消，取消后回到可操作状态
+00:01 +13: /Users/ckkk/dev/code/Go/EasyRemote/client/test/connect_pending_test.dart: 请求中显示等待条与取消，取消后回到可操作状态
+00:02 +14: /Users/ckkk/dev/code/Go/EasyRemote/client/test/connect_pending_test.dart: 请求中显示等待条与取消，取消后回到可操作状态
+00:02 +15: /Users/ckkk/dev/code/Go/EasyRemote/client/test/widget_test.dart: 设置页展示隐私屏与防睡眠（未接入，只读）
+00:02 +16: /Users/ckkk/dev/code/Go/EasyRemote/client/test/widget_test.dart: 设置页展示隐私屏与防睡眠（未接入，只读）
+00:02 +17: /Users/ckkk/dev/code/Go/EasyRemote/client/test/widget_test.dart: 设置页展示隐私屏与防睡眠（未接入，只读）
+00:02 +18: /Users/ckkk/dev/code/Go/EasyRemote/client/test/widget_test.dart: 设置页展示隐私屏与防睡眠（未接入，只读）
+00:02 +19: /Users/ckkk/dev/code/Go/EasyRemote/client/test/widget_test.dart: 设置页展示隐私屏与防睡眠（未接入，只读）
+00:02 +20: /Users/ckkk/dev/code/Go/EasyRemote/client/test/zz_dbg_test.dart: debug send vs submit
+00:02 +21: /Users/ckkk/dev/code/Go/EasyRemote/client/test/zz_dbg_test.dart: debug send vs submit
+00:02 +22: /Users/ckkk/dev/code/Go/EasyRemote/client/test/zz_dbg_test.dart: debug send vs submit
+00:02 +22: /Users/ckkk/dev/code/Go/EasyRemote/client/test/zz_plain_test.dart: loginEmail completes
+DBG calling
+00:02 +23: /Users/ckkk/dev/code/Go/EasyRemote/client/test/zz_dbg_test.dart: debug send vs submit
+00:02 +24: /Users/ckkk/dev/code/Go/EasyRemote/client/test/zz_dbg_test.dart: debug send vs submit
+00:02 +24: /Users/ckkk/dev/code/Go/EasyRemote/client/test/zz_plain_test.dart: loginEmail completes
+DBG done token=t
+00:02 +25: /Users/ckkk/dev/code/Go/EasyRemote/client/test/zz_dbg_test.dart: debug send vs submit
+00:02 +26: /Users/ckkk/dev/code/Go/EasyRemote/client/test/zz_dbg_test.dart: debug send vs submit
+00:02 +27: /Users/ckkk/dev/code/Go/EasyRemote/client/test/zz_dbg_test.dart: debug send vs submit
+00:02 +28: /Users/ckkk/dev/code/Go/EasyRemote/client/test/zz_dbg_test.dart: debug send vs submit
+00:02 +29: /Users/ckkk/dev/code/Go/EasyRemote/client/test/zz_dbg_test.dart: debug send vs submit
+00:02 +30: /Users/ckkk/dev/code/Go/EasyRemote/client/test/zz_dbg_test.dart: debug send vs submit
+00:02 +31: /Users/ckkk/dev/code/Go/EasyRemote/client/test/zz_dbg_test.dart: debug send vs submit
+00:02 +32: /Users/ckkk/dev/code/Go/EasyRemote/client/test/zz_dbg_test.dart: debug send vs submit
+00:02 +33: /Users/ckkk/dev/code/Go/EasyRemote/client/test/zz_dbg_test.dart: debug send vs submit
+00:02 +34: /Users/ckkk/dev/code/Go/EasyRemote/client/test/zz_dbg_test.dart: debug send vs submit
+00:03 +35: /Users/ckkk/dev/code/Go/EasyRemote/client/test/zz_dbg_test.dart: debug send vs submit
+after send pumps calls=/v1/auth/email/code
+notice=1
+00:03 +36: /Users/ckkk/dev/code/Go/EasyRemote/client/test/widget_test.dart: 自检页渲染输入与按钮
+00:03 +37: /Users/ckkk/dev/code/Go/EasyRemote/client/test/shell_nav_test.dart: 设置导航固定在侧边栏最下方；切页保留页面状态
+00:03 +38: /Users/ckkk/dev/code/Go/EasyRemote/client/test/shell_nav_test.dart: 设置导航固定在侧边栏最下方；切页保留页面状态
+00:03 +39: /Users/ckkk/dev/code/Go/EasyRemote/client/test/shell_nav_test.dart: 设置导航固定在侧边栏最下方；切页保留页面状态
+00:03 +40: /Users/ckkk/dev/code/Go/EasyRemote/client/test/shell_nav_test.dart: 设置导航固定在侧边栏最下方；切页保留页面状态
+00:03 +41: /Users/ckkk/dev/code/Go/EasyRemote/client/test/shell_nav_test.dart: 设置导航固定在侧边栏最下方；切页保留页面状态
+00:03 +42: /Users/ckkk/dev/code/Go/EasyRemote/client/test/shell_nav_test.dart: 设置导航固定在侧边栏最下方；切页保留页面状态
+00:03 +43: /Users/ckkk/dev/code/Go/EasyRemote/client/test/shell_nav_test.dart: 设置导航固定在侧边栏最下方；切页保留页面状态
+00:03 +44: /Users/ckkk/dev/code/Go/EasyRemote/client/test/shell_nav_test.dart: 设置导航固定在侧边栏最下方；切页保留页面状态
+00:03 +45: /Users/ckkk/dev/code/Go/EasyRemote/client/test/shell_nav_test.dart: 设置导航固定在侧边栏最下方；切页保留页面状态
+00:03 +46: /Users/ckkk/dev/code/Go/EasyRemote/client/test/shell_nav_test.dart: 设置导航固定在侧边栏最下方；切页保留页面状态
+00:03 +47: /Users/ckkk/dev/code/Go/EasyRemote/client/test/shell_nav_test.dart: 设置导航固定在侧边栏最下方；切页保留页面状态
+00:03 +48: /Users/ckkk/dev/code/Go/EasyRemote/client/test/shell_nav_test.dart: 设置导航固定在侧边栏最下方；切页保留页面状态
+00:03 +49: /Users/ckkk/dev/code/Go/EasyRemote/client/test/shell_nav_test.dart: 设置导航固定在侧边栏最下方；切页保留页面状态
+00:04 +50: /Users/ckkk/dev/code/Go/EasyRemote/client/test/shell_nav_test.dart: 设置导航固定在侧边栏最下方；切页保留页面状态
+00:04 +50: /Users/ckkk/dev/code/Go/EasyRemote/client/test/host_link_test.dart: 设备码 + 验证码 的完整会话
+skip: ER_GATEWAY_URL / ER_RELAY_ADDR not set
+00:04 +51: /Users/ckkk/dev/code/Go/EasyRemote/client/test/shell_nav_test.dart: 设置导航固定在侧边栏最下方；切页保留页面状态
+00:04 +52: /Users/ckkk/dev/code/Go/EasyRemote/client/test/shell_nav_test.dart: 设置导航固定在侧边栏最下方；切页保留页面状态
+00:04 +53: /Users/ckkk/dev/code/Go/EasyRemote/client/test/shell_nav_test.dart: 设置导航固定在侧边栏最下方；切页保留页面状态
+00:04 +54: /Users/ckkk/dev/code/Go/EasyRemote/client/test/shell_nav_test.dart: 设置导航固定在侧边栏最下方；切页保留页面状态
+00:04 +55: /Users/ckkk/dev/code/Go/EasyRemote/client/test/shell_nav_test.dart: 设置导航固定在侧边栏最下方；切页保留页面状态
+00:04 +56: /Users/ckkk/dev/code/Go/EasyRemote/client/test/shell_nav_test.dart: 设置导航固定在侧边栏最下方；切页保留页面状态
+00:04 +57: /Users/ckkk/dev/code/Go/EasyRemote/client/test/shell_nav_test.dart: 设置导航固定在侧边栏最下方；切页保留页面状态
+00:04 +58: /Users/ckkk/dev/code/Go/EasyRemote/client/test/native_test.dart: 编码产出的 H.264 以 Annex-B 起始码开头
+Shell: [OpenH264] this = 0x0x9d2ecc120, Warning:ParamValidation(), AdaptiveQuant(1) is not supported yet for screen content, auto turned off
+Shell: [OpenH264] this = 0x0x9d2ecc120, Warning:ParamValidation(), BackgroundDetection(1) is not supported yet for screen content, auto turned off
+Shell: [OpenH264] this = 0x0x9d2ecc120, Warning:bEnableFrameSkip = 0,bitrate can't be controlled for RC_QUALITY_MODE,RC_BITRATE_MODE and RC_TIMESTAMP_MODE without enabling skip frame.
+00:04 +59: /Users/ckkk/dev/code/Go/EasyRemote/client/test/native_test.dart: 编码产出的 H.264 以 Annex-B 起始码开头
+00:05 +60: /Users/ckkk/dev/code/Go/EasyRemote/client/test/native_test.dart: ABR 决策可跨边界返回
+00:05 +61: /Users/ckkk/dev/code/Go/EasyRemote/client/test/native_test.dart: 重复 close 安全
+00:05 +62: /Users/ckkk/dev/code/Go/EasyRemote/client/test/native_test.dart: (tearDownAll)
+00:05 +62: All tests passed!
+  PASS
+
+== 16/18 web: web-admin tsc --noEmit ==
+  PASS
+
+== 17/18 web: web-admin npm test ==
+
+> easyremote-admin@0.2.8 test
+> vitest run --run
+
+
+ RUN  v2.1.9 /Users/ckkk/dev/code/Go/EasyRemote/web-admin
+
+ ✓ tests/gate.test.ts (3 tests) 2ms
+
+ Test Files  1 passed (1)
+      Tests  3 passed (3)
+   Start at  12:36:04
+   Duration  290ms (transform 22ms, setup 0ms, collect 15ms, tests 2ms, environment 0ms, prepare 45ms)
+
+  PASS
+
+== 18/18 web: web-admin build ==
+
+> easyremote-admin@0.2.8 build
+> tsc -b && vite build
+
+vite v8.3.8 building client environment for production...
+transforming...
+✓ 18 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                   0.41 kB │ gzip:  0.29 kB
+dist/assets/index-tFSv-zr6.css    9.63 kB │ gzip:  2.70 kB
+dist/assets/index-Cda8433E.js   255.41 kB │ gzip: 77.92 kB
+
+✓ built in 604ms
+  PASS
+
+== 汇总 ==
+  scripts   PASS
+  contract  FAIL (contract-gen)
+  go        PASS
+  rust      FAIL (rust-fmt, rust-clippy, rust-test)
+  flutter   PASS
+  web       PASS
+
+GATE: FAIL

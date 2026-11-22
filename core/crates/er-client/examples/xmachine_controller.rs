@@ -16,7 +16,7 @@ use std::time::Duration;
 use er_capture::{Capture, ScreenCapture};
 use er_client::agent::{encode_video_msg, ControllerAgent, MSG_VIDEO};
 use er_client::link::VideoHeader;
-use er_codec::{create_encoder, EncodeConfig, Encoder};
+use er_codec::{create_encoder, EncodeConfig};
 use er_input::InputEvent;
 use er_session::crypto::CryptoSession;
 use er_session::relay_client::RelayClient;
@@ -121,7 +121,7 @@ fn main() {
 
     // ① 发给被控端视频帧
     match ScreenCapture::open_primary() {
-        Ok(mut cap) => {
+        Ok(cap) => {
             let info = cap.info();
             println!("MAC: capture_ok {}x{}", info.width, info.height);
             let sizes = ctrl

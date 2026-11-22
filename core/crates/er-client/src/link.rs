@@ -138,6 +138,11 @@ impl FeedbackReport {
             loss_pct,
             rtt_ms,
             queue_ms: self.queue_ms,
+            // 反馈报文暂未携带吞吐/编码队列；用发送队列作为缓冲代理，
+            // 其余保持 0（未知），ABR 不会据此误判。
+            throughput_kbps: 0,
+            buffer_ms: self.queue_ms,
+            encode_queue: 0,
         }
     }
 }
@@ -215,7 +220,11 @@ impl LinkStats {
     /// 是本报告里**丢包**的主口径。
     ///
     /// 周期内**一帧都没收到**时返回 None（没数据就没有可判定的丢帧率）。
-    pub fn take_cycle(&mut self, arrival_ms: u32, frag: ReassemblyStats) -> Option<FeedbackReport> {
+    pub fn take_cycle(
+        &mut self,
+        _arrival_ms: u32,
+        frag: ReassemblyStats,
+    ) -> Option<FeedbackReport> {
         let (Some(cbase), cum_base) = (self.cycle_base_seq, self.cum_base_seq.unwrap_or(0)) else {
             return None;
         };
@@ -516,9 +525,10 @@ mod tests {
             frag_missing: 150,
             datagram_loss_pct: 15.0,
         };
-        // 迟滞：连续两周期严重拥塞才降档
-        assert!(d.on_report(&r, 30).is_none(), "首周期不应立刻降档");
-        let first = d.on_report(&r, 30).expect("second cycle should downgrade");
+        // PRD 5.2.4：严重拥塞单周期即降，首份报告就必须改档。
+        let first = d
+            .on_report(&r, 30)
+            .expect("severe loss must downgrade on the first cycle");
         assert_eq!(first.0.level.name, "900p30");
         // 继续喂同一份（累积）报告，直到出现分辨率降档或档位不再变化
         let mut last_w = first.1.width;

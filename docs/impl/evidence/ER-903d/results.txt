@@ -1,0 +1,10 @@
+start health=200 ready=200 config=200
+== kill redis ==
+health after redis kill=200 ready=503 config=401
+== restart redis ==
+health after redis restart=200 ready=200 config=401
+relogin config=200
+== kill postgres ==
+health after pg kill=200 ready=503 config=500
+== restart postgres ==
+health after pg restart=200 ready=200 config=200

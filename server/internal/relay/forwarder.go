@@ -18,10 +18,14 @@ const (
 	FrameRegister    byte = 1 // [type][u16 sidLen][sid][u16 devLen][devID][ticket]
 	FrameData        byte = 2 // [type][u16 sidLen][sid][payload]
 	FrameNodeForward byte = 3 // [type][u16 sidLen][sid][u16 devLen][targetDev][payload]
+	// FrameRegisterAck 确认注册成功；客户端只有收到它才认为已注册。
+	FrameRegisterAck byte = 4
 )
 
 // MaxDatagram 是单个 UDP 包上限。
-const MaxDatagram = 64 * 1024
+// MaxDatagram 是单个 UDP 包上限。分片载荷控制在 1200B 以内，2048 足够容纳
+// 帧头/设备 id，同时避免放大攻击面。
+const MaxDatagram = 2048
 
 // ErrShort 表示包长度不足。
 var ErrShort = errors.New("relay: short frame")

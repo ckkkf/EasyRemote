@@ -8,8 +8,8 @@ use std::net::SocketAddr;
 use std::time::Duration;
 
 use er_capture::{Capture, ScreenCapture};
-use er_client::{decode_pubkey, encode_pubkey, Gateway};
-use er_codec::{EncodeConfig, Encoder, H264Decoder, OpenH264Codec};
+use er_client::{encode_pubkey, Gateway};
+use er_codec::{EncodeConfig, H264Decoder, OpenH264Codec};
 use er_session::crypto::CryptoSession;
 use er_session::identity::{sign_handshake, verify_handshake, DeviceIdentity, Handshake};
 use er_session::relay_client::RelayClient;

@@ -18,7 +18,7 @@ import (
 func TestProductionRefusesMFADisabled(t *testing.T) {
 	t.Setenv("ER_ENV", "production")
 	t.Setenv("ER_ADMIN_TOTP_OFF", "1")
-	_, err := NewWithStoreAndSessions(store.NewMemory(), adminsession.New(nil, time.Hour), ratelimit.NewMemory(), adminapi.NewMemoryReplayGuard())
+	_, err := NewWithStoreAndSessions(store.NewMemory(), adminsession.New(nil, time.Hour), ratelimit.NewMemory(), adminapi.NewMemoryReplayGuard(), nil, nil, nil)
 	if err == nil || !strings.Contains(err.Error(), "ER_ADMIN_TOTP_OFF") {
 		t.Fatalf("want production refusal, got %v", err)
 	}
@@ -32,7 +32,7 @@ func TestDevMFADisabledAllowsEmptyCode(t *testing.T) {
 	if err := SeedDevAdmin(context.Background(), mem); err != nil {
 		t.Fatalf("seed: %v", err)
 	}
-	h, err := NewWithStoreAndSessions(mem, adminsession.New(nil, time.Hour), ratelimit.NewMemory(), adminapi.NewMemoryReplayGuard())
+	h, err := NewWithStoreAndSessions(mem, adminsession.New(nil, time.Hour), ratelimit.NewMemory(), adminapi.NewMemoryReplayGuard(), nil, nil, nil)
 	if err != nil {
 		t.Fatalf("assemble: %v", err)
 	}
@@ -56,7 +56,7 @@ func TestDevMFAOnRejectsEmptyCode(t *testing.T) {
 	if err := SeedDevAdmin(context.Background(), mem); err != nil {
 		t.Fatalf("seed: %v", err)
 	}
-	h, err := NewWithStoreAndSessions(mem, adminsession.New(nil, time.Hour), ratelimit.NewMemory(), adminapi.NewMemoryReplayGuard())
+	h, err := NewWithStoreAndSessions(mem, adminsession.New(nil, time.Hour), ratelimit.NewMemory(), adminapi.NewMemoryReplayGuard(), nil, nil, nil)
 	if err != nil {
 		t.Fatalf("assemble: %v", err)
 	}

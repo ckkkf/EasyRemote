@@ -9,8 +9,6 @@
 //! 2880x1620 实测约 600ms/帧），这正是端到端主瓶颈；DXGI Desktop Duplication
 //! 的 GPU 纹理路径把它压到毫秒级，见 docs/impl/evidence/windows-2026-11-20-dxgi/。
 
-pub mod privacy;
-
 #[cfg(target_os = "windows")]
 pub mod dxgi;
 
@@ -152,7 +150,8 @@ fn xcap_grab(display: &xcap::Monitor) -> Result<RawFrame, CaptureError> {
     let (w, h) = (image.width(), image.height());
     // xcap 返回 RGBA；对外统一成 BGRA 以匹配编码器输入
     let mut data = image.into_raw();
-    for px in data.chunks_exact_mut(4) {
+    let (pixels, _) = data.as_chunks_mut::<4>();
+    for px in pixels {
         px.swap(0, 2);
     }
     let ts_ms = std::time::SystemTime::now()
@@ -294,12 +293,12 @@ impl ScreenCapture {
 }
 
 impl Capture for ScreenCapture {
-    fn next_frame(&mut self, timeout_ms: u32) -> Result<Option<RawFrame>, CaptureError> {
+    fn next_frame(&mut self, _timeout_ms: u32) -> Result<Option<RawFrame>, CaptureError> {
         #[cfg(target_os = "windows")]
         {
             let mut dxgi_attempt: Option<Result<Option<RawFrame>, CaptureError>> = None;
             if let Backend::Dxgi(cap) = &mut self.backend {
-                dxgi_attempt = Some(cap.grab_cpu(timeout_ms));
+                dxgi_attempt = Some(cap.grab_cpu(_timeout_ms));
             }
             if let Some(res) = dxgi_attempt {
                 match res {

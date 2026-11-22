@@ -79,10 +79,19 @@ type AuditRow struct {
 
 // AdminSession 的字段定义见 docs/spec/contract.yaml。
 type AdminSession struct {
-	Token     string    `json:"token"`
-	Username  string    `json:"username"`
-	Role      string    `json:"role"`
-	ExpiresAt time.Time `json:"expires_at"`
+	Token       string    `json:"token"`
+	Username    string    `json:"username"`
+	Role        string    `json:"role"`
+	Permissions []string  `json:"permissions"`
+	ExpiresAt   time.Time `json:"expires_at"`
+}
+
+// KillSessionResult 的字段定义见 docs/spec/contract.yaml。
+type KillSessionResult struct {
+	Closed     bool   `json:"closed"`
+	Propagated bool   `json:"propagated"`
+	Audited    bool   `json:"audited"`
+	Warning    string `json:"warning,omitempty"`
 }
 
 // ConfigField 的字段定义见 docs/spec/contract.yaml。
@@ -107,6 +116,186 @@ type ConfigPutResult struct {
 	Audited bool              `json:"audited"`
 }
 
+// LoginResult 的字段定义见 docs/spec/contract.yaml。
+type LoginResult struct {
+	Token     string `json:"token"`
+	AccountID string `json:"account_id"`
+}
+
+// DeviceItem 的字段定义见 docs/spec/contract.yaml。
+type DeviceItem struct {
+	DeviceCode string    `json:"device_code"`
+	RawCode    string    `json:"raw_code"`
+	Platform   string    `json:"platform"`
+	Online     bool      `json:"online"`
+	LastSeen   time.Time `json:"last_seen"`
+}
+
+// DeviceListResult 的字段定义见 docs/spec/contract.yaml。
+type DeviceListResult struct {
+	Devices []DeviceItem `json:"devices"`
+}
+
+// VerifyCodeResult 的字段定义见 docs/spec/contract.yaml。
+type VerifyCodeResult struct {
+	Code      string    `json:"code"`
+	ExpiresAt time.Time `json:"expires_at"`
+}
+
+// ConnectResult 的字段定义见 docs/spec/contract.yaml。
+type ConnectResult struct {
+	SessionID string `json:"session_id"`
+	State     string `json:"state"`
+	Trusted   bool   `json:"trusted"`
+}
+
+// ConsentResult 的字段定义见 docs/spec/contract.yaml。
+type ConsentResult struct {
+	SessionID    string    `json:"session_id"`
+	State        string    `json:"state"`
+	AuthExpireAt time.Time `json:"auth_expire_at"`
+}
+
+// SessionStateResult 的字段定义见 docs/spec/contract.yaml。
+type SessionStateResult struct {
+	SessionID string `json:"session_id"`
+	State     string `json:"state"`
+	Reason    string `json:"reason"`
+}
+
+// SessionKeysResult 的字段定义见 docs/spec/contract.yaml。
+type SessionKeysResult struct {
+	SessionID        string `json:"session_id"`
+	ControllerID     string `json:"controller_id"`
+	TargetID         string `json:"target_id"`
+	ControllerPubkey string `json:"controller_pubkey"`
+	TargetPubkey     string `json:"target_pubkey"`
+}
+
+// RelayTicketResult 的字段定义见 docs/spec/contract.yaml。
+type RelayTicketResult struct {
+	Ticket     string `json:"ticket"`
+	SelfDevice string `json:"self_device"`
+}
+
+// EmailCodeResult 的字段定义见 docs/spec/contract.yaml。
+type EmailCodeResult struct {
+	OK    bool   `json:"ok"`
+	Email string `json:"email"`
+}
+
+// EmailLoginResult 的字段定义见 docs/spec/contract.yaml。
+type EmailLoginResult struct {
+	Token     string `json:"token"`
+	AccountID string `json:"account_id"`
+	Email     string `json:"email"`
+}
+
+// AssistCreateResult 的字段定义见 docs/spec/contract.yaml。
+type AssistCreateResult struct {
+	Code           string    `json:"code"`
+	ExpiresAt      time.Time `json:"expires_at"`
+	TargetDeviceID string    `json:"target_device_id"`
+	TtlSeconds     int       `json:"ttl_seconds"`
+}
+
+// AssistRedeemResult 的字段定义见 docs/spec/contract.yaml。
+type AssistRedeemResult struct {
+	SessionID string `json:"session_id"`
+	State     string `json:"state"`
+	TargetID  string `json:"target_id"`
+}
+
+// ReflectResult 的字段定义见 docs/spec/contract.yaml。
+type ReflectResult struct {
+	IP     string `json:"ip"`
+	Port   int    `json:"port"`
+	Source string `json:"source"`
+	Via    string `json:"via"`
+	AtUnix int64  `json:"at_unix"`
+}
+
+// FileRow 的字段定义见 docs/spec/contract.yaml。
+type FileRow struct {
+	ID        string    `json:"id"`
+	AccountID string    `json:"account_id"`
+	DeviceID  string    `json:"device_id"`
+	Name      string    `json:"name"`
+	Size      int64     `json:"size"`
+	Sha256    string    `json:"sha256"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// FileUploadResult 的字段定义见 docs/spec/contract.yaml。
+type FileUploadResult struct {
+	File FileRow `json:"file"`
+}
+
+// FileListResult 的字段定义见 docs/spec/contract.yaml。
+type FileListResult struct {
+	Files  []FileRow `json:"files"`
+	Limit  int       `json:"limit"`
+	Offset int       `json:"offset"`
+}
+
+// FileDeletedResult 的字段定义见 docs/spec/contract.yaml。
+type FileDeletedResult struct {
+	OK      bool `json:"ok"`
+	Deleted bool `json:"deleted"`
+}
+
+// FileTicketResult 的字段定义见 docs/spec/contract.yaml。
+type FileTicketResult struct {
+	URL       string    `json:"url"`
+	ExpiresAt time.Time `json:"expires_at"`
+	Name      string    `json:"name"`
+}
+
+// SessionLimits 的字段定义见 docs/spec/contract.yaml。
+type SessionLimits struct {
+	MaxMinutes int `json:"max_minutes"`
+}
+
+// FileLimits 的字段定义见 docs/spec/contract.yaml。
+type FileLimits struct {
+	MaxBytes int64 `json:"max_bytes"`
+}
+
+// DiagConfig 的字段定义见 docs/spec/contract.yaml。
+type DiagConfig struct {
+	AutoRefreshSecs int `json:"auto_refresh_secs"`
+}
+
+// ClientFlags 的字段定义见 docs/spec/contract.yaml。
+type ClientFlags struct {
+	ForceUpdate bool `json:"force_update"`
+}
+
+// RuntimeEndpoints 的字段定义见 docs/spec/contract.yaml。
+type RuntimeEndpoints struct {
+	GatewayURL      string `json:"gateway_url"`
+	SignalURL       string `json:"signal_url"`
+	RelayAddr       string `json:"relay_addr"`
+	StunURL         string `json:"stun_url"`
+	WebtransportURL string `json:"webtransport_url"`
+	TlsRequired     bool   `json:"tls_required"`
+}
+
+// ClientRuntimeConfig 的字段定义见 docs/spec/contract.yaml。
+type ClientRuntimeConfig struct {
+	Endpoints    RuntimeEndpoints `json:"endpoints"`
+	Session      SessionLimits    `json:"session"`
+	File         FileLimits       `json:"file"`
+	Diag         DiagConfig       `json:"diag"`
+	Client       ClientFlags      `json:"client"`
+	Capabilities map[string]bool  `json:"capabilities"`
+}
+
+// ClientConfigResult 的字段定义见 docs/spec/contract.yaml。
+type ClientConfigResult struct {
+	Config ClientRuntimeConfig `json:"config"`
+}
+
 // Endpoint 是一条接口的契约描述。
 type Endpoint struct {
 	ID       string
@@ -126,29 +315,35 @@ var Endpoints = []Endpoint{
 	{ID: "ADM-05", Method: "POST", Path: "/admin/v1/users/ban", Auth: "admin", Response: "OkResult", Errors: []string{"ADMIN_SESSION_EXPIRED", "ADMIN_FORBIDDEN", "ADMIN_REASON_REQUIRED"}},
 	{ID: "ADM-06", Method: "GET", Path: "/admin/v1/devices", Auth: "admin", Response: "list<DeviceRow>", Errors: []string{"ADMIN_SESSION_EXPIRED", "ADMIN_FORBIDDEN"}},
 	{ID: "ADM-07", Method: "GET", Path: "/admin/v1/sessions", Auth: "admin", Response: "list<SessionRow>", Errors: []string{"ADMIN_SESSION_EXPIRED", "ADMIN_FORBIDDEN"}},
-	{ID: "ADM-08", Method: "POST", Path: "/admin/v1/sessions/kill", Auth: "admin", Response: "OkResult", Errors: []string{"ADMIN_SESSION_EXPIRED", "ADMIN_FORBIDDEN", "ADMIN_REASON_REQUIRED"}},
+	{ID: "ADM-08", Method: "POST", Path: "/admin/v1/sessions/kill", Auth: "admin", Response: "KillSessionResult", Errors: []string{"ADMIN_SESSION_EXPIRED", "ADMIN_FORBIDDEN", "ADMIN_REASON_REQUIRED"}},
 	{ID: "ADM-09", Method: "GET", Path: "/admin/v1/config", Auth: "admin", Response: "ConfigView", Errors: []string{"ADMIN_SESSION_EXPIRED", "ADMIN_FORBIDDEN"}},
 	{ID: "ADM-10", Method: "PUT", Path: "/admin/v1/config", Auth: "admin", Response: "ConfigPutResult", Errors: []string{"ADMIN_SESSION_EXPIRED", "ADMIN_FORBIDDEN", "ADMIN_CONFIG_INVALID"}},
 	{ID: "ADM-11", Method: "GET", Path: "/admin/v1/audit", Auth: "admin", Response: "list<AuditRow>", Errors: []string{"ADMIN_SESSION_EXPIRED", "ADMIN_FORBIDDEN"}},
 	{ID: "GW-01", Method: "POST", Path: "/v1/auth/sms", Auth: "none", Response: "OkResult", Errors: []string{"AUTH_INVALID_CREDENTIAL", "AUTH_SMS_RATE_LIMITED"}},
-	{ID: "GW-02", Method: "POST", Path: "/v1/auth/login", Auth: "none", Response: "any", Errors: []string{"AUTH_INVALID_CREDENTIAL", "AUTH_TOO_MANY_ATTEMPTS"}},
-	{ID: "GW-03", Method: "GET", Path: "/v1/devices", Auth: "bearer", Response: "any", Errors: []string{"AUTH_TOKEN_EXPIRED", "SRV_INTERNAL"}},
+	{ID: "GW-02", Method: "POST", Path: "/v1/auth/login", Auth: "none", Response: "LoginResult", Errors: []string{"AUTH_INVALID_CREDENTIAL", "AUTH_TOO_MANY_ATTEMPTS"}},
+	{ID: "GW-03", Method: "GET", Path: "/v1/devices", Auth: "bearer", Response: "DeviceListResult", Errors: []string{"AUTH_TOKEN_EXPIRED", "SRV_INTERNAL"}},
 	{ID: "GW-04", Method: "POST", Path: "/v1/devices/bind", Auth: "bearer", Response: "BindResult", Errors: []string{"AUTH_TOKEN_EXPIRED", "SRV_INTERNAL"}},
-	{ID: "GW-05", Method: "POST", Path: "/v1/devices/verify-code", Auth: "device", Response: "any", Errors: []string{"CONN_DEVICE_NOT_FOUND", "ADMIN_FORBIDDEN"}},
-	{ID: "GW-06", Method: "POST", Path: "/v1/connect/request", Auth: "bearer", Response: "any", Errors: []string{"CONN_DEVICE_NOT_FOUND", "CONN_DEVICE_OFFLINE", "CONN_CAPTCHA_INVALID", "CONN_RATE_LIMITED"}},
-	{ID: "GW-07", Method: "POST", Path: "/v1/connect/consent", Auth: "device", Response: "any", Errors: []string{"CONN_DEVICE_NOT_FOUND", "ADMIN_FORBIDDEN"}},
-	{ID: "GW-08", Method: "POST", Path: "/v1/connect/status", Auth: "bearer", Response: "any", Errors: []string{"SESSION_NOT_FOUND", "AUTH_TOKEN_EXPIRED"}},
-	{ID: "GW-09", Method: "POST", Path: "/v1/devices/identity", Auth: "device", Response: "any", Errors: []string{"CONN_DEVICE_NOT_FOUND", "ADMIN_FORBIDDEN"}},
-	{ID: "GW-10", Method: "POST", Path: "/v1/connect/keys", Auth: "bearer", Response: "any", Errors: []string{"SESSION_NOT_FOUND", "AUTH_TOKEN_EXPIRED"}},
-	{ID: "GW-11", Method: "POST", Path: "/v1/relay/ticket", Auth: "device", Response: "any", Errors: []string{"SESSION_NOT_FOUND", "SESSION_AUTH_WINDOW_EXCEEDED", "ADMIN_FORBIDDEN"}},
-	{ID: "GW-12", Method: "POST", Path: "/v1/auth/email/code", Auth: "none", Response: "any", Errors: []string{"AUTH_INVALID_CREDENTIAL", "AUTH_SMS_RATE_LIMITED"}},
-	{ID: "GW-13", Method: "POST", Path: "/v1/auth/email/login", Auth: "none", Response: "any", Errors: []string{"AUTH_INVALID_CREDENTIAL", "AUTH_TOO_MANY_ATTEMPTS"}},
-	{ID: "GW-14", Method: "POST", Path: "/v1/files", Auth: "bearer", Response: "any", Errors: []string{"AUTH_TOKEN_EXPIRED", "FILE_READ_FAILED", "CONN_RATE_LIMITED"}},
-	{ID: "GW-15", Method: "GET", Path: "/v1/files/", Auth: "bearer", Response: "any", Errors: []string{"AUTH_TOKEN_EXPIRED", "FILE_NOT_FOUND", "ADMIN_FORBIDDEN"}},
-	{ID: "GW-16", Method: "POST", Path: "/v1/assist/create", Auth: "bearer", Response: "any", Errors: []string{"CONN_DEVICE_NOT_FOUND", "ADMIN_FORBIDDEN", "CONN_RATE_LIMITED"}},
-	{ID: "GW-17", Method: "POST", Path: "/v1/assist/redeem", Auth: "bearer", Response: "any", Errors: []string{"CONN_ASSIST_CODE_INVALID", "CONN_ASSIST_CODE_USED", "CONN_ASSIST_CODE_EXPIRED", "CONN_SELF_CONNECT"}},
-	{ID: "GW-18", Method: "GET", Path: "/v1/config", Auth: "none", Response: "any", Errors: []string{"SRV_INTERNAL"}},
-	{ID: "GW-19", Method: "POST", Path: "/v1/net/reflect", Auth: "none", Response: "any", Errors: []string{"SRV_INTERNAL"}},
-	{ID: "GW-20", Method: "POST", Path: "/v1/devices/password", Auth: "bearer", Response: "any", Errors: []string{"CONN_DEVICE_NOT_FOUND", "CONN_CAPTCHA_INVALID", "AUTH_TOKEN_EXPIRED"}},
+	{ID: "GW-05", Method: "POST", Path: "/v1/devices/verify-code", Auth: "device", Response: "VerifyCodeResult", Errors: []string{"CONN_DEVICE_NOT_FOUND", "ADMIN_FORBIDDEN"}},
+	{ID: "GW-06", Method: "POST", Path: "/v1/connect/request", Auth: "bearer", Response: "ConnectResult", Errors: []string{"CONN_DEVICE_NOT_FOUND", "CONN_DEVICE_OFFLINE", "CONN_CAPTCHA_INVALID", "CONN_RATE_LIMITED"}},
+	{ID: "GW-07", Method: "POST", Path: "/v1/connect/consent", Auth: "device", Response: "ConsentResult", Errors: []string{"CONN_DEVICE_NOT_FOUND", "ADMIN_FORBIDDEN"}},
+	{ID: "GW-08", Method: "GET", Path: "/v1/connect/status", Auth: "bearer", Response: "SessionStateResult", Errors: []string{"SESSION_NOT_FOUND", "AUTH_TOKEN_EXPIRED"}},
+	{ID: "GW-09", Method: "POST", Path: "/v1/devices/identity", Auth: "device", Response: "OkResult", Errors: []string{"CONN_DEVICE_NOT_FOUND", "ADMIN_FORBIDDEN"}},
+	{ID: "GW-10", Method: "GET", Path: "/v1/connect/keys", Auth: "bearer", Response: "SessionKeysResult", Errors: []string{"SESSION_NOT_FOUND", "AUTH_TOKEN_EXPIRED"}},
+	{ID: "GW-11", Method: "POST", Path: "/v1/relay/ticket", Auth: "device", Response: "RelayTicketResult", Errors: []string{"SESSION_NOT_FOUND", "SESSION_AUTH_WINDOW_EXCEEDED", "ADMIN_FORBIDDEN"}},
+	{ID: "GW-12", Method: "POST", Path: "/v1/auth/email/code", Auth: "none", Response: "EmailCodeResult", Errors: []string{"AUTH_INVALID_CREDENTIAL", "AUTH_SMS_RATE_LIMITED"}},
+	{ID: "GW-13", Method: "POST", Path: "/v1/auth/email/login", Auth: "none", Response: "EmailLoginResult", Errors: []string{"AUTH_INVALID_CREDENTIAL", "AUTH_TOO_MANY_ATTEMPTS"}},
+	{ID: "GW-14", Method: "POST", Path: "/v1/files", Auth: "bearer", Response: "FileUploadResult", Errors: []string{"AUTH_TOKEN_EXPIRED", "FILE_READ_FAILED", "CONN_RATE_LIMITED"}},
+	{ID: "GW-15", Method: "GET", Path: "/v1/files/", Auth: "bearer", Response: "binary", Errors: []string{"AUTH_TOKEN_EXPIRED", "FILE_NOT_FOUND", "ADMIN_FORBIDDEN"}},
+	{ID: "GW-16", Method: "POST", Path: "/v1/assist/create", Auth: "bearer", Response: "AssistCreateResult", Errors: []string{"CONN_DEVICE_NOT_FOUND", "ADMIN_FORBIDDEN", "CONN_RATE_LIMITED"}},
+	{ID: "GW-17", Method: "POST", Path: "/v1/assist/redeem", Auth: "bearer", Response: "AssistRedeemResult", Errors: []string{"CONN_ASSIST_CODE_INVALID", "CONN_ASSIST_CODE_USED", "CONN_ASSIST_CODE_EXPIRED", "CONN_SELF_CONNECT"}},
+	{ID: "GW-18", Method: "GET", Path: "/v1/config", Auth: "none", Response: "ClientConfigResult", Errors: []string{"SRV_INTERNAL"}},
+	{ID: "GW-19", Method: "GET", Path: "/v1/net/reflect", Auth: "none", Response: "ReflectResult", Errors: []string{"SRV_INTERNAL"}},
+	{ID: "GW-20", Method: "POST", Path: "/v1/devices/password", Auth: "bearer", Response: "OkResult", Errors: []string{"CONN_DEVICE_NOT_FOUND", "CONN_CAPTCHA_INVALID", "AUTH_TOKEN_EXPIRED"}},
+	{ID: "GW-21", Method: "GET", Path: "/v1/files", Auth: "bearer", Response: "FileListResult", Errors: []string{"AUTH_TOKEN_EXPIRED", "SRV_INTERNAL"}},
+	{ID: "GW-22", Method: "DELETE", Path: "/v1/files/", Auth: "bearer", Response: "FileDeletedResult", Errors: []string{"AUTH_TOKEN_EXPIRED", "FILE_NOT_FOUND", "ADMIN_FORBIDDEN"}},
+	{ID: "GW-23", Method: "POST", Path: "/v1/files/", Auth: "bearer", Response: "FileTicketResult", Errors: []string{"AUTH_TOKEN_EXPIRED", "FILE_NOT_FOUND", "CONN_DEVICE_NOT_FOUND"}},
+	{ID: "GW-24", Method: "POST", Path: "/v1/sessions/ready", Auth: "device", Response: "SessionStateResult", Errors: []string{"SESSION_NOT_FOUND", "ADMIN_FORBIDDEN", "SESSION_AUTH_WINDOW_EXCEEDED"}},
+	{ID: "GW-25", Method: "POST", Path: "/v1/sessions/close", Auth: "device", Response: "SessionStateResult", Errors: []string{"SESSION_NOT_FOUND", "ADMIN_FORBIDDEN"}},
 	{ID: "SYS-01", Method: "GET", Path: "/healthz", Auth: "none", Response: "OkResult", Errors: []string{"[]"}},
+	{ID: "SYS-02", Method: "GET", Path: "/readyz", Auth: "none", Response: "OkResult", Errors: []string{"SRV_DB_UNAVAILABLE", "SRV_CACHE_UNAVAILABLE"}},
 }

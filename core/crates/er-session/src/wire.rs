@@ -10,6 +10,11 @@ use std::collections::HashMap;
 pub const FRAME_REGISTER: u8 = 1;
 pub const FRAME_DATA: u8 = 2;
 pub const FRAME_NODE_FORWARD: u8 = 3;
+/// 中继确认注册成功；客户端必须收到它才算注册完成。
+pub const FRAME_REGISTER_ACK: u8 = 4;
+
+/// ACK 载荷魔数：客户端用它把“迟到的重复 ACK”从数据分片中过滤掉。
+pub const REGISTER_ACK_MAGIC: &[u8] = b"ERACK1";
 
 /// 单个 UDP 包上限。
 ///
@@ -145,6 +150,9 @@ impl ReassemblyStats {
 /// 同时在途的消息数上限。超出后淘汰最旧的（视频场景丢旧帧可接受）。
 const MAX_INFLIGHT: usize = 8;
 
+/// 单条消息分片数上限：防止恶意 total=65535 造成大分配。
+const MAX_FRAGMENTS: usize = 4096;
+
 /// 重组器：支持多消息并发，避免新消息打断未完成的上一条。
 #[derive(Default)]
 pub struct Reassembler {
@@ -156,6 +164,11 @@ pub struct Reassembler {
 impl Reassembler {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// 当前在途消息数（测试/诊断：必须有界）。
+    pub fn inflight_len(&self) -> usize {
+        self.inflight.len()
     }
 
     /// 分片级计数（不清理未完成消息）。
@@ -192,7 +205,7 @@ impl Reassembler {
         let msg_id = u32::from_be_bytes([frag[0], frag[1], frag[2], frag[3]]);
         let idx = u16::from_be_bytes([frag[4], frag[5]]) as usize;
         let total = u16::from_be_bytes([frag[6], frag[7]]) as usize;
-        if total == 0 || idx >= total {
+        if total == 0 || idx >= total || total > MAX_FRAGMENTS {
             return None;
         }
 
@@ -329,5 +342,30 @@ mod tests {
         let frags = fragment(1, &[], 64);
         let mut r = Reassembler::new();
         assert_eq!(r.push(&frags[0]), Some(Vec::new()));
+    }
+    #[test]
+    fn oversized_fragment_count_rejected() {
+        let mut r = Reassembler::new();
+        let mut frag = vec![0u8; FRAG_HEADER];
+        frag[0..4].copy_from_slice(&1u32.to_be_bytes());
+        frag[4..6].copy_from_slice(&0u16.to_be_bytes());
+        frag[6..8].copy_from_slice(&(MAX_FRAGMENTS as u16 + 1).to_be_bytes());
+        assert!(r.push(&frag).is_none());
+    }
+    #[test]
+    fn inflight_messages_are_bounded() {
+        let mut r = Reassembler::new();
+        for id in 0..(MAX_INFLIGHT as u32 + 5) {
+            let mut frag = vec![0u8; FRAG_HEADER];
+            frag[0..4].copy_from_slice(&id.to_be_bytes());
+            frag[4..6].copy_from_slice(&0u16.to_be_bytes());
+            frag[6..8].copy_from_slice(&2u16.to_be_bytes());
+            assert!(r.push(&frag).is_none());
+        }
+        assert!(
+            r.inflight_len() <= MAX_INFLIGHT,
+            "inflight={}",
+            r.inflight_len()
+        );
     }
 }

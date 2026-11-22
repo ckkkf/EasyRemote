@@ -1,0 +1,79 @@
+00:00 +0: loading /Users/ckkk/dev/code/Go/EasyRemote/client/test/connect_code_input_test.dart
+00:00 +0: /Users/ckkk/dev/code/Go/EasyRemote/client/test/settings_prefs_test.dart: 隐私屏/防休眠未接入：没有开关，点了也不改偏好
+00:00 +0: /Users/ckkk/dev/code/Go/EasyRemote/client/test/session_e2e_test.dart: 完整会话：登录→建会话→握手→加密→解码
+skip: ER_GATEWAY_URL / ER_RELAY_ADDR not set
+00:00 +1: /Users/ckkk/dev/code/Go/EasyRemote/client/test/settings_prefs_test.dart: 隐私屏/防休眠未接入：没有开关，点了也不改偏好
+00:00 +2: /Users/ckkk/dev/code/Go/EasyRemote/client/test/settings_prefs_test.dart: 隐私屏/防休眠未接入：没有开关，点了也不改偏好
+00:00 +3: /Users/ckkk/dev/code/Go/EasyRemote/client/test/p2_login_files_test.dart: 登录页是原型单表单：没有手机号/邮箱大 Tab，邮箱入口可点开弹窗
+00:00 +4: /Users/ckkk/dev/code/Go/EasyRemote/client/test/p2_login_files_test.dart: 登录页是原型单表单：没有手机号/邮箱大 Tab，邮箱入口可点开弹窗
+00:00 +5: /Users/ckkk/dev/code/Go/EasyRemote/client/test/connect_pending_test.dart: 请求中显示等待条与取消，取消后回到可操作状态
+00:00 +6: /Users/ckkk/dev/code/Go/EasyRemote/client/test/connect_pending_test.dart: 请求中显示等待条与取消，取消后回到可操作状态
+00:01 +7: /Users/ckkk/dev/code/Go/EasyRemote/client/test/connect_pending_test.dart: 请求中显示等待条与取消，取消后回到可操作状态
+00:01 +8: /Users/ckkk/dev/code/Go/EasyRemote/client/test/connect_pending_test.dart: 请求中显示等待条与取消，取消后回到可操作状态
+00:01 +9: /Users/ckkk/dev/code/Go/EasyRemote/client/test/connect_pending_test.dart: 请求中显示等待条与取消，取消后回到可操作状态
+00:01 +10: /Users/ckkk/dev/code/Go/EasyRemote/client/test/connect_pending_test.dart: 请求中显示等待条与取消，取消后回到可操作状态
+00:01 +11: /Users/ckkk/dev/code/Go/EasyRemote/client/test/connect_pending_test.dart: 请求中显示等待条与取消，取消后回到可操作状态
+00:01 +12: /Users/ckkk/dev/code/Go/EasyRemote/client/test/connect_pending_test.dart: 请求中显示等待条与取消，取消后回到可操作状态
+00:01 +13: /Users/ckkk/dev/code/Go/EasyRemote/client/test/connect_code_input_test.dart: 逐格输入自动前移，输满 9 位后按钮可用
+00:01 +14: /Users/ckkk/dev/code/Go/EasyRemote/client/test/widget_test.dart: 设置页展示隐私屏与防睡眠（未接入，只读）
+00:01 +15: /Users/ckkk/dev/code/Go/EasyRemote/client/test/widget_test.dart: 设置页展示隐私屏与防睡眠（未接入，只读）
+00:01 +16: /Users/ckkk/dev/code/Go/EasyRemote/client/test/widget_test.dart: 设置页展示隐私屏与防睡眠（未接入，只读）
+00:02 +17: /Users/ckkk/dev/code/Go/EasyRemote/client/test/zz_dbg_test.dart: debug send vs submit
+00:02 +18: /Users/ckkk/dev/code/Go/EasyRemote/client/test/zz_dbg_test.dart: debug send vs submit
+00:02 +19: /Users/ckkk/dev/code/Go/EasyRemote/client/test/zz_dbg_test.dart: debug send vs submit
+00:02 +20: /Users/ckkk/dev/code/Go/EasyRemote/client/test/zz_dbg_test.dart: debug send vs submit
+00:02 +21: /Users/ckkk/dev/code/Go/EasyRemote/client/test/zz_dbg_test.dart: debug send vs submit
+00:02 +22: /Users/ckkk/dev/code/Go/EasyRemote/client/test/zz_dbg_test.dart: debug send vs submit
+00:02 +23: /Users/ckkk/dev/code/Go/EasyRemote/client/test/zz_dbg_test.dart: debug send vs submit
+00:02 +24: /Users/ckkk/dev/code/Go/EasyRemote/client/test/zz_dbg_test.dart: debug send vs submit
+00:02 +25: /Users/ckkk/dev/code/Go/EasyRemote/client/test/zz_dbg_test.dart: debug send vs submit
+00:02 +26: /Users/ckkk/dev/code/Go/EasyRemote/client/test/zz_dbg_test.dart: debug send vs submit
+00:02 +27: /Users/ckkk/dev/code/Go/EasyRemote/client/test/zz_dbg_test.dart: debug send vs submit
+00:02 +28: /Users/ckkk/dev/code/Go/EasyRemote/client/test/zz_dbg_test.dart: debug send vs submit
+00:02 +29: /Users/ckkk/dev/code/Go/EasyRemote/client/test/zz_dbg_test.dart: debug send vs submit
+00:02 +30: /Users/ckkk/dev/code/Go/EasyRemote/client/test/zz_dbg_test.dart: debug send vs submit
+after send pumps calls=/v1/auth/email/code
+notice=1
+00:02 +31: /Users/ckkk/dev/code/Go/EasyRemote/client/test/auth_expiry_test.dart: 任意接口返回 AUTH_TOKEN_EXPIRED → authExpired 通知一次并清令牌
+00:02 +32: /Users/ckkk/dev/code/Go/EasyRemote/client/test/auth_expiry_test.dart: 同账号免密直连：direct=true 进入请求体
+00:02 +33: /Users/ckkk/dev/code/Go/EasyRemote/client/test/auth_expiry_test.dart: 反向代理回 "bad gateway" 纯文本：转成人话 ApiException，不抛 SyntaxError
+00:02 +34: /Users/ckkk/dev/code/Go/EasyRemote/client/test/auth_expiry_test.dart: 反向代理回 HTML 错误页：提示 HTML 而不是甩一堆标签
+00:02 +35: /Users/ckkk/dev/code/Go/EasyRemote/client/test/auth_expiry_test.dart: device_id 缺失时 ensureDevice 会自动补绑（修 missing session）
+00:02 +36: /Users/ckkk/dev/code/Go/EasyRemote/client/test/net_probe_stun_test.dart: Binding Request 头部符合 RFC 5389
+00:03 +36: /Users/ckkk/dev/code/Go/EasyRemote/client/test/zz_plain_test.dart: loginEmail completes
+DBG calling
+00:03 +37: /Users/ckkk/dev/code/Go/EasyRemote/client/test/native_test.dart: (setUpAll)
+00:03 +38: /Users/ckkk/dev/code/Go/EasyRemote/client/test/native_test.dart: (setUpAll)
+00:03 +39: /Users/ckkk/dev/code/Go/EasyRemote/client/test/native_test.dart: (setUpAll)
+00:03 +39: /Users/ckkk/dev/code/Go/EasyRemote/client/test/zz_plain_test.dart: loginEmail completes
+00:03 +40: /Users/ckkk/dev/code/Go/EasyRemote/client/test/zz_plain_test.dart: loginEmail completes
+00:03 +41: /Users/ckkk/dev/code/Go/EasyRemote/client/test/zz_plain_test.dart: loginEmail completes
+00:03 +42: /Users/ckkk/dev/code/Go/EasyRemote/client/test/zz_plain_test.dart: loginEmail completes
+DBG done token=t
+00:03 +43: /Users/ckkk/dev/code/Go/EasyRemote/client/test/native_test.dart: 创建会话并读取屏幕尺寸
+00:03 +44: /Users/ckkk/dev/code/Go/EasyRemote/client/test/native_test.dart: 抓帧字节数与尺寸一致
+00:03 +45: /Users/ckkk/dev/code/Go/EasyRemote/client/test/shell_nav_test.dart: 设置导航固定在侧边栏最下方；切页保留页面状态
+00:03 +46: /Users/ckkk/dev/code/Go/EasyRemote/client/test/shell_nav_test.dart: 设置导航固定在侧边栏最下方；切页保留页面状态
+00:03 +47: /Users/ckkk/dev/code/Go/EasyRemote/client/test/shell_nav_test.dart: 设置导航固定在侧边栏最下方；切页保留页面状态
+00:03 +48: /Users/ckkk/dev/code/Go/EasyRemote/client/test/shell_nav_test.dart: 设置导航固定在侧边栏最下方；切页保留页面状态
+00:03 +49: /Users/ckkk/dev/code/Go/EasyRemote/client/test/shell_nav_test.dart: 设置导航固定在侧边栏最下方；切页保留页面状态
+00:03 +50: /Users/ckkk/dev/code/Go/EasyRemote/client/test/shell_nav_test.dart: 设置导航固定在侧边栏最下方；切页保留页面状态
+00:03 +51: /Users/ckkk/dev/code/Go/EasyRemote/client/test/shell_nav_test.dart: 设置导航固定在侧边栏最下方；切页保留页面状态
+00:03 +52: /Users/ckkk/dev/code/Go/EasyRemote/client/test/shell_nav_test.dart: 设置导航固定在侧边栏最下方；切页保留页面状态
+00:03 +52: /Users/ckkk/dev/code/Go/EasyRemote/client/test/host_link_test.dart: 设备码 + 验证码 的完整会话
+skip: ER_GATEWAY_URL / ER_RELAY_ADDR not set
+00:03 +53: /Users/ckkk/dev/code/Go/EasyRemote/client/test/shell_nav_test.dart: 设置导航固定在侧边栏最下方；切页保留页面状态
+00:03 +54: /Users/ckkk/dev/code/Go/EasyRemote/client/test/shell_nav_test.dart: 设置导航固定在侧边栏最下方；切页保留页面状态
+00:03 +55: /Users/ckkk/dev/code/Go/EasyRemote/client/test/shell_nav_test.dart: 设置导航固定在侧边栏最下方；切页保留页面状态
+00:03 +56: /Users/ckkk/dev/code/Go/EasyRemote/client/test/shell_nav_test.dart: 设置导航固定在侧边栏最下方；切页保留页面状态
+00:03 +57: /Users/ckkk/dev/code/Go/EasyRemote/client/test/shell_nav_test.dart: 设置导航固定在侧边栏最下方；切页保留页面状态
+00:04 +58: /Users/ckkk/dev/code/Go/EasyRemote/client/test/native_test.dart: 编码产出的 H.264 以 Annex-B 起始码开头
+Shell: [OpenH264] this = 0x0xa68c12580, Warning:ParamValidation(), AdaptiveQuant(1) is not supported yet for screen content, auto turned off
+Shell: [OpenH264] this = 0x0xa68c12580, Warning:ParamValidation(), BackgroundDetection(1) is not supported yet for screen content, auto turned off
+Shell: [OpenH264] this = 0x0xa68c12580, Warning:bEnableFrameSkip = 0,bitrate can't be controlled for RC_QUALITY_MODE,RC_BITRATE_MODE and RC_TIMESTAMP_MODE without enabling skip frame.
+00:04 +59: /Users/ckkk/dev/code/Go/EasyRemote/client/test/native_test.dart: 编码产出的 H.264 以 Annex-B 起始码开头
+00:04 +60: /Users/ckkk/dev/code/Go/EasyRemote/client/test/native_test.dart: ABR 决策可跨边界返回
+00:04 +61: /Users/ckkk/dev/code/Go/EasyRemote/client/test/native_test.dart: 重复 close 安全
+00:04 +62: /Users/ckkk/dev/code/Go/EasyRemote/client/test/native_test.dart: (tearDownAll)
+00:04 +62: All tests passed!
+TEST_EXIT=0
