@@ -74,6 +74,13 @@ class GatewayClient {
     _runtime = ClientRuntimeConfig.fromJson(data).endpoints;
   }
 
+  /// 启动时配置没拉到（服务端晚起/网络闪断）时，在真正要用端点前再拉一次。
+  /// 否则 relay 永远为空，被控/画面接管会一直报“运行时端点未加载”。
+  Future<void> ensureRuntimeConfig() async {
+    if (_runtime != null) return;
+    await loadRuntimeConfig();
+  }
+
   /// 单次请求超时。
   ///
   /// http 包默认**没有**超时：网关/反向代理把连接接住却迟迟不回时，Future 会一直挂着，
@@ -239,6 +246,13 @@ class GatewayClient {
     _token = body['token'] as String?;
     _authExpiredNotified = false;
     await _persist();
+    // /v1/config 需要登录态；启动时未登录拉到 401，登录后必须补一次，
+    // 否则 relay 端点永远为空，被控无法启动。
+    try {
+      await loadRuntimeConfig();
+    } catch (_) {
+      // 配置失败不应让登录失败；真正使用端点时会再重试。
+    }
   }
 
   /// 绑定本机设备。
@@ -299,6 +313,11 @@ class GatewayClient {
     _devicePlatform = stored.devicePlatform;
 
     try {
+      try {
+        await loadRuntimeConfig();
+      } catch (_) {
+        // 恢复登录态时配置端点不可达不应把人踢回登录页。
+      }
       final devices = await listDevices();
       DeviceInfo? self;
       for (final d in devices) {

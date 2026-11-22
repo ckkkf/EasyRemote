@@ -1,14 +1,17 @@
 package gateway
 
 import (
-	"github.com/easyremote/server/internal/httpx"
 	"net"
 	"net/http"
+	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/easyremote/server/internal/appconfig"
+	"github.com/easyremote/server/internal/config"
 	"github.com/easyremote/server/internal/contract"
+	"github.com/easyremote/server/internal/httpx"
 )
 
 // clientConfig 把运行时配置下发给客户端。
@@ -30,6 +33,13 @@ func (a *App) clientConfig(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		WriteErr(w, err)
 		return
+	}
+	// 开发环境未显式配置端点时，用本次请求的 Host 回填 gateway/signal：
+	// 否则 stack 跑在 18090，客户端会被默认的 127.0.0.1:8080 带走。
+	if !config.IsProduction() && strings.TrimSpace(os.Getenv("ER_PUBLIC_GATEWAY_URL")) == "" && r.Host != "" {
+		base := "http://" + r.Host
+		nested.Endpoints.GatewayURL = base
+		nested.Endpoints.SignalURL = base
 	}
 	httpx.OK(w, r, contract.ClientConfigResult{Config: nested})
 }

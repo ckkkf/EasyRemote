@@ -140,9 +140,14 @@ class _DeviceListPageState extends State<DeviceListPage> {
         final device = await widget.client.ensureDevice(
           platform: currentPlatformName(),
         );
+        try {
+          await widget.client.ensureRuntimeConfig();
+        } catch (e) {
+          throw StateError("运行时端点加载失败：$e");
+        }
         final relay = widget.client.relayAddr;
         if (relay.isEmpty) {
-          throw StateError("运行时端点未加载：无法启动被控（请检查服务端配置）");
+          throw StateError("服务端未下发 relay 端点：请检查 /v1/config 与 ER_RELAY_ADDR");
         }
         final code = HostService.instance.prepare(
           gateway: widget.client.gatewayURL,

@@ -107,9 +107,15 @@ class _SessionPageState extends State<SessionPage> {
       debugPrint("[video] 缺少登录态，跳过画面接管");
       return;
     }
+    try {
+      await widget.client.ensureRuntimeConfig();
+    } catch (e) {
+      debugPrint("[video] 运行时端点加载失败：$e");
+      return;
+    }
     final relay = widget.client.relayAddr;
     if (relay.isEmpty) {
-      debugPrint("[video] 运行时端点未加载，跳过画面接管");
+      debugPrint("[video] 服务端未下发 relay 端点，跳过画面接管");
       return;
     }
     await SessionVideo.instance.attach(
