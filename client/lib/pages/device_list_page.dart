@@ -130,8 +130,12 @@ class _DeviceListPageState extends State<DeviceListPage> {
       _hostBusy = true;
       _hostError = "";
     });
+    final wasAllowed = appPrefs.value.allowControl;
     try {
       if (on) {
+        // HostService 在 prepare/start 里会检查本机偏好；必须先落偏好，
+        // 否则第一次打开开关必然报“允许被控已关闭（本机设置）”。
+        if (fromUser && !wasAllowed) _patchAllowControl(true);
         if (!HostService.supported) {
           throw StateError("当前平台不支持被控：浏览器预览没有原生采集/注入，请在桌面客户端开启");
         }
@@ -167,7 +171,6 @@ class _DeviceListPageState extends State<DeviceListPage> {
           _hostPassword = pw;
           _hostStatus = HostStatus.idle;
         });
-        if (fromUser) _patchAllowControl(true);
         debugPrint("[host] 允许被控已开启 device_code=$code password=$pw");
       } else {
         HostService.instance.stop();
@@ -178,6 +181,8 @@ class _DeviceListPageState extends State<DeviceListPage> {
         if (fromUser) _patchAllowControl(false);
       }
     } catch (e) {
+      // 开启失败要把偏好回滚，否则 UI 显示“关”，持久化却是“开”。
+      if (on && fromUser && !wasAllowed) _patchAllowControl(false);
       setState(() {
         _hostOn = false;
         _hostError = _friendlyHostError(e);
