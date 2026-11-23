@@ -46,6 +46,9 @@ func ValidateDeployment(getenv func(string) string) error {
 	if truthy(getenv("ER_ADMIN_TOTP_OFF")) {
 		return errors.New("config: ER_ADMIN_TOTP_OFF is forbidden in production")
 	}
+	if truthy(getenv("ER_RATELIMIT_OFF")) {
+		return errors.New("config: ER_RATELIMIT_OFF is forbidden in production")
+	}
 	if getenv("ER_SECRET") == devSecret {
 		return errors.New("config: development secret is forbidden in production")
 	}

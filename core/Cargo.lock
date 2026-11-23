@@ -768,11 +768,11 @@ checksum = "00d174d5400e5e8fd687ad1049e2f578285fa914201b1af7e8b112a4546bd826"
 
 [[package]]
 name = "er-abr"
-version = "0.2.9"
+version = "0.2.11"
 
 [[package]]
 name = "er-capture"
-version = "0.2.9"
+version = "0.2.11"
 dependencies = [
  "windows",
  "xcap",
@@ -780,14 +780,14 @@ dependencies = [
 
 [[package]]
 name = "er-channels"
-version = "0.2.9"
+version = "0.2.11"
 dependencies = [
  "sha2",
 ]
 
 [[package]]
 name = "er-client"
-version = "0.2.9"
+version = "0.2.11"
 dependencies = [
  "ed25519-dalek",
  "er-abr",
@@ -808,7 +808,7 @@ dependencies = [
 
 [[package]]
 name = "er-codec"
-version = "0.2.9"
+version = "0.2.11"
 dependencies = [
  "er-capture",
  "er-common",
@@ -817,7 +817,7 @@ dependencies = [
 
 [[package]]
 name = "er-common"
-version = "0.2.9"
+version = "0.2.11"
 dependencies = [
  "serde",
  "serde_json",
@@ -825,11 +825,11 @@ dependencies = [
 
 [[package]]
 name = "er-features"
-version = "0.2.9"
+version = "0.2.11"
 
 [[package]]
 name = "er-ffi"
-version = "0.2.9"
+version = "0.2.11"
 dependencies = [
  "er-abr",
  "er-capture",
@@ -842,11 +842,11 @@ dependencies = [
 
 [[package]]
 name = "er-input"
-version = "0.2.9"
+version = "0.2.11"
 
 [[package]]
 name = "er-session"
-version = "0.2.9"
+version = "0.2.11"
 dependencies = [
  "base64",
  "chacha20poly1305",
@@ -864,7 +864,7 @@ dependencies = [
 
 [[package]]
 name = "er-transport"
-version = "0.2.9"
+version = "0.2.11"
 dependencies = [
  "bytes",
  "er-common",
@@ -877,7 +877,7 @@ dependencies = [
 
 [[package]]
 name = "er-winapp"
-version = "0.2.9"
+version = "0.2.11"
 dependencies = [
  "eframe",
  "egui",

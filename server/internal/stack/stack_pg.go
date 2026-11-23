@@ -127,13 +127,25 @@ func seedDevAdminIfNotProduction(ctx context.Context, st store.Store) error {
 	return SeedDevAdmin(ctx, st)
 }
 
+// devLimiter 返回开发限流器：ER_RATELIMIT_OFF=1 且非生产时无限流，否则内存限流。
+//
+// 装配层原来直接写死 ratelimit.NewMemory()，导致开关只改 OpenLimiter 时对
+// cmd/stack 完全无效（限流照样锁人）。所有开发装配入口必须走这里。
+// 生产环境忽略该开关（ValidateDeployment 另有硬拒绝，双保险）。
+func devLimiter() ratelimit.Limiter {
+	if truthyEnv(os.Getenv("ER_RATELIMIT_OFF")) && !config.IsProduction() {
+		return ratelimit.NewUnlimited()
+	}
+	return ratelimit.NewMemory()
+}
+
 // NewDev 内存环境（本地联调、集成测试）。
 func NewDev() (*store.Memory, http.Handler, error) {
 	mem := store.NewMemory()
 	if err := SeedDevAdmin(context.Background(), mem); err != nil {
 		return nil, nil, err
 	}
-	h, err := NewWithStoreAndSessions(mem, adminsession.New(nil, 8*time.Hour), ratelimit.NewMemory(), adminapi.NewMemoryReplayGuard(), NotifierFromEnv(), nil, NotifierFromEnv())
+	h, err := NewWithStoreAndSessions(mem, adminsession.New(nil, 8*time.Hour), devLimiter(), adminapi.NewMemoryReplayGuard(), NotifierFromEnv(), nil, NotifierFromEnv())
 	return mem, h, err
 }
 
@@ -153,7 +165,7 @@ func NewPostgres(ctx context.Context, dsn string) (store.Store, http.Handler, er
 	if err := seedDevAdminIfNotProduction(ctx, pg); err != nil {
 		return nil, nil, err
 	}
-	h, err := NewWithStoreAndSessions(pg, adminsession.New(nil, 8*time.Hour), ratelimit.NewMemory(), adminapi.NewMemoryReplayGuard(), nil, nil, nil)
+	h, err := NewWithStoreAndSessions(pg, adminsession.New(nil, 8*time.Hour), devLimiter(), adminapi.NewMemoryReplayGuard(), nil, nil, nil)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -180,7 +192,7 @@ func NewPostgresWithRedis(ctx context.Context, dsn, redisURL string, notifier ga
 	if err != nil {
 		return nil, nil, err
 	}
-	h, err := NewWithStoreAndSessions(pg, adminsession.New(sessStore, 8*time.Hour), ratelimit.NewMemory(), adminapi.NewMemoryReplayGuard(), notifier, presence, closer)
+	h, err := NewWithStoreAndSessions(pg, adminsession.New(sessStore, 8*time.Hour), devLimiter(), adminapi.NewMemoryReplayGuard(), notifier, presence, closer)
 	if err != nil {
 		return nil, nil, err
 	}

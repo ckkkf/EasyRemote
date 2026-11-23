@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 一键本地演示：一体化服务端(:8090) + 管理后台(:5174) + 客户端 Web 预览(:8091)
+# 一键本地演示：一体化服务端(:18090) + 管理后台(:5199) + 客户端 Web 预览(:8091)
 #
 #   ./scripts/dev-demo.sh            # 全部拉起（前台，Ctrl-C 结束）
 #
@@ -8,8 +8,9 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-STACK_PORT="${STACK_PORT:-8090}"
-ADMIN_PORT="${ADMIN_PORT:-5174}"
+# 18090 是与桌面客户端构建产物、scripts/mac/* 一致的唯一开发端口，别再各写一份。
+STACK_PORT="${STACK_PORT:-18090}"
+ADMIN_PORT="${ADMIN_PORT:-5199}"
 CLIENT_PORT="${CLIENT_PORT:-8091}"
 
 cleanup() {
@@ -25,9 +26,11 @@ echo "[dev-demo] 构建服务端 → /tmp/er-stack-new"
 echo "[dev-demo] 构建客户端 Web（--dart-define=ER_GATEWAY= 走同源代理）"
 bash "$ROOT/scripts/build-client-web.sh"
 
-echo "[dev-demo] 启动一体化服务端 :${STACK_PORT}（内存存储 + 开发管理员 root/dev-pass，二次验证已关闭）"
+echo "[dev-demo] 启动一体化服务端 :${STACK_PORT}（内存存储 + 开发管理员 root/dev-pass，二次验证与限流已关闭）"
 # ER_ADMIN_TOTP_OFF=1：本地联调关闭二次验证；生产环境配这个变量会直接启动失败。
-ER_ADMIN_TOTP_OFF=1 /tmp/er-stack-new -addr ":${STACK_PORT}" &
+# ER_RATELIMIT_OFF=1：本地联调关闭限流（登录 10 次/小时等阈值会把开发者自己锁死）；
+# 生产环境配这个变量同样直接启动失败，见 config.ValidateDeployment。
+ER_ADMIN_TOTP_OFF=1 ER_RATELIMIT_OFF=1 /tmp/er-stack-new -addr ":${STACK_PORT}" &
 
 echo "[dev-demo] 启动管理后台 :${ADMIN_PORT}（代理 /admin → :${STACK_PORT}）"
 ( cd "$ROOT/web-admin" && npx vite --config vite.demo.config.ts --port "${ADMIN_PORT}" ) &

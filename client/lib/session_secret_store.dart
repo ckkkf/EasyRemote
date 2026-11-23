@@ -12,9 +12,18 @@ abstract class SecretStore {
 }
 
 /// 系统安全存储实现。
+///
+/// macOS 必须显式关掉 data protection keychain：它要求 `application-identifier`
+/// entitlement（也就是 Team ID + provisioning），而本项目分发的 .app 是 **ad-hoc 签名**，
+/// 没有 Team ID，于是每次 SecItemAdd 都返回 -34018（errSecMissingEntitlement）。
+/// 传统 keychain（不设 kSecUseDataProtectionKeychain）对非沙盒 app 不需要访问组。
 class SystemSecretStore implements SecretStore {
   SystemSecretStore({FlutterSecureStorage? storage})
-    : _storage = storage ?? const FlutterSecureStorage();
+    : _storage =
+          storage ??
+          const FlutterSecureStorage(
+            mOptions: MacOsOptions(usesDataProtectionKeychain: false),
+          );
 
   final FlutterSecureStorage _storage;
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/easyremote/server/internal/adminapi"
@@ -77,7 +78,17 @@ func OpenReplayGuard(ctx context.Context) (adminapi.ReplayGuard, error) {
 
 // OpenLimiter 按环境打开限流器：有 REDIS_URL 用 Redis（跨实例），
 // 生产缺配置直接失败，开发环境退回内存。
+//
+// ER_RATELIMIT_OFF=1 时返回无限流器，只允许本地联调：本地反复登录/发码会被
+// 生产阈值（登录 10 次/小时等）锁死，重启进程清计数只是掩盖问题。生产环境
+// 配置该变量直接失败，限流这层安全能力不能被环境变量静默关掉。
 func OpenLimiter(ctx context.Context) (ratelimit.Limiter, error) {
+	if truthyEnv(os.Getenv("ER_RATELIMIT_OFF")) {
+		if config.IsProduction() {
+			return nil, errors.New("stack: ER_RATELIMIT_OFF is forbidden in production")
+		}
+		return ratelimit.NewUnlimited(), nil
+	}
 	url := os.Getenv("REDIS_URL")
 	if url != "" {
 		return ratelimit.NewRedisFromURL(ctx, url, "er:rl:")
@@ -86,4 +97,13 @@ func OpenLimiter(ctx context.Context) (ratelimit.Limiter, error) {
 		return nil, errors.New("stack: REDIS_URL is required in production for rate limiting")
 	}
 	return ratelimit.NewMemory(), nil
+}
+
+// truthyEnv 与 config 包的 truthy 语义保持一致：1/true/yes/on 视为开启。
+func truthyEnv(v string) bool {
+	switch strings.ToLower(strings.TrimSpace(v)) {
+	case "1", "true", "yes", "on":
+		return true
+	}
+	return false
 }
