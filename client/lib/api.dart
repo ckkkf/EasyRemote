@@ -71,7 +71,20 @@ class GatewayClient {
   /// 拉取运行时配置（/v1/config 无需登录）。
   Future<void> loadRuntimeConfig() async {
     final data = await _get('/v1/config');
-    _runtime = ClientRuntimeConfig.fromJson(data).endpoints;
+    // 契约响应是 ClientConfigResult{config: {...}}，不是直接 ClientRuntimeConfig。
+    // 生成的嵌套 fromJson 只做 Map cast，这里显式解 endpoints，避免
+    // "type 'Null' is not a subtype of RuntimeEndpoints"。
+    final raw = data['config'];
+    final endpoints = raw is Map<String, dynamic> ? raw['endpoints'] : null;
+    if (endpoints is! Map<String, dynamic>) {
+      throw ApiException(
+        'SRV_INTERNAL',
+        '服务端 /v1/config 缺少 endpoints 对象',
+        name: 'SRV_INTERNAL',
+        retryable: false,
+      );
+    }
+    _runtime = RuntimeEndpoints.fromJson(endpoints);
   }
 
   /// 启动时配置没拉到（服务端晚起/网络闪断）时，在真正要用端点前再拉一次。
