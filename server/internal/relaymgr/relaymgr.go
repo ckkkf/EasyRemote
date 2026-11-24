@@ -63,13 +63,34 @@ func (s *Service) Issue(sessionID, self, peer string) (string, *Ticket, error) {
 
 // IssueWithEpoch 签发带票据代号的票据；epoch=0 表示单机模式（不轮换）。
 func (s *Service) IssueWithEpoch(sessionID, self, peer string, epoch int64) (string, *Ticket, error) {
+	return s.issue(sessionID, self, peer, epoch, time.Time{})
+}
+
+// IssueAuthorized 签发不晚于会话授权截止时刻失效的票据。
+func (s *Service) IssueAuthorized(sessionID, self, peer string, epoch int64, deadline time.Time) (string, *Ticket, error) {
+	if deadline.IsZero() {
+		return "", nil, errcode.New(errcode.SessionAuthWindowExceeded, "missing session authorization deadline")
+	}
+	return s.issue(sessionID, self, peer, epoch, deadline)
+}
+
+func (s *Service) issue(sessionID, self, peer string, epoch int64, deadline time.Time) (string, *Ticket, error) {
 	if sessionID == "" || self == "" || peer == "" {
 		return "", nil, errcode.New(errcode.SrvInternal, "issue: empty field")
 	}
 	if err := s.Validate(); err != nil {
 		return "", nil, errcode.New(errcode.SrvInternal, err.Error())
 	}
-	exp := s.now().Add(s.ttl)
+	now := s.now()
+	exp := now.Add(s.ttl)
+	if !deadline.IsZero() && deadline.Before(exp) {
+		exp = deadline
+	}
+	// 票据使用秒级时间，向下取整才不会越过授权上限；验证端按排他截止处理。
+	exp = exp.Truncate(time.Second)
+	if !now.Before(exp) {
+		return "", nil, errcode.New(errcode.SessionAuthWindowExceeded, "insufficient time to issue a relay ticket")
+	}
 	fields := []string{sessionID, self, peer, strconv.FormatInt(exp.Unix(), 10)}
 	if epoch > 0 {
 		fields = append(fields, strconv.FormatInt(epoch, 10))
@@ -101,7 +122,7 @@ func (s *Service) Verify(token string) (*Ticket, error) {
 	if err != nil {
 		return nil, errcode.New(errcode.ConnRelayUnavailable, "bad exp")
 	}
-	if s.now().Unix() > exp {
+	if s.now().Unix() >= exp {
 		return nil, errcode.New(errcode.ConnRelayUnavailable, "ticket expired")
 	}
 	var epoch int64

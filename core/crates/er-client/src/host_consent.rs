@@ -56,7 +56,7 @@ impl ConsentBroker {
     pub fn pending(&self) -> Option<ConsentSnapshot> {
         let guard = self.inner.lock().unwrap_or_else(|e| e.into_inner());
         let p = guard.as_ref()?;
-        if Instant::now() >= p.deadline {
+        if p.decision.is_some() || Instant::now() >= p.deadline {
             return None;
         }
         Some(ConsentSnapshot {
@@ -75,7 +75,7 @@ impl ConsentBroker {
         let Some(p) = guard.as_mut() else {
             return false;
         };
-        if p.session_id != session_id || Instant::now() >= p.deadline {
+        if p.session_id != session_id || p.decision.is_some() || Instant::now() >= p.deadline {
             return false;
         }
         p.decision = Some(accepted);
@@ -85,7 +85,19 @@ impl ConsentBroker {
 
     /// 阻塞等待决策。true=本机接受；false=超时/无决策；stop 时 Err。
     pub fn wait(&self, stop: &AtomicBool, timeout: Duration) -> Result<bool, String> {
+        self.wait_while_pending(stop, timeout, || true)
+    }
+
+    /// Check remote cancellation without holding the lock used by the local UI.
+    pub fn wait_while_pending(
+        &self,
+        stop: &AtomicBool,
+        timeout: Duration,
+        mut still_pending: impl FnMut() -> bool,
+    ) -> Result<bool, String> {
+        const STATUS_INTERVAL: Duration = Duration::from_secs(1);
         let deadline = Instant::now() + timeout;
+        let mut next_status = Instant::now() + STATUS_INTERVAL;
         let mut guard = self.inner.lock().unwrap_or_else(|e| e.into_inner());
         loop {
             if stop.load(Ordering::Relaxed) {
@@ -104,7 +116,22 @@ impl ConsentBroker {
                 *guard = None;
                 return Ok(false);
             }
-            let wait_for = p.deadline.min(deadline).saturating_duration_since(now);
+            if now >= next_status {
+                drop(guard);
+                let pending = still_pending();
+                guard = self.inner.lock().unwrap_or_else(|e| e.into_inner());
+                if !pending {
+                    *guard = None;
+                    return Err("request no longer pending".into());
+                }
+                next_status = Instant::now() + STATUS_INTERVAL;
+                continue;
+            }
+            let wait_for = p
+                .deadline
+                .min(deadline)
+                .min(next_status)
+                .saturating_duration_since(now);
             let (next, _) = self
                 .cv
                 .wait_timeout(guard, wait_for.min(Duration::from_millis(100)))
@@ -146,6 +173,26 @@ mod tests {
         assert!(!b.decide("other", true), "其它 session 不能决策");
         assert!(b.decide("ses-2", true));
         assert!(b.wait(&stop, Duration::from_millis(200)).unwrap());
+    }
+
+    #[test]
+    fn remote_cancel_removes_pending_without_accepting() {
+        let broker = ConsentBroker::new();
+        let stop = AtomicBool::new(false);
+        broker.request("cancelled", "peer", Duration::from_secs(30));
+        let result = broker.wait_while_pending(&stop, Duration::from_secs(30), || false);
+        assert!(result.is_err());
+        assert!(broker.pending().is_none());
+        assert!(!broker.decide("cancelled", true));
+    }
+
+    #[test]
+    fn accepted_decision_is_not_presented_twice() {
+        let broker = ConsentBroker::new();
+        broker.request("accepted", "peer", Duration::from_secs(30));
+        assert!(broker.decide("accepted", true));
+        assert!(broker.pending().is_none());
+        assert!(!broker.decide("accepted", false));
     }
 
     #[test]

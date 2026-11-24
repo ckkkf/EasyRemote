@@ -8,7 +8,9 @@
 //! 被控端这边一片安静）——排查时很容易被误判成「码错了」。
 
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::mpsc::{sync_channel, Receiver, RecvTimeoutError, TrySendError};
 use std::sync::Arc;
+use std::time::Duration;
 
 use er_session::relay_client::{p2p_token, P2PConfig};
 
@@ -96,9 +98,36 @@ pub fn start_host_stream(
     let stop_thread = stop.clone();
     let consent_thread = consent.clone();
     std::thread::spawn(move || {
+        const MAX_PENDING_NOTIFICATIONS: usize = 4;
+        let (requests, incoming) = sync_channel(MAX_PENDING_NOTIFICATIONS);
+        let signal_target = target.clone();
+        let signal_stop = stop_thread.clone();
+        let worker = std::thread::spawn(move || {
+            let worker = || -> Result<(), String> {
+                let mut conn = signal_target
+                    .connect_signalling(&signal)
+                    .map_err(|e| e.to_string())?;
+                while let Some(sid) = conn
+                    .wait_while(|| !signal_stop.load(Ordering::Relaxed))
+                    .map_err(|e| e.to_string())?
+                {
+                    match requests.try_send(sid) {
+                        Ok(()) => {}
+                        Err(TrySendError::Disconnected(_)) => break,
+                        Err(TrySendError::Full(sid)) => {
+                            eprintln!("[host] consent queue full session_id={sid}");
+                        }
+                    }
+                }
+                Ok(())
+            };
+            if let Err(e) = worker() {
+                eprintln!("[host] signalling receive failed: {e}");
+            }
+        });
         if let Err(e) = run_host_stream(
             &target,
-            &signal,
+            &incoming,
             fps,
             idle_timeout_secs,
             keep_awake,
@@ -109,6 +138,10 @@ pub fn start_host_stream(
             if let Ok(mut s) = stats_thread.lock() {
                 s.last_error = e;
             }
+        }
+        stop_thread.store(true, Ordering::Relaxed);
+        if worker.join().is_err() {
+            eprintln!("[host] signalling worker panicked");
         }
         if let Ok(mut s) = stats_thread.lock() {
             s.running = false;
@@ -121,7 +154,7 @@ pub fn start_host_stream(
 #[allow(clippy::too_many_arguments)]
 fn run_host_stream(
     target: &crate::agent::TargetAgent,
-    signal: &str,
+    requests: &Receiver<String>,
     fps: u32,
     idle_timeout_secs: u64,
     keep_awake: bool,
@@ -129,29 +162,7 @@ fn run_host_stream(
     stats: &Arc<std::sync::Mutex<HostStreamStats>>,
     consent: &Arc<ConsentBroker>,
 ) -> Result<(), String> {
-    let mut cap = er_capture::ScreenCapture::open_primary().map_err(|e| format!("capture: {e}"))?;
-    let info = er_capture::Capture::info(&cap);
-    let requested = er_codec::EncodeConfig {
-        width: info.width & !1,
-        height: info.height & !1,
-        fps: fps.clamp(5, 60),
-        bitrate_kbps: 4000,
-        gop: fps.clamp(5, 60),
-        bframes: 0,
-    };
-    let resolved = er_codec::resolve_config(requested, er_codec::host_capability());
-    let cfg = resolved.config;
-    let fps = cfg.fps;
-    if resolved.downgraded {
-        if let Ok(mut st) = stats.lock() {
-            st.last_error = format!("encode downgraded: {}", resolved.reason);
-        }
-    }
-    let mut enc = crate::encoder::HybridEncoder::new(cfg)?;
-    let mut injector = input_injector();
-    let budget = std::time::Duration::from_millis((1000 / fps.max(1)) as u64);
     let idle = std::time::Duration::from_secs(idle_timeout_secs.max(60));
-    let mut seq: u32 = 0;
 
     // D2 防睡眠：只在设置开启时持有 OS 抑制；guard 在函数退出/panic 时释放。
     let mut power = er_features::d2_power::PlatformInhibitor::new();
@@ -174,57 +185,100 @@ fn run_host_stream(
             break;
         }
         // ① 回到等待：这里是最容易被写成「只跑一次」的地方
-        let session_id = match target.wait_for_session(signal, std::time::Duration::from_secs(3600))
+        let session_id = match requests.recv_timeout(Duration::from_secs(1)) {
+            Ok(id) => id,
+            Err(RecvTimeoutError::Timeout) => continue,
+            Err(RecvTimeoutError::Disconnected) => {
+                return Err("信令连接中断，请关闭再开启「允许被控」".into());
+            }
+        };
+        if stop.load(Ordering::Relaxed) {
+            break;
+        }
+        // A queued/duplicate notification may have expired while another session was busy.
+        if !target
+            .session_state(&session_id)
+            .is_ok_and(|state| state == "requested")
         {
-            Ok(s) => s,
-            Err(e) => {
-                if let Ok(mut st) = stats.lock() {
-                    st.last_error = format!("signalling: {e}");
+            continue;
+        }
+        if let Ok(mut st) = stats.lock() {
+            st.last_error.clear();
+        }
+        // 先接收请求并等待本机点击，再启动会话媒体。无显示器或编码器故障不应切断申请入口。
+        let label = format!(
+            "远程设备（{}）",
+            session_id.chars().take(8).collect::<String>()
+        );
+        let consent_timeout = std::time::Duration::from_secs(30);
+        consent.request(&session_id, &label, consent_timeout);
+        match consent.wait_while_pending(stop, consent_timeout, || {
+            !target
+                .session_state(&session_id)
+                .is_ok_and(|state| peer_closed(&state))
+        }) {
+            Ok(true) => {}
+            Ok(false) => {
+                if let Err(e) = target.reject(&session_id) {
+                    eprintln!("[host] reject failed session_id={session_id}: {e}");
+                }
+                continue;
+            }
+            Err(_) if stop.load(Ordering::Relaxed) => {
+                if let Err(e) = target.reject(&session_id) {
+                    eprintln!("[host] reject on stop failed session_id={session_id}: {e}");
                 }
                 break;
             }
+            Err(_) => continue,
+        }
+        if stop.load(Ordering::Relaxed) {
+            break;
+        }
+
+        let result = (|| {
+            let (mut cap, mut enc) = open_media(fps)?;
+            target.consent(&session_id).map_err(|e| e.to_string())?;
+            let (mut relay, mut crypto, msg) =
+                target.begin(&session_id).map_err(|e| e.to_string())?;
+            let peer_p2p = relay.negotiate_p2p(&P2PConfig::new(
+                &session_id,
+                p2p_token(&session_id),
+                std::time::Duration::from_secs(2),
+            ));
+            target
+                .finish_with_resend(&mut relay, &mut crypto, &session_id, Some(&msg))
+                .map_err(|e| e.to_string())?;
+            if stop.load(Ordering::Relaxed) {
+                return Err("host stopped".into());
+            }
+            // 初始化后预取一帧；采集错误不应被上报成 ready。静止桌面可能暂时没有新帧。
+            let first_frame = enc.capture_and_encode(&mut cap)?;
+            target.mark_ready(&session_id).map_err(|e| e.to_string())?;
+            Ok::<_, String>((cap, enc, relay, crypto, peer_p2p, first_frame))
+        })();
+        let (mut cap, mut enc, mut relay, mut crypto, peer_p2p, mut first_frame) = match result {
+            Ok(media) => media,
+            Err(e) => {
+                eprintln!("[host] session setup failed session_id={session_id}: {e}");
+                if let Ok(mut st) = stats.lock() {
+                    st.last_error = "无法建立远控画面，请检查屏幕录制权限及网络".into();
+                }
+                if let Err(e) = target.close_session(&session_id) {
+                    eprintln!("[host] close after setup failure session_id={session_id}: {e}");
+                }
+                continue;
+            }
         };
+        let cfg = enc.config();
+        let budget = std::time::Duration::from_millis((1000 / cfg.fps.max(1)) as u64);
+        let mut injector = input_injector();
+        let mut seq = 0u32;
         if let Ok(mut st) = stats.lock() {
             st.session_id = session_id.clone();
-        }
-        // ② 本地授权：只有本机 UI 的 decision 才能通过；超时=拒绝。
-        // 之前这里直接 target.consent()，等于任何知道设备码的人都能连。
-        let label = format!("远程设备（{}）", &session_id[..session_id.len().min(8)]);
-        consent.request(&session_id, &label, std::time::Duration::from_secs(30));
-        let accepted = match consent.wait(stop, std::time::Duration::from_secs(30)) {
-            Ok(v) => v,
-            Err(_) => break,
-        };
-        if !accepted {
-            let _ = target.reject(&session_id);
-            continue;
-        }
-        if target.consent(&session_id).is_err() {
-            continue;
-        }
-        std::thread::sleep(std::time::Duration::from_millis(1200));
-        let (mut relay, mut crypto, msg) = match target.begin(&session_id) {
-            Ok(v) => v,
-            Err(_) => continue,
-        };
-        // 生产 P2P：双方独立进程按同一顺序协商；失败保持 Relay。
-        let peer_p2p = relay.negotiate_p2p(&P2PConfig::new(
-            &session_id,
-            p2p_token(&session_id),
-            std::time::Duration::from_secs(2),
-        ));
-        if let Ok(mut st) = stats.lock() {
-            st.link = if peer_p2p { "p2p" } else { "relay" }.to_string();
-        }
-        std::thread::sleep(std::time::Duration::from_millis(2500));
-        if target.announce(&mut relay, &msg).is_err() {
-            continue;
-        }
-        if target.finish(&mut relay, &mut crypto, &session_id).is_err() {
-            continue;
-        }
-        if target.mark_ready(&session_id).is_err() {
-            continue;
+            st.frames = 0;
+            st.injected = 0;
+            st.link = if peer_p2p { "p2p" } else { "relay" }.into();
         }
 
         // ③ 推流 + 注入，直到对方离开或 stop
@@ -244,12 +298,14 @@ fn run_host_stream(
         };
         let mut last_clip_poll = std::time::Instant::now();
         let mut file_rx: Option<er_channels::file_stream::StreamReceiver> = None;
+        let mut remote_closed = false;
         while !stop.load(Ordering::Relaxed) {
             // 关闭传播兜底：对端/后台关闭后 1s 内停止采集与输入，不依赖心跳超时。
             if last_state_check.elapsed() >= std::time::Duration::from_secs(1) {
                 last_state_check = std::time::Instant::now();
                 if let Ok(state) = target.session_state(&session_id) {
                     if peer_closed(&state) {
+                        remote_closed = true;
                         break;
                     }
                 }
@@ -383,21 +439,37 @@ fn run_host_stream(
                 }
             }
             let t0 = std::time::Instant::now();
-            if let Ok(Some(encoded)) = enc.capture_and_encode(&mut cap) {
-                if !encoded.is_empty() {
-                    seq = seq.wrapping_add(1);
-                    let hdr = crate::link::VideoHeader {
-                        seq,
-                        ts_ms: t0.elapsed().as_millis() as u32,
-                        width: (cfg.width & 0xffff) as u16,
-                        height: (cfg.height & 0xffff) as u16,
-                    };
-                    let msg = crate::agent::encode_video_msg(&hdr, &encoded);
-                    let sealed = crypto.seal(&msg);
-                    if relay.send(&sealed).is_ok() {
-                        if let Ok(mut st) = stats.lock() {
-                            st.frames += 1;
-                        }
+            let encoded = match first_frame
+                .take()
+                .map_or_else(|| enc.capture_and_encode(&mut cap), |frame| Ok(Some(frame)))
+            {
+                Ok(frame) => frame,
+                Err(e) => {
+                    eprintln!("[host] capture failed session_id={session_id}: {e}");
+                    if let Ok(mut st) = stats.lock() {
+                        st.last_error = "屏幕采集失败，请检查本机权限后重新连接".into();
+                    }
+                    if let Err(e) = target.close_session(&session_id) {
+                        eprintln!(
+                            "[host] close after capture failure session_id={session_id}: {e}"
+                        );
+                    }
+                    break;
+                }
+            };
+            if let Some(encoded) = encoded.filter(|frame| !frame.is_empty()) {
+                seq = seq.wrapping_add(1);
+                let hdr = crate::link::VideoHeader {
+                    seq,
+                    ts_ms: t0.elapsed().as_millis() as u32,
+                    width: (cfg.width & 0xffff) as u16,
+                    height: (cfg.height & 0xffff) as u16,
+                };
+                let msg = crate::agent::encode_video_msg(&hdr, &encoded);
+                let sealed = crypto.seal(&msg);
+                if relay.send(&sealed).is_ok() {
+                    if let Ok(mut st) = stats.lock() {
+                        st.frames += 1;
                     }
                 }
             }
@@ -406,12 +478,37 @@ fn run_host_stream(
                 std::thread::sleep(budget - spent);
             }
         }
+        if !remote_closed {
+            if let Err(e) = target.close_session(&session_id) {
+                eprintln!("[host] close after stream end session_id={session_id}: {e}");
+            }
+        }
         if let Ok(mut st) = stats.lock() {
             st.session_id.clear();
         }
     }
 
     Ok(())
+}
+
+fn open_media(
+    fps: u32,
+) -> Result<(er_capture::ScreenCapture, crate::encoder::HybridEncoder), String> {
+    use er_capture::Capture;
+    let cap = er_capture::ScreenCapture::open_primary().map_err(|e| format!("capture: {e}"))?;
+    let info = cap.info();
+    let fps = fps.clamp(5, 60);
+    let requested = er_codec::EncodeConfig {
+        width: info.width & !1,
+        height: info.height & !1,
+        fps,
+        bitrate_kbps: 4000,
+        gop: fps,
+        bframes: 0,
+    };
+    let resolved = er_codec::resolve_config(requested, er_codec::host_capability());
+    let enc = crate::encoder::HybridEncoder::new(resolved.config)?;
+    Ok((cap, enc))
 }
 
 /// 查询被控流状态。

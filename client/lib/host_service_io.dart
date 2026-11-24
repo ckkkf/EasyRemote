@@ -307,7 +307,10 @@ class HostService {
     final id = _hostId;
     if (id == null) return;
     final pending = pendingConsent();
-    if (pending == null) return;
+    if (pending == null) {
+      ConsentController.instance.dismiss();
+      return;
+    }
     final sessionId = pending['session_id'] as String? ?? '';
     if (sessionId.isEmpty) return;
     if (ConsentController.instance.pending?.sessionId == sessionId) return;
@@ -422,6 +425,7 @@ class HostService {
     if (id == null) return;
     _consentPoll?.cancel();
     _consentPoll = null;
+    ConsentController.instance.dismiss();
     final lib = _load();
     final hid = id.toNativeUtf8();
     try {

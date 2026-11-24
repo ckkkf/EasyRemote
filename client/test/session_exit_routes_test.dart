@@ -56,6 +56,48 @@ void main() {
     calls = <String>[];
     leaveCalls = 0;
   });
+  testWidgets('TestConfirmedClosePopsRealNavigatorRouteOnlyOnce', (
+    tester,
+  ) async {
+    final client = fakeClient();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: TextButton(
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => SessionPage(
+                    client: client,
+                    sessionId: 'ses-1',
+                    onLeave: () {
+                      leaveCalls++;
+                      // Match HomeShell: checks PopScope before removing the route.
+                      if (leaveCalls == 1) Navigator.of(context).maybePop();
+                    },
+                    probeNat: false,
+                    pollSessionStatus: false,
+                    enableVideo: false,
+                  ),
+                ),
+              ),
+              child: const Text('设备页'),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('设备页'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('cancel-connect')));
+    await tester.pumpAndSettle();
+    expect(find.text('设备页'), findsOneWidget);
+    expect(find.byType(SessionPage), findsNothing);
+    expect(calls.where((call) => call == 'POST ' + closePath), hasLength(1));
+    expect(leaveCalls, 1);
+    expect(find.text('已断开连接'), findsOneWidget);
+  });
+
   testWidgets('TestBackToDevicesClosesBeforeLeaving', (tester) async {
     await tester.pumpWidget(wrap(fakeClient()));
     await tester.pump();

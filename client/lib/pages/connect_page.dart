@@ -53,6 +53,14 @@ class _ConnectPageState extends State<ConnectPage> {
   bool _busy = false;
   String? _error;
   ApiException? _apiError;
+  String? _passwordRequiredFor;
+
+  bool get _passwordVisible =>
+      !appPrefs.value.sameAccountDirect || _passwordRequiredFor == _code;
+
+  void _onPrefs() {
+    if (mounted) setState(() {});
+  }
 
   /// 请求期间每秒 +1：把「卡住」变成「看得见的等待」。
   int _elapsed = 0;
@@ -64,6 +72,7 @@ class _ConnectPageState extends State<ConnectPage> {
   @override
   void initState() {
     super.initState();
+    appPrefs.addListener(_onPrefs);
     _applyCode(widget.initialCode);
   }
 
@@ -75,6 +84,8 @@ class _ConnectPageState extends State<ConnectPage> {
   }
 
   void _applyCode(String code) {
+    _passwordRequiredFor = null;
+    _captcha.clear();
     _codeCtl.text = code.replaceAll(RegExp(r'[^0-9]'), '');
     // 从「我的设备」点连接会带设备码进来，此时必须切回设备码模式，否则看起来像没反应。
     if (code.isNotEmpty) _mode = _ConnectMode.device;
@@ -85,6 +96,7 @@ class _ConnectPageState extends State<ConnectPage> {
 
   @override
   void dispose() {
+    appPrefs.removeListener(_onPrefs);
     _busyTick?.cancel();
     _codeCtl.dispose();
     _captcha.dispose();
@@ -100,7 +112,12 @@ class _ConnectPageState extends State<ConnectPage> {
     if (digits.isEmpty) return;
     _codeCtl.text = digits.length > 9 ? digits.substring(0, 9) : digits;
     _codeEntryKey.currentState?.focusNextEmpty();
-    setState(() => _error = null);
+    _captcha.clear();
+    setState(() {
+      _passwordRequiredFor = null;
+      _error = null;
+      _apiError = null;
+    });
   }
 
   /// 进入「等待中」：立刻给出进度、已等待秒数和一个可点的取消。
@@ -109,7 +126,6 @@ class _ConnectPageState extends State<ConnectPage> {
     setState(() {
       _busy = true;
       _error = null;
-      _apiError = null;
       _apiError = null;
       _elapsed = 0;
     });
@@ -155,23 +171,34 @@ class _ConnectPageState extends State<ConnectPage> {
 
   Future<void> _connect() async {
     final attempt = ++_attempt;
+    final code = _code;
+    final direct = appPrefs.value.sameAccountDirect;
+    final password = _passwordVisible ? _captcha.text.trim() : '';
     _startBusy();
     try {
-      final code = _code;
       final sid = await widget.client.requestConnect(
         code,
-        captcha: _captcha.text.trim(),
+        captcha: password,
         // 只对「同一账号」的目标生效：跨账号服务端仍会要求临时密码。
-        direct: appPrefs.value.sameAccountDirect,
+        direct: direct,
       );
       if (!mounted || attempt != _attempt) return;
+      _captcha.clear();
+      if (sid.isEmpty) throw ApiException('INVALID_RESPONSE', '服务端没有返回会话 ID');
       widget.onCodeUsed(code);
       widget.onSessionStarted(sid, code.replaceAll(RegExp(r'[^0-9]'), ''));
     } on ApiException catch (e) {
       if (mounted && attempt == _attempt) {
         setState(() {
           _apiError = e;
-          _error = _friendlyConnectError(e);
+          final requiresPassword =
+              direct &&
+              password.isEmpty &&
+              (e.name ?? e.code) == 'CONN_CAPTCHA_EXPIRED';
+          if (requiresPassword) _passwordRequiredFor = code;
+          _error = requiresPassword
+              ? '此连接需要验证，请输入对方设备显示的临时密码。'
+              : _friendlyConnectError(e);
         });
       }
     } catch (e) {
@@ -333,7 +360,12 @@ class _ConnectPageState extends State<ConnectPage> {
                             _CodeEntry(
                               key: _codeEntryKey,
                               controller: _codeCtl,
-                              onChanged: () => setState(() {}),
+                              onChanged: () => setState(() {
+                                _passwordRequiredFor = null;
+                                _captcha.clear();
+                                _error = null;
+                                _apiError = null;
+                              }),
                             ),
                             // 粘贴入口：透明输入层的光标与格子对不上，
                             // 与其纠结光标位置，不如给一个显式的「粘贴设备码」。
@@ -349,21 +381,22 @@ class _ConnectPageState extends State<ConnectPage> {
                               ),
                             ),
                             const SizedBox(height: 6),
-                            TextField(
-                              key: const Key('captcha-field'),
-                              controller: _captcha,
-                              keyboardType: TextInputType.number,
-                              decoration: InputDecoration(
-                                labelText: '临时密码',
-                                hintText: appPrefs.value.sameAccountDirect
-                                    ? '同账号设备可留空（免密直连已开启）'
-                                    : '被控端窗口里显示的 8 位数字（可长期复用）',
-                                prefixIcon: const Icon(
-                                  Icons.verified_user_outlined,
-                                  size: 18,
+                            if (_passwordVisible)
+                              TextField(
+                                key: const Key('captcha-field'),
+                                controller: _captcha,
+                                keyboardType: TextInputType.number,
+                                decoration: const InputDecoration(
+                                  labelText: '临时密码',
+                                  hintText: '输入被控端窗口显示的临时密码',
+                                  prefixIcon: Icon(
+                                    Icons.verified_user_outlined,
+                                    size: 18,
+                                  ),
                                 ),
-                              ),
-                            ),
+                              )
+                            else
+                              const Text('同账号免临时密码；首次连接仍需对方在本机确认。'),
                           ] else ...[
                             TextField(
                               key: const Key('assist-code-field'),

@@ -25,8 +25,10 @@ class FakeVideo implements VideoAdapter {
   String _error = '';
   bool _attached = false;
 
+  ui.Image? frame;
+  ui.Image? nextFrame;
   @override
-  ui.Image? get image => null;
+  ui.Image? get image => frame;
   @override
   AttachFailure? get failure => _failure;
   @override
@@ -69,7 +71,12 @@ class FakeVideo implements VideoAdapter {
   }
 
   @override
-  Future<void> poll() async {}
+  void send(int kind, int a, [int b = 0]) {}
+
+  @override
+  Future<void> poll() async {
+    frame = nextFrame;
+  }
 
   @override
   void close() {
@@ -146,6 +153,43 @@ const failureResult = {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  testWidgets('TestNoFirstFrameIsExplicitAndRecoverable', (tester) async {
+    final video = FakeVideo();
+    await tester.pumpWidget(wrap(video));
+    await tester.pumpAndSettle();
+    await tester.pump(const Duration(seconds: 20));
+    await tester.pump();
+    expect(find.textContaining('未收到首帧'), findsOneWidget);
+    expect(find.byKey(const Key('reconnect')), findsOneWidget);
+  });
+
+  testWidgets('TestClosingDiscardsLateAttach', (tester) async {
+    final video = FakeVideo()..gate = Completer<void>();
+    await tester.pumpWidget(wrap(video));
+    await tester.pump();
+    expect(video.attachCalls, 1);
+    await tester.pumpWidget(const SizedBox());
+    video.gate!.complete();
+    await tester.pump();
+    expect(video.attached, isFalse);
+  });
+
+  testWidgets('TestActiveSessionRendersReceivedFrame', (tester) async {
+    final recorder = ui.PictureRecorder();
+    ui.Canvas(recorder).drawPaint(ui.Paint()..color = const Color(0xFF22AA99));
+    final picture = recorder.endRecording();
+    addTearDown(picture.dispose);
+    final frame = picture.toImageSync(2, 2);
+    addTearDown(frame.dispose);
+    final video = FakeVideo();
+    await tester.pumpWidget(wrap(video));
+    await tester.pump();
+    video.nextFrame = frame;
+    await tester.pump(const Duration(milliseconds: 60));
+    await tester.pump();
+    expect(tester.widget<RawImage>(find.byType(RawImage)).image, same(frame));
+  });
 
   testWidgets('TestSessionPageShowsSanitizedAttachError', (tester) async {
     final video = FakeVideo(attachResult: failureResult);

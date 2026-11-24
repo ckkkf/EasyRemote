@@ -21,8 +21,8 @@ class AttachFailure {
 
 /// Web 兜底：浏览器里没有原生解码与注入。
 class SessionVideo {
-  SessionVideo._();
-  static final SessionVideo instance = SessionVideo._();
+  SessionVideo();
+  static final SessionVideo instance = SessionVideo();
 
   /// 测试注入点（Web 无 FFI，直接完成）。
   static Future<Map<String, dynamic>> Function(Map<String, String>)

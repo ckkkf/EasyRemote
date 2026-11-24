@@ -75,14 +75,16 @@ class AttachFailure {
 }
 
 class SessionVideo {
-  SessionVideo._();
-  static final SessionVideo instance = SessionVideo._();
+  SessionVideo();
+  static final SessionVideo instance = SessionVideo();
 
   /// 测试注入点：默认在后台 isolate 执行阻塞 attach。
   static AttachRunner attachRunner = _attachInIsolate;
 
   DynamicLibrary? _lib;
   String? _ffiSession;
+  int _generation = 0;
+  int _lastDecodedFrame = 0;
   ui.Image? _image;
   int _lastW = 0;
   int _lastH = 0;
@@ -195,6 +197,7 @@ class SessionVideo {
     required String deviceToken,
     required String sessionId,
   }) async {
+    final generation = _generation;
     // 每次 attach 开始都先清旧失败态：否则上一次的错误会一直挂在画面上。
     _failure = null;
     _error = '';
@@ -208,6 +211,11 @@ class SessionVideo {
         'device_token': deviceToken,
         'session_id': sessionId,
       });
+      if (generation != _generation) {
+        final id = map['session_id'];
+        if (map['ok'] == true && id is String) _closeNative(id);
+        return;
+      }
       if (map['ok'] != true) {
         final raw = map['error'];
         if (raw is Map) {
@@ -223,7 +231,7 @@ class SessionVideo {
         } else {
           // legacy 字符串错误（老版本 FFI）可能含内部 URL / 原始 JSON：
           // 原文只进 debug 日志，UI 一律用稳定文案。
-          debugPrint('[video] legacy attach error: $raw');
+          debugPrint('[video] received unstructured native attach error');
           _failure = const AttachFailure(message: '画面接管失败，请重试');
         }
         _error = _failure!.display;
@@ -237,7 +245,8 @@ class SessionVideo {
       debugPrint('[video] attached $_ffiSession');
     } catch (e) {
       // 原始异常可能带内部 URL/端口：只进日志，UI 用稳定文案。
-      debugPrint('[video] attach exception: $e');
+      if (generation != _generation) return;
+      debugPrint('[video] attach exception: ${e.runtimeType}');
       _failure = const AttachFailure(message: '连接失败，请检查网络后重试');
       _error = _failure!.display;
     }
@@ -247,6 +256,7 @@ class SessionVideo {
   Future<void> poll() async {
     final id = _ffiSession;
     if (id == null) return;
+    final generation = _generation;
     final lib = _lib;
     if (lib == null) return;
     try {
@@ -266,6 +276,14 @@ class SessionVideo {
       _lossPct = (info['loss_pct'] as num?)?.toDouble() ?? _lossPct;
       _inputP95Ms = (info['input_p95_ms'] as num?)?.toInt() ?? _inputP95Ms;
       _inputAcks = (info['input_acks'] as num?)?.toInt() ?? _inputAcks;
+      if (info['connected'] != true) {
+        _error = '画面传输已停止，请断开后重新连接';
+        _image?.dispose();
+        _image = null;
+        return;
+      }
+      final frames = (info['frames'] as num?)?.toInt() ?? 0;
+      if (frames <= _lastDecodedFrame) return;
       final w = (info['width'] as num?)?.toInt() ?? 0;
       final h = (info['height'] as num?)?.toInt() ?? 0;
       if (w <= 0 || h <= 0) return;
@@ -285,12 +303,18 @@ class SessionVideo {
         } finally {
           calloc.free(sidPtr);
         }
-        if (n <= 0) return;
+        if (n != need) return;
         _buffer!.setRange(0, n, bufPtr.asTypedList(n));
       } finally {
         malloc.free(bufPtr);
       }
       final image = await _decode(_buffer!, w, h);
+      if (generation != _generation) {
+        image.dispose();
+        return;
+      }
+      _lastDecodedFrame = frames;
+      _error = '';
       final old = _image;
       _image = image;
       _frameCount++;
@@ -299,7 +323,8 @@ class SessionVideo {
       _lastH = h;
       if (old != null) old.dispose();
     } catch (e) {
-      _error = e.toString();
+      debugPrint('[video] frame read failed: ${e.runtimeType}');
+      if (generation == _generation) _error = '读取远程画面失败，请重试';
     }
   }
 
@@ -334,35 +359,38 @@ class SessionVideo {
     }
   }
 
-  void close() {
-    // 失败 attach 后 _ffiSession 仍为 null：也必须清掉失败态，否则重连看不到变化。
-    final id = _ffiSession;
-    if (id == null) {
-      _failure = null;
-      _error = '';
-      return;
-    }
+  void _closeNative(String id) {
     try {
-      final lib = _lib;
+      final fn = (_lib ??= openLibrary()).lookupFunction<_CloseC, _CloseDart>(
+        'er_ctrl_close',
+      );
       final sidPtr = id.toNativeUtf8();
       try {
-        lib?.lookupFunction<_CloseC, _CloseDart>('er_ctrl_close')(sidPtr);
+        fn(sidPtr);
       } finally {
         calloc.free(sidPtr);
       }
     } catch (e) {
-      debugPrint('[video] close failed: $e');
+      debugPrint('[video] close failed: ${e.runtimeType}');
     }
+  }
+
+  void close() {
+    _generation++;
+    final id = _ffiSession;
+    _ffiSession = null;
+    if (id != null) _closeNative(id);
     final texture = _textureId;
     if (texture != null) {
       _textureId = null;
       // 异步释放，不能阻塞 close。
       unawaited(VideoTextureBridge.dispose(texture));
     }
-    _ffiSession = null;
     _image?.dispose();
     _image = null;
     _frameCount = 0;
+    _lastDecodedFrame = 0;
+    _buffer = null;
     // close 是「回到干净状态」：无论之前是成功还是失败，失败态都要清掉。
     _failure = null;
     _error = '';

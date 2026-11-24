@@ -6,7 +6,7 @@ import 'session_video.dart';
 ///
 /// 为什么要这层：widget 测试不能加载真实 FFI，但必须验证**页面**行为
 /// （错误文案脱敏、trace_id 复制按钮、重连真的再次 attach、并发不重复）。
-/// 生产默认实现只是把调用转给 SessionVideo.instance，行为不变。
+/// 每个会话页独占 native 画面句柄，迟到的结果不会覆盖下一次会话。
 abstract class VideoAdapter {
   ui.Image? get image;
   AttachFailure? get failure;
@@ -22,25 +22,28 @@ abstract class VideoAdapter {
     required String sessionId,
   });
 
+  void send(int kind, int a, [int b = 0]);
   Future<void> poll();
   void close();
 }
 
-/// 生产实现：委托全局 SessionVideo 单例。
+/// 生产实现：使用页面所属的 SessionVideo。
 class DefaultVideoAdapter implements VideoAdapter {
-  const DefaultVideoAdapter();
+  DefaultVideoAdapter();
+
+  final SessionVideo session = SessionVideo();
 
   @override
-  ui.Image? get image => SessionVideo.instance.image;
+  ui.Image? get image => session.image;
 
   @override
-  AttachFailure? get failure => SessionVideo.instance.failure;
+  AttachFailure? get failure => session.failure;
 
   @override
-  String get error => SessionVideo.instance.error;
+  String get error => session.error;
 
   @override
-  bool get attached => SessionVideo.instance.attached;
+  bool get attached => session.attached;
 
   @override
   Future<void> attach({
@@ -50,7 +53,7 @@ class DefaultVideoAdapter implements VideoAdapter {
     required String deviceId,
     required String deviceToken,
     required String sessionId,
-  }) => SessionVideo.instance.attach(
+  }) => session.attach(
     gateway: gateway,
     relay: relay,
     token: token,
@@ -60,8 +63,11 @@ class DefaultVideoAdapter implements VideoAdapter {
   );
 
   @override
-  Future<void> poll() => SessionVideo.instance.poll();
+  void send(int kind, int a, [int b = 0]) => session.send(kind, a, b);
 
   @override
-  void close() => SessionVideo.instance.close();
+  Future<void> poll() => session.poll();
+
+  @override
+  void close() => session.close();
 }

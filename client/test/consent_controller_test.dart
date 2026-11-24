@@ -60,6 +60,21 @@ void main() {
     });
   });
 
+  test('TestCancelledNativeRequestCannotBeAccepted', () {
+    fakeAsync((async) {
+      final controller = ConsentController();
+      final decisions = <ConsentDecision>[];
+      controller.decisions.listen(decisions.add);
+      controller.request(sessionId: 'cancelled', controllerLabel: '测试设备');
+      controller.dismiss();
+      expect(controller.hasPending, isFalse);
+      expect(controller.accept(), isFalse);
+      async.elapse(const Duration(seconds: 31));
+      expect(decisions, isEmpty);
+      controller.dispose();
+    });
+  });
+
   test('TestRemoteCannotDecide', () {
     fakeAsync((async) {
       final c = ConsentController(clock: () => DateTime(2026));

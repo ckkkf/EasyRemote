@@ -508,7 +508,6 @@ fn run_loop(
         }
     }
 
-    let _ = ctrl.rejoin(relay, session_id);
     if let Ok(mut s) = stats.lock() {
         s.connected = false;
     }
@@ -539,47 +538,9 @@ pub fn attach(
         p2p_token(session_id),
         Duration::from_secs(2),
     ));
-    // 时序对齐：被控端收到 consent 后要 sleep 1.2s → begin → 再 sleep 2.5s 才 announce，
-    // 也就是说它在中继上「可收包」大约在 3.7s 之后。主控 600ms 就 announce 的话，
-    // 中继会因对端未注册直接丢包，接着 finish 干等 15s —— 就是用户看到的
-    // 「no peer handshake within 15s」。这里对齐到 3s，并且握手失败时重发（幂等）。
-    std::thread::sleep(Duration::from_millis(3000));
-    ctrl.announce(&mut relay_cli, &msg).map_err(|e| {
-        // 本地中继错误原文可能含地址/路径：只进日志，UI 用稳定文案。
-        eprintln!("attach announce error: {e}");
-        AttachError {
-            code: "RELAY".into(),
-            name: String::new(),
-            message: "中继连接失败，请稍后重试".into(),
-            retryable: true,
-            trace_id: String::new(),
-        }
-    })?;
-    // 三轮重试：失败保留**最后一次结构化原因**（含 trace_id），不再压成字符串。
-    let mut last_err: Option<AttachError> = None;
-    let mut handshake_ok = false;
-    for _ in 0..3 {
-        match ctrl.finish_ex(&mut relay_cli, &mut crypto, &keys, session_id, Some(&msg)) {
-            Ok(()) => {
-                handshake_ok = true;
-                break;
-            }
-            Err(e) => {
-                last_err = Some(AttachError::from(e));
-                let _ = ctrl.rejoin(&mut relay_cli, session_id);
-                let _ = ctrl.announce(&mut relay_cli, &msg);
-            }
-        }
-    }
-    if !handshake_ok {
-        return Err(last_err.unwrap_or(AttachError {
-            code: "HANDSHAKE".into(),
-            name: "NO_PEER_HANDSHAKE".into(),
-            message: "建立加密通道超时，请确认对方已开启被控".into(),
-            retryable: true,
-            trace_id: String::new(),
-        }));
-    }
+    // 两端在握手 deadline 内重发注册和签名消息，不靠启动时间对齐。
+    ctrl.finish_ex(&mut relay_cli, &mut crypto, &keys, session_id, Some(&msg))
+        .map_err(AttachError::from)?;
     ctrl.mark_ready_ex(session_id).map_err(AttachError::from)?;
 
     let latest: Arc<Mutex<Option<Frame>>> = Arc::new(Mutex::new(None));
