@@ -1,0 +1,75 @@
+{
+  "checks": [
+    {
+      "name": "nav shows versions page",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "versions start empty",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "draft published",
+      "ok": true,
+      "detail": "windows\t0.2.14\t草稿\t0%\t否\t—\t2026/11/24 08:40:26\t下线"
+    },
+    {
+      "name": "draft rollout is 0",
+      "ok": true,
+      "detail": "windows\t0.2.14\t草稿\t0%\t否\t—\t2026/11/24 08:40:26\t下线"
+    },
+    {
+      "name": "full with 50% blocked locally",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "rollout error explained",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "rolling published with 20%",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "publish writes audit",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "retire requires reason",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "retire marks version retired",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "retire writes audit",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "deep link survives reload",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "no versions nav without permission",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "forbidden on deep link",
+      "ok": true,
+      "detail": "ER | EasyRemote | 管理后台 | 仪表盘 | 用户 | 设备 | 会话 | 审计日志 | C | cs1 | 客服 | 退出登录 | 无权限 |  | 所有写操作按角色权限执行并写入审"
+    }
+  ],
+  "pageErrors": []
+}

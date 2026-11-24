@@ -231,6 +231,14 @@ impl TargetAgent {
     }
 
     /// 数据面就绪上报（被控端）。
+    /// 结构化版 mark_ready：保留 ServiceError 的 code/name/message/retryable/trace_id。
+    ///
+    /// 为什么需要 _ex 变体：ER-905 要求 attach 失败时 UI 能拿到 trace_id，
+    /// 而 AgentError 只是 String，会把结构化字段压平（再靠字符串猜 HTTP 是错的）。
+    pub fn mark_ready_ex(&self, session_id: &str) -> Result<(), crate::ServiceError> {
+        self.gw.mark_ready(session_id).map(|_| ())
+    }
+
     pub fn mark_ready(&self, session_id: &str) -> Result<(), AgentError> {
         self.gw
             .mark_ready(session_id)
@@ -256,6 +264,31 @@ impl TargetAgent {
             fail!("consent state = {}", state);
         }
         Ok(())
+    }
+
+    /// 结构化版 begin：网关卡点的错误保留 code/name/retryable/trace_id。
+    ///
+    /// relay_ticket 的 403 就发生在这里——正是它带着 trace_id，
+    /// 走 AgentError 会被压成字符串，UI 再也拿不到。
+    pub fn begin_ex(
+        &self,
+        session_id: &str,
+    ) -> Result<(RelayClient, CryptoSession, Vec<u8>), crate::ServiceError> {
+        let ticket = self.gw.relay_ticket(session_id)?;
+        let keys = self.gw.session_keys(session_id)?;
+
+        let relay = RelayClient::new(self.relay_addr, session_id, &self.device.device_id)
+            .map_err(|e| crate::ServiceError::internal("RELAY", e.to_string()))?;
+        relay
+            .register(&ticket)
+            .map_err(|e| crate::ServiceError::internal("RELAY", e.to_string()))?;
+
+        let (crypto, eph) = CryptoSession::new(session_id, false);
+        let hs = sign_handshake(&self.identity, session_id, &eph, "controlled");
+        let mut msg = TAG.to_vec();
+        msg.extend_from_slice(&hs.encode());
+        let _ = keys;
+        Ok((relay, crypto, msg))
     }
 
     /// 握手第一步：注册中继并构造好本方握手消息（**不发送**）。
@@ -800,6 +833,11 @@ impl ControllerAgent {
     }
 
     /// 数据面就绪上报（主控端）。
+    /// 结构化版 mark_ready（主控）：保留 ServiceError 全部字段。
+    pub fn mark_ready_ex(&self, session_id: &str) -> Result<(), crate::ServiceError> {
+        self.gw.mark_ready(session_id).map(|_| ())
+    }
+
     pub fn mark_ready(&self, session_id: &str) -> Result<(), AgentError> {
         self.gw
             .mark_ready(session_id)
@@ -846,6 +884,28 @@ impl ControllerAgent {
             }
             std::thread::sleep(std::time::Duration::from_millis(50));
         }
+    }
+
+    /// 结构化版 begin（主控）：relay_ticket 的 403 在这里，必须保留 trace_id。
+    pub fn begin_ex(
+        &self,
+        session_id: &str,
+    ) -> Result<(RelayClient, CryptoSession, SessionKeys, Vec<u8>), crate::ServiceError> {
+        let ticket = self.gw.relay_ticket(session_id)?;
+        let keys = self.gw.session_keys(session_id)?;
+
+        let relay = RelayClient::new(self.relay_addr, session_id, &self.device.device_id)
+            .map_err(|e| crate::ServiceError::internal("RELAY", e.to_string()))?;
+        relay
+            .register(&ticket)
+            .map_err(|e| crate::ServiceError::internal("RELAY", e.to_string()))?;
+
+        let (crypto, eph) = CryptoSession::new(session_id, true);
+        let hs = sign_handshake(&self.identity, session_id, &eph, "operator");
+        let mut msg = TAG.to_vec();
+        msg.extend_from_slice(&hs.encode());
+        let _ = keys;
+        Ok((relay, crypto, keys, msg))
     }
 
     /// 握手第一步：注册中继并构造好本方握手消息（**不发送**）。
@@ -895,6 +955,42 @@ impl ControllerAgent {
     }
 
     /// 与 finish 相同，但等待对端期间周期重发自己的握手包（见 TargetAgent 同名方法）。
+    /// 结构化版 finish：`relay_ticket` 是第三个网关卡点，失败也要保留 trace_id。
+    ///
+    /// 本地中继/验签失败走 `ServiceError::internal` + 稳定脱敏文案，
+    /// 原文（可能含 URL/路径）只进 eprintln。
+    pub fn finish_ex(
+        &self,
+        relay: &mut RelayClient,
+        crypto: &mut CryptoSession,
+        keys: &SessionKeys,
+        session_id: &str,
+        own_msg: Option<&[u8]>,
+    ) -> Result<(), crate::ServiceError> {
+        let ticket = self.gw.relay_ticket(session_id)?;
+        let peer = wait_peer_handshake(relay, Duration::from_secs(15), own_msg, Some(&ticket))
+            .map_err(|e| {
+                eprintln!("attach finish handshake error: {e}");
+                crate::ServiceError::internal("HANDSHAKE", "建立加密通道超时，请确认对方已开启被控")
+            })?;
+        if let Some(msg) = own_msg {
+            let _ = relay.send(msg);
+        }
+        let target_pub = decode_pubkey(&keys.target_pubkey).ok_or_else(|| {
+            crate::ServiceError::internal("HANDSHAKE", "对方公钥无效，请重新连接")
+        })?;
+        let verifier = ed25519_from_bytes(&target_pub).map_err(|e| {
+            eprintln!("attach verify key error: {e}");
+            crate::ServiceError::internal("HANDSHAKE", "对方公钥无效，请重新连接")
+        })?;
+        verify_handshake(&verifier, session_id, &peer, "controlled").map_err(|e| {
+            eprintln!("attach verify handshake error: {e}");
+            crate::ServiceError::internal("HANDSHAKE", "对方身份校验失败，请重新连接")
+        })?;
+        crypto.derive_keys(&peer.ephemeral_key(), true);
+        Ok(())
+    }
+
     pub fn finish_with_resend(
         &self,
         relay: &mut RelayClient,

@@ -1,0 +1,162 @@
+{
+  "generatedAt": "2026-11-23T12:20:33+0800",
+  "viewport": {
+    "width": 1360,
+    "height": 860
+  },
+  "deviceScaleFactor": 1,
+  "font": "Inter, \"PingFang SC\", \"Microsoft YaHei\", sans-serif",
+  "theme": "light",
+  "locale": "zh-CN",
+  "baseUrl": "http://127.0.0.1:5392/",
+  "fixture": {
+    "stack": "server/cmd/stack (内存存储, 127.0.0.1:8299)",
+    "accounts": 6,
+    "devices": 10,
+    "sessions": 4,
+    "sessionStates": [
+      "active",
+      "authorized",
+      "closed",
+      "requested"
+    ],
+    "sessionIds": {
+      "requested": "ses-d74d31848c6349ca",
+      "authorized": "ses-8b6937628032e494",
+      "active": "ses-69d3834573d3bc4d",
+      "closed": "ses-42f01317f01964de"
+    },
+    "controllerDevice": "657 042 850",
+    "admin": {
+      "username": "root",
+      "role": "super",
+      "permissions": [
+        "audit.read",
+        "config.read",
+        "config.write",
+        "device.read",
+        "session.kill",
+        "session.read",
+        "stats.read",
+        "user.ban",
+        "user.read"
+      ]
+    },
+    "note": "开发账号 + 合成手机号；不含生产数据；未设置 ER_ADMIN_TOTP_OFF，走真实 TOTP"
+  },
+  "screens": [
+    {
+      "name": "a1-login",
+      "file": "a1-login.png",
+      "title": "A1 登录（TOTP）",
+      "criteria": {
+        "form": 1,
+        "inputs": 3,
+        "submitLabel": "登录"
+      }
+    },
+    {
+      "name": "a2-dashboard",
+      "file": "a2-dashboard.png",
+      "title": "A2 仪表盘",
+      "criteria": {
+        "metricCards": 15,
+        "metricLabels": [
+          "在线设备",
+          "设备总数",
+          "进行中会话",
+          "待授权会话",
+          "在线用户",
+          "24h 新增设备",
+          "建连成功率",
+          "P2P 命中率",
+          "中继占比",
+          "延迟 P50",
+          "延迟 P95",
+          "帧率达成率",
+          "会话异常中断率",
+          "客户端崩溃率",
+          "重连成功率"
+        ],
+        "tables": 2,
+        "nav": [
+          "▦\n仪表盘",
+          "☰\n用户",
+          "▤\n设备",
+          "⇄\n会话",
+          "◷\n审计日志",
+          "⚙\n配置中心"
+        ]
+      }
+    },
+    {
+      "name": "a3-users",
+      "file": "a3-users.png",
+      "title": "A3 用户列表",
+      "criteria": {
+        "columns": [
+          "账号 ID",
+          "昵称",
+          "手机号",
+          "设备数",
+          "状态",
+          "注册时间",
+          "最近登录",
+          "操作"
+        ],
+        "rows": 6,
+        "filters": 2,
+        "pager": "共 6 条"
+      }
+    },
+    {
+      "name": "a6-device-detail",
+      "file": "a6-device-detail.png",
+      "title": "A6 设备详情（独立路由）",
+      "criteria": {
+        "modalTitle": "657 042 850",
+        "kvPairs": 7,
+        "sessionRows": 4
+      }
+    },
+    {
+      "name": "a7-sessions",
+      "file": "a7-sessions.png",
+      "title": "A7 会话列表",
+      "criteria": {
+        "columns": [
+          "会话 ID",
+          "主控",
+          "被控",
+          "状态",
+          "时长",
+          "开始时间",
+          "操作"
+        ],
+        "rows": 4,
+        "states": [
+          "等待授权",
+          "已授权",
+          "进行中",
+          "已结束"
+        ]
+      }
+    },
+    {
+      "name": "a12-config",
+      "file": "a12-config.png",
+      "title": "A12 配置中心",
+      "criteria": {
+        "columns": [
+          "配置项",
+          "当前值",
+          "默认 / 范围",
+          "说明"
+        ],
+        "configRows": 4,
+        "capabilityRows": 7
+      }
+    }
+  ],
+  "pageErrors": []
+}

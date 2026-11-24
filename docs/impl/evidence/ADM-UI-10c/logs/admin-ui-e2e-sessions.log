@@ -1,0 +1,39 @@
+PASS session columns -> ['会话 ID', '主控', '被控', '状态', '时长', '平均延迟', '结束原因', '链路', '开始时间', '操作']
+PASS session latency and link from samples
+PASS future time range returns no sessions
+PASS device filter narrows rows -> dev-d67b2551c7ffbd51
+PASS link filter matches link column
+PASS abnormal filter returns only abnormal closed sessions
+PASS state filter has machine states -> ['全部状态', '等待授权（requested）', '已授权（authorized）', '进行中（active）', '已结束（closed）']
+PASS state filter has no 'ended' -> ['全部状态', '等待授权（requested）', '已授权（authorized）', '进行中（active）', '已结束（closed）']
+PASS closed filter returns rows -> ['已结束']
+PASS closed rows labelled -> ['已结束']
+PASS kill disabled on closed row
+PASS kill dialog requires category
+PASS kill dialog enabled after category
+PASS kill dialog shows audited reason
+PASS cancel writes no kill audit
+PASS kill writes audit
+PASS kill closes session -> {'id': 'ses-a4c7081a6a2f391e', 'controller_id': 'dev-d67b2551c7ffbd51', 'target_id': 'dev-00fd6d7508c08910', 'state': 'closed', 'reason': 'admin: 安全应急', 'started_at': '2026-11-24T00:39:58.537313Z', 'ended_at': '2026-11-24T00:40:00.789551Z', 'latency_available': True, 'avg_latency_ms': 34, 'link': 'relay'}
+PASS row opens session detail -> http://127.0.0.1:5400/sessions/ses-e3909d0d615bc118
+PASS detail shows session fields
+PASS unsampled session shows no data
+PASS quality samples rendered -> 3
+PASS quality summary computed
+PASS quality link column shows relay
+PASS session error timeline recorded -> 1
+PASS error timeline shows code and source
+PASS session parties listed -> 2
+PASS link switch recorded -> 时间	从	到 | 2026/11/24 08:39:57	p2p	relay
+PASS timeline rendered
+PASS deep link survives reload
+PASS back returns to list -> http://127.0.0.1:5400/sessions
+PASS dual request requires reason
+PASS pending request listed -> ses-3bf311af2149228d
+PASS dual request writes audit
+PASS requester cannot confirm own request -> 没有权限执行该操作 | 700005 ADMIN_FORBIDDEN · trace rNYxFha4bP8RLHdF | 复制 trace
+PASS second admin confirmed and closed session
+PASS session closed after confirmation -> ses-3bf311af2149228d
+PASS confirm writes audit
+PASS unknown session shows not found
+E2E OK (38 checks)

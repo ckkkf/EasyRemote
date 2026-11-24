@@ -1,0 +1,6 @@
+PASS TestTailwindWiredToGeneratedTokens · token 单一来源 + preflight 关闭
+PASS TestShadcnPrimitivesAreSource · 4 个源码 primitive
+PASS TestTailwindBuildEmitsUtility · index-CHVlNU0n.css · 品牌色 #1e4bdb + 工具类
+
+汇总: 3/3 通过
+CHECK_EXIT=0

@@ -1,0 +1,23 @@
+=== flutter analyze 明细（16/20）===
+== 16/20 flutter: flutter analyze（error/warning=0） ==
+Analyzing client...                                             
+
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • lib/api.dart:141:9 • prefer_interpolation_to_compose_strings
+   info • Unnecessary use of getter and setter to wrap a field. Try removing the getter and setter and renaming the field • lib/api.dart:533:14 • unnecessary_getters_setters
+   info • 'package:flutter/material.dart' is deprecated and shouldn't be used. Use package:material_ui/material_ui.dart instead. This feature was deprecated after v3.47.0-0.0.pre. Try replacing the use of the deprecated member with the replacement • lib/consent_dialog.dart:1:1 • deprecated_member_use
+   info • 'package:flutter/material.dart' is deprecated and shouldn't be used. Use package:material_ui/material_ui.dart instead. This feature was deprecated after v3.47.0-0.0.pre. Try replacing the use of the deprecated member with the replacement • lib/error_view.dart:1:1 • deprecated_member_use
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • lib/host_service_io.dart:161:7 • prefer_interpolation_to_compose_strings
+   info • 'package:flutter/material.dart' is deprecated and shouldn't be used. Use package:material_ui/material_ui.dart instead. This feature was deprecated after v3.47.0-0.0.pre. Try replacing the use of the deprecated member with the replacement • lib/local_control_bar.dart:1:1 • deprecated_member_use
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • lib/local_control_bar.dart:32:15 • prefer_interpolation_to_compose_strings
+   info • 'package:flutter/material.dart' is deprecated and shouldn't be used. Use package:material_ui/material_ui.dart instead. This feature was deprecated after v3.47.0-0.0.pre. Try replacing the use of the deprecated member with the replacement • lib/main.dart:1:1 • deprecated_member_use
+   info • Use the null-aware marker '?' rather than a null check via an 'if'. Try using '?' • lib/native.dart:133:7 • use_null_aware_elements
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • lib/native.dart:152:7 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • lib/native.dart:208:24 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • lib/native.dart:215:11 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • lib/native.dart:217:15 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • lib/native.dart:234:11 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • lib/native.dart:236:15 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • lib/native.dart:277:11 • prefer_interpolation_to_compose_strings
+   info • Use interpolation to compose strings and values. Try using string interpolation to build the composite string • lib/native.dart:279:15 • prefer_interpolation_to_compose_strings
+=== 存量 lint 基线（闸门允许的既有 info）===
+124

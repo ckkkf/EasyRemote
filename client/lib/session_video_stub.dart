@@ -1,5 +1,24 @@
 import 'dart:ui' as ui;
 
+/// 与 IO 版同形的结构化失败类型（Web 下恒为空）。
+class AttachFailure {
+  const AttachFailure({
+    this.code = '',
+    this.name = '',
+    this.message = '画面接管失败',
+    this.retryable = false,
+    this.traceId = '',
+  });
+
+  final String code;
+  final String name;
+  final String message;
+  final bool retryable;
+  final String traceId;
+
+  String get display => message;
+}
+
 /// Web 兜底：浏览器里没有原生解码与注入。
 class SessionVideo {
   SessionVideo._();
@@ -10,6 +29,8 @@ class SessionVideo {
   attachRunner = (args) async => <String, dynamic>{'ok': false};
 
   ui.Image? get image => null;
+
+  AttachFailure? get failure => null;
   String get error => '浏览器预览不解码视频流（需要桌面端）';
   bool get attached => false;
   int get frameCount => 0;

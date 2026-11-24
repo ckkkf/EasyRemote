@@ -1,0 +1,54 @@
+# ADM-UI-10c 命令输出
+# 采集时间: 2026-11-23T17:55:04+0800
+# commit: 267a635
+
+$ bash scripts/admin-ui-e2e-all.sh
+==> admin-ui-e2e-routes.py
+    E2E OK (14 checks)
+==> admin-ui-e2e-login.py
+    E2E OK (9 checks)
+==> admin-ui-e2e-dashboard.py
+    E2E OK (23 checks)
+==> admin-ui-e2e-users.py
+    E2E OK (26 checks)
+==> admin-ui-e2e-devices.py
+    E2E OK (26 checks)
+==> admin-ui-e2e-sessions.py
+    E2E OK (28 checks)
+==> admin-ui-e2e-config-audit.py
+    E2E OK (24 checks)
+==> admin-ui-e2e-admins.py
+    E2E OK (13 checks)
+==> admin-ui-e2e-risk.py
+    E2E OK (14 checks)
+==> admin-ui-e2e-versions.py
+    E2E OK (14 checks)
+==> admin-ui-e2e-dialogs.py
+    E2E OK (16 checks)
+==> admin-ui-e2e-lifecycle.py
+    E2E OK (11 checks)
+==> admin-ui-responsive-a11y.py
+    AUDIT OK
+==> admin-ui-baseline.py
+    BASELINE OK
+
+== 汇总 ==
+  PASS: 14
+  FAIL: 0
+  耗时: 143s
+  日志: /Users/ckkk/dev/code/Go/EasyRemote/docs/impl/evidence/ADM-UI-10c/logs
+  E2E SUITE: PASS
+
+$ bash scripts/gate.sh
+✓ built in 322ms
+  PASS
+
+== 汇总 ==
+  scripts   PASS
+  contract  PASS
+  go        PASS
+  rust      PASS
+  flutter   PASS
+  web       PASS
+
+GATE: PASS

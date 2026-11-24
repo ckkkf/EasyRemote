@@ -7,6 +7,7 @@ import '../api.dart';
 import '../capabilities.dart';
 import '../consent_controller.dart';
 import '../consent_dialog.dart';
+import '../host_close_policy.dart';
 import '../host_service.dart';
 import '../local_control_bar.dart';
 
@@ -51,6 +52,15 @@ class _DeviceListPageState extends State<DeviceListPage> {
   String _hostError = "";
   HostStatus _hostStatus = HostStatus.idle;
   Timer? _hostTimer;
+
+  /// 关闭请求进行中：按钮 pending，避免重复发起。
+  bool _hostClosing = false;
+
+  /// 最近一次断开失败的原因（失败时控制条保留并显示它）。
+  String _hostCloseError = '';
+
+  /// 断开结果策略（唯一判据来源）：失败不清、成功记已关闭、轮询不复活。
+  final HostClosePolicy _closePolicy = HostClosePolicy();
   String? _directBusyCode;
   bool _consentDialogOpen = false;
 
@@ -65,7 +75,19 @@ class _DeviceListPageState extends State<DeviceListPage> {
     // 被控状态每 2 秒轮询一次（主控连进来后 frames/injected 会变）
     _hostTimer = Timer.periodic(const Duration(seconds: 2), (_) {
       if (!mounted || !_hostOn) return;
-      final st = HostService.instance.status();
+      var st = HostService.instance.status();
+      // 已确认关闭的会话不得被轮询复活（否则控制条「消失又出现」）
+      if (st.sessionId.isNotEmpty &&
+          _closePolicy.visibleSession(st.sessionId).isEmpty) {
+        st = HostStatus(
+          running: st.running,
+          sessionId: '',
+          frames: st.frames,
+          injected: st.injected,
+          link: st.link,
+          error: st.error,
+        );
+      }
       if (st.running != _hostStatus.running ||
           st.sessionId != _hostStatus.sessionId ||
           st.frames != _hostStatus.frames ||
@@ -90,10 +112,43 @@ class _DeviceListPageState extends State<DeviceListPage> {
     if (mounted) setState(() {});
   }
 
+  /// 被控端主动断开（ER-905）。
+  ///
+  /// 之前忽略 closeSession 的返回值、立刻把本地状态置 idle：服务端会话还在时，
+  /// 下一轮 FFI 轮询会把旧 session_id 写回来，控制条“消失又出现”。
+  /// 现在：成功才清；失败保留控制条并显示原因；已关闭的 session 加入忽略集合，
+  /// 防止轮询把旧值写回。
   Future<void> _disconnectRemote() async {
+    if (_hostClosing) return;
     final id = _hostStatus.sessionId;
-    if (id.isNotEmpty) HostService.instance.closeSession(id);
-    setState(() => _hostStatus = HostStatus.idle);
+    if (id.isEmpty) return;
+    setState(() {
+      _hostClosing = true;
+      _hostCloseError = '';
+    });
+    // FFI 内部是同步网络请求：放到独立 isolate，避免卡住 UI（AGENTS 7 / 9.4）。
+    // 任何异常（动态库缺失 / FFI 崩溃 / JSON 解析失败）都必须转成失败结果，
+    // 否则 _hostClosing 会永久为 true，按钮永远停在「断开中…」。
+    HostCloseResult result;
+    try {
+      result = await closeSessionInWorker(
+        HostService.instance.hostId ?? '',
+        id,
+      );
+    } catch (e) {
+      result = HostCloseResult(ok: false, error: e.toString());
+    }
+    final outcome = _closePolicy.apply(id, result);
+    if (!mounted) return;
+    setState(() {
+      _hostClosing = false;
+      _hostCloseError = outcome.error;
+      if (outcome.cleared) _hostStatus = HostStatus.idle;
+    });
+    if (outcome.cleared) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('已断开远程控制')));
+    }
   }
 
   void _onConsentChanged() {
@@ -130,8 +185,12 @@ class _DeviceListPageState extends State<DeviceListPage> {
       _hostBusy = true;
       _hostError = "";
     });
+    final wasAllowed = appPrefs.value.allowControl;
     try {
       if (on) {
+        // HostService 在 prepare/start 里会检查本机偏好；必须先落偏好，
+        // 否则第一次打开开关必然报“允许被控已关闭（本机设置）”。
+        if (fromUser && !wasAllowed) _patchAllowControl(true);
         if (!HostService.supported) {
           throw StateError("当前平台不支持被控：浏览器预览没有原生采集/注入，请在桌面客户端开启");
         }
@@ -167,7 +226,6 @@ class _DeviceListPageState extends State<DeviceListPage> {
           _hostPassword = pw;
           _hostStatus = HostStatus.idle;
         });
-        if (fromUser) _patchAllowControl(true);
         debugPrint("[host] 允许被控已开启 device_code=$code password=$pw");
       } else {
         HostService.instance.stop();
@@ -178,6 +236,8 @@ class _DeviceListPageState extends State<DeviceListPage> {
         if (fromUser) _patchAllowControl(false);
       }
     } catch (e) {
+      // 开启失败要把偏好回滚，否则 UI 显示“关”，持久化却是“开”。
+      if (on && fromUser && !wasAllowed) _patchAllowControl(false);
       setState(() {
         _hostOn = false;
         _hostError = _friendlyHostError(e);
@@ -392,6 +452,13 @@ class _DeviceListPageState extends State<DeviceListPage> {
             statusText,
             style: text.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
           ),
+          if (_hostCloseError.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              '断开失败：$_hostCloseError（控制条保留，可重试）',
+              style: text.bodySmall?.copyWith(color: scheme.error),
+            ),
+          ],
           if (_hostError.isNotEmpty) ...[
             const SizedBox(height: 6),
             Text(
@@ -459,6 +526,8 @@ class _DeviceListPageState extends State<DeviceListPage> {
           LocalControlBar(
             sessionId: _hostStatus.sessionId,
             onDisconnect: _disconnectRemote,
+            busy: _hostClosing,
+            error: _hostCloseError,
           ),
         PageHeader(
           title: '我的设备',

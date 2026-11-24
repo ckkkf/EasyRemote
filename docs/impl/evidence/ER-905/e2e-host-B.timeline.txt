@@ -1,0 +1,9 @@
+MAC: waiting_for_signalling ...
+MAC: session=ses-a6d46c1dffdf5d95
+MAC: consent=authorized
+MAC: handshake_verified (ed25519 + x25519)
+MAC: streaming ...
+MAC: local_close_after=1s
+MAC: local_close_ok
+MAC: session_closed sent=2 injected=0, back to waiting
+MAC: waiting_for_signalling ...

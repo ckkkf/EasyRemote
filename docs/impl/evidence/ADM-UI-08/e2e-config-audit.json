@@ -1,0 +1,156 @@
+{
+  "generatedAt": "2026-11-24T08:40:12+0800",
+  "viewport": {
+    "width": 1360,
+    "height": 860
+  },
+  "checks": [
+    {
+      "name": "no changes initially",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "history card rendered",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "diff lists before -> after",
+      "ok": true,
+      "detail": "连接 · session.max_minutes: 720 -> 601"
+    },
+    {
+      "name": "save enabled with valid change",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "config save writes audit",
+      "ok": true,
+      "detail": "config.update {\"session.max_minutes\":\"720\"}->{\"session.max_minutes\":\"601\"}"
+    },
+    {
+      "name": "rollback restores previous value",
+      "ok": true,
+      "detail": "720"
+    },
+    {
+      "name": "rollback writes audit",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "config group shown",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "scoped save audits with platform",
+      "ok": true,
+      "detail": "app_config@windows"
+    },
+    {
+      "name": "global unchanged after platform save",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "platform scope keeps its own value",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "version scope audited with platform and version",
+      "ok": true,
+      "detail": "app_config@windows@0.2.13"
+    },
+    {
+      "name": "other version falls back to platform scope",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "invalid value disables save",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "invalid value explained",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "audit columns",
+      "ok": true,
+      "detail": [
+        "时间",
+        "操作人",
+        "动作",
+        "对象",
+        "结果",
+        "IP",
+        "变更"
+      ]
+    },
+    {
+      "name": "action options come from server",
+      "ok": true,
+      "detail": [
+        "全部动作",
+        "admin.login",
+        "config.rollback",
+        "config.update",
+        "user.ban"
+      ]
+    },
+    {
+      "name": "audit export enabled",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "csv header exported",
+      "ok": true,
+      "detail": "时间,操作人,角色,动作,对象,变更前,变更后,IP,结果"
+    },
+    {
+      "name": "csv masks ip",
+      "ok": true,
+      "detail": "2026-11-24T00:40:10Z,root,super,config.update,app_config@windows@0.2.13,\"{\"\"session.max_minutes\"\":\"\"300\"\"}\",\"{\"\"session.max_minutes\"\":\"\"121\"\"}\",127.0.x.x:57945,ok"
+    },
+    {
+      "name": "export count shown",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "export writes audit",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "exact action filter",
+      "ok": true,
+      "detail": [
+        "user.ban"
+      ]
+    },
+    {
+      "name": "actor filter",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "future time range returns no rows",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "clearing filters restores rows",
+      "ok": true,
+      "detail": ""
+    }
+  ],
+  "pageErrors": []
+}

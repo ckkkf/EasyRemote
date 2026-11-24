@@ -1,0 +1,162 @@
+{
+  "generatedAt": "2026-11-24T08:39:49+0800",
+  "viewport": {
+    "width": 1360,
+    "height": 860
+  },
+  "checks": [
+    {
+      "name": "users table columns",
+      "ok": true,
+      "detail": [
+        "账号 ID",
+        "昵称",
+        "手机号",
+        "设备数",
+        "状态",
+        "注册时间",
+        "最近登录",
+        "操作"
+      ]
+    },
+    {
+      "name": "device count column from server",
+      "ok": true,
+      "detail": [
+        "2",
+        "1"
+      ]
+    },
+    {
+      "name": "nickname empty until set",
+      "ok": true,
+      "detail": [
+        "—",
+        "—"
+      ]
+    },
+    {
+      "name": "last login recorded",
+      "ok": true,
+      "detail": [
+        "刚刚",
+        "刚刚"
+      ]
+    },
+    {
+      "name": "phone masked",
+      "ok": true,
+      "detail": [
+        "139****5000",
+        "139****5001"
+      ]
+    },
+    {
+      "name": "future range returns no users",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "clearing range restores rows",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "csv header exported",
+      "ok": true,
+      "detail": "账号 ID,昵称,手机号,设备数,状态,注册时间,最近登录"
+    },
+    {
+      "name": "csv masks phone",
+      "ok": true,
+      "detail": "acc-18be5c6995a6eb6c,,139****5000,2,active,2026-11-24T00:39:45Z,2026-11-24T00:39:45Z | acc-91f6e3e87f17032b,,139****5001,1,active,2026-11-24T00:39:45Z,2026-11-24T00:39:45Z"
+    },
+    {
+      "name": "export writes audit",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "kick requires reason",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "kick writes audit",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "ban applied",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "unban writes audit",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "row opens detail route",
+      "ok": true,
+      "detail": "http://127.0.0.1:5398/users/acc-18be5c6995a6eb6c"
+    },
+    {
+      "name": "detail shows account section",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "detail shows masked phone",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "detail lists devices",
+      "ok": true,
+      "detail": 2
+    },
+    {
+      "name": "account sessions listed",
+      "ok": true,
+      "detail": 1
+    },
+    {
+      "name": "session reason shown",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "note saved",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "note writes audit",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "note persisted in form",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "deep link survives reload",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "back returns to list",
+      "ok": true,
+      "detail": "http://127.0.0.1:5398/users"
+    },
+    {
+      "name": "unknown user shows not found",
+      "ok": true,
+      "detail": ""
+    }
+  ],
+  "pageErrors": [],
+  "firstUserId": "acc-18be5c6995a6eb6c"
+}

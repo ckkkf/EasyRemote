@@ -1,0 +1,7 @@
+{
+  "comparedTo": "/Users/ckkk/dev/code/Go/EasyRemote/docs/impl/evidence/ADM-API-02e/screens/manifest.json",
+  "diffs": [
+    "a2-dashboard.nav: ['▦\\n仪表盘', '☰\\n用户', '▤\\n设备', '⇄\\n会话', '◷\\n审计日志', '⚙\\n配置中心'] -> ['▦\\n仪表盘', '☰\\n用户', '▤\\n设备', '⇄\\n会话', '◷\\n审计日志', '⚙\\n配置中心', '☗\\n管理员与角色']"
+  ],
+  "screens": 6
+}

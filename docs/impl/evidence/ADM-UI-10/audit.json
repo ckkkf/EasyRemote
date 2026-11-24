@@ -1,0 +1,61 @@
+{
+  "generatedAt": "2026-11-24T08:41:08+0800",
+  "viewports": [
+    [
+      1360,
+      860
+    ],
+    [
+      1280,
+      800
+    ],
+    [
+      1024,
+      768
+    ],
+    [
+      768,
+      1024
+    ]
+  ],
+  "pages": [
+    "/login",
+    "/dashboard",
+    "/users",
+    "/devices",
+    "/sessions",
+    "/audit",
+    "/config"
+  ],
+  "screenshots": [
+    "1360x860-login",
+    "1360x860-dashboard",
+    "1360x860-users",
+    "1360x860-devices",
+    "1360x860-sessions",
+    "1360x860-audit",
+    "1360x860-config",
+    "1280x800-login",
+    "1280x800-dashboard",
+    "1280x800-users",
+    "1280x800-devices",
+    "1280x800-sessions",
+    "1280x800-audit",
+    "1280x800-config",
+    "1024x768-login",
+    "1024x768-dashboard",
+    "1024x768-users",
+    "1024x768-devices",
+    "1024x768-sessions",
+    "1024x768-audit",
+    "1024x768-config",
+    "768x1024-login",
+    "768x1024-dashboard",
+    "768x1024-users",
+    "768x1024-devices",
+    "768x1024-sessions",
+    "768x1024-audit",
+    "768x1024-config"
+  ],
+  "findings": []
+}

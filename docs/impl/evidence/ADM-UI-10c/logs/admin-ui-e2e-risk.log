@@ -1,0 +1,15 @@
+PASS nav shows risk page
+PASS blocked connect produced alert -> True
+PASS blacklist starts empty
+PASS invalid ip rejected -> 配置值不合法 | 700010 ADMIN_CONFIG_INVALID · trace bpcEHHslgDshbSmr | 复制 trace
+PASS blacklist row added -> account	acc-050aa55fbb5fcd63	同 IP 高频连接	2026/11/25 08:40:21	root	移除
+PASS blacklist shows expiry -> account	acc-050aa55fbb5fcd63	同 IP 高频连接	2026/11/25 08:40:21	root	移除
+PASS add writes audit
+PASS alert listed from real block -> 1
+PASS alert subject is account
+PASS remove requires reason
+PASS blacklist removed
+PASS remove writes audit
+PASS no risk nav without permission
+PASS forbidden on deep link -> ER | EasyRemote | 管理后台 | 仪表盘 | 用户 | 设备 | 会话 | 审计日志 | C | cs1 | 客服 | 退出登录 | 无权限 |  | 所有写操作按角色权限执行并写入审
+E2E OK (14 checks)

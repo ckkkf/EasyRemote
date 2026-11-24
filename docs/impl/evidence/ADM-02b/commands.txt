@@ -1,0 +1,97 @@
+# ADM-02b 命令输出
+# 采集时间: 2026-11-23T12:01:16+0800
+# commit: 267a635
+
+$ (cd server && go test ./internal/store/ -run Contract -v)
+=== RUN   TestMemoryContract
+=== RUN   TestMemoryContract/AccountLifecycle
+=== RUN   TestMemoryContract/AccountUniquePhone
+=== RUN   TestMemoryContract/AccountPhoneEncBackfill
+=== RUN   TestMemoryContract/DeviceLifecycle
+=== RUN   TestMemoryContract/DeviceCodeUnique
+=== RUN   TestMemoryContract/VerifyCodeAtomic
+=== RUN   TestMemoryContract/TrustExpiry
+=== RUN   TestMemoryContract/SessionLifecycle
+=== RUN   TestMemoryContract/AuditOrder
+=== RUN   TestMemoryContract/FileLifecycle
+=== RUN   TestMemoryContract/AssistSingleUse
+=== RUN   TestMemoryContract/ConfigRoundTrip
+=== RUN   TestMemoryContract/Pagination
+=== RUN   TestMemoryContract/NotFoundIsDistinct
+--- PASS: TestMemoryContract (0.00s)
+    --- PASS: TestMemoryContract/AccountLifecycle (0.00s)
+    --- PASS: TestMemoryContract/AccountUniquePhone (0.00s)
+    --- PASS: TestMemoryContract/AccountPhoneEncBackfill (0.00s)
+    --- PASS: TestMemoryContract/DeviceLifecycle (0.00s)
+    --- PASS: TestMemoryContract/DeviceCodeUnique (0.00s)
+    --- PASS: TestMemoryContract/VerifyCodeAtomic (0.00s)
+    --- PASS: TestMemoryContract/TrustExpiry (0.00s)
+    --- PASS: TestMemoryContract/SessionLifecycle (0.00s)
+    --- PASS: TestMemoryContract/AuditOrder (0.00s)
+    --- PASS: TestMemoryContract/FileLifecycle (0.00s)
+    --- PASS: TestMemoryContract/AssistSingleUse (0.00s)
+    --- PASS: TestMemoryContract/ConfigRoundTrip (0.00s)
+    --- PASS: TestMemoryContract/Pagination (0.00s)
+    --- PASS: TestMemoryContract/NotFoundIsDistinct (0.00s)
+PASS
+ok  	github.com/easyremote/server/internal/store	(cached)
+[exit=0]
+
+$ (cd server && go test ./internal/auth/ ./internal/adminapi/ ./internal/adminhttp/ -run PhoneEnc|ListUsers|MasksPhone|Envelope -v)
+=== RUN   TestSMSLoginStoresPhoneEnc
+--- PASS: TestSMSLoginStoresPhoneEnc (0.00s)
+=== RUN   TestLoginBackfillsMissingPhoneEnc
+--- PASS: TestLoginBackfillsMissingPhoneEnc (0.00s)
+PASS
+ok  	github.com/easyremote/server/internal/auth	0.418s
+=== RUN   TestUserListMasksPhone
+--- PASS: TestUserListMasksPhone (0.00s)
+=== RUN   TestListUsers_Mask
+--- PASS: TestListUsers_Mask (0.00s)
+=== RUN   TestListUsers_Empty
+--- PASS: TestListUsers_Empty (0.00s)
+=== RUN   TestListUsers_Forbidden
+--- PASS: TestListUsers_Forbidden (0.00s)
+PASS
+ok  	github.com/easyremote/server/internal/adminapi	0.232s
+=== RUN   TestAdminEnvelopeContract
+2026/11/23 12:01:18 trace=tF421_WpibWVrP7s code=100001 name=AUTH_INVALID_CREDENTIAL detail=invalid credentials
+2026/11/23 12:01:18 trace=YBphoBaXUyiix2_l code=100001 name=AUTH_INVALID_CREDENTIAL detail=invalid credentials
+2026/11/23 12:01:18 trace=A9gkJC-gbjuSaaGh code=700007 name=ADMIN_SESSION_EXPIRED detail=unauthorized
+2026/11/23 12:01:18 trace=w2iNtYfs_KyVeyaY code=700007 name=ADMIN_SESSION_EXPIRED detail=unauthorized
+2026/11/23 12:01:18 trace=wEjCvVrDTXipho2b code=700009 name=ADMIN_REASON_REQUIRED detail=reason required
+2026/11/23 12:01:18 trace=toKBThUrzD9lLTWx code=700007 name=ADMIN_SESSION_EXPIRED detail=unauthorized
+2026/11/23 12:01:18 trace=eI2jRTI-PkgBuAUx code=700007 name=ADMIN_SESSION_EXPIRED detail=unauthorized
+2026/11/23 12:01:18 trace=SyqwdxCIuALxzVyV code=700007 name=ADMIN_SESSION_EXPIRED detail=unauthorized
+2026/11/23 12:01:18 trace=pgOYwY2VTZxrkijq code=700009 name=ADMIN_REASON_REQUIRED detail=reason required
+2026/11/23 12:01:18 trace=75KF_GUGbA7vnyDr code=700007 name=ADMIN_SESSION_EXPIRED detail=unauthorized
+2026/11/23 12:01:18 trace=7se6lr1cGsKdGH5F code=700007 name=ADMIN_SESSION_EXPIRED detail=unauthorized
+2026/11/23 12:01:18 trace=E4TyEUgp5VVyDbp8 code=700010 name=ADMIN_CONFIG_INVALID detail=empty values
+2026/11/23 12:01:18 trace=bQkxySxI-rW3t3pu code=700007 name=ADMIN_SESSION_EXPIRED detail=unauthorized
+2026/11/23 12:01:18 trace=Y0kLQ4SVpFPqKrhf code=700007 name=ADMIN_SESSION_EXPIRED detail=unauthorized
+2026/11/23 12:01:18 trace=3DOF7tJowMRaozn4 code=700011 name=SRV_ROUTE_NOT_FOUND detail=GET /admin/v1/does-not-exist
+    contract_test.go:108: 全部 38 条接口响应形状已对齐
+--- PASS: TestAdminEnvelopeContract (0.00s)
+=== RUN   TestListUsers_HTTPEnvelope
+--- PASS: TestListUsers_HTTPEnvelope (0.00s)
+PASS
+ok  	github.com/easyremote/server/internal/adminhttp	0.613s
+[exit=0]
+
+$ (cd server && gofmt -l internal/store internal/auth)
+[exit=0]
+
+$ bash scripts/gate.sh
+✓ built in 390ms
+  PASS
+
+== 汇总 ==
+  scripts   PASS
+  contract  PASS
+  go        PASS
+  rust      PASS
+  flutter   PASS
+  web       PASS
+
+GATE: PASS
+[exit=0]

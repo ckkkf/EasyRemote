@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:ffi';
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:ffi/ffi.dart';
 
@@ -79,6 +80,16 @@ typedef _DecideConsentDart = Pointer<Utf8> Function(
   Pointer<Utf8>,
   int,
 );
+
+/// 关闭被控会话的结果（ER-905）。
+///
+/// 结构化而非 bool：失败时必须能把原因显示给用户，并保留控制条等待重试。
+class HostCloseResult {
+  const HostCloseResult({required this.ok, this.error = ''});
+
+  final bool ok;
+  final String error;
+}
 
 /// 被控状态（UI 轮询用）。
 class HostStatus {
@@ -326,9 +337,15 @@ class HostService {
   }
 
   /// 本机断开当前会话（本地控制条）。返回 false 表示失败。
-  bool closeSession(String sessionId) {
+  /// 关闭当前被控会话（ER-905）。
+  ///
+  /// 返回结构化结果：`ok=false` 时必须带上原因，调用方据此**保留控制条**并展示错误，
+  /// 不能乐观清 UI——否则服务端会话还在，下一轮轮询又把它写回来（控制条反复出现）。
+  HostCloseResult closeSession(String sessionId) {
     final id = _hostId;
-    if (id == null || sessionId.isEmpty) return false;
+    if (id == null || sessionId.isEmpty) {
+      return const HostCloseResult(ok: false, error: '被控服务未启动或会话为空');
+    }
     final lib = _load();
     final fn = lib.lookupFunction<_CloseSessionC, _CloseSessionDart>(
       'er_host_close_session',
@@ -343,7 +360,10 @@ class HostService {
       calloc.free(sid);
     }
     final map = jsonDecode(raw) as Map<String, dynamic>;
-    return map['ok'] == true;
+    return HostCloseResult(
+      ok: map['ok'] == true,
+      error: map['error']?.toString() ?? '',
+    );
   }
 
   /// 本机决策（accept/reject）；false 表示没有匹配的 pending。
@@ -412,4 +432,89 @@ class HostService {
     }
     _hostId = null;
   }
+}
+
+/// 在**独立 isolate** 里执行 closeSession。
+///
+/// FFI 内部是同步 ureq 网络请求（阻塞当前线程）；`Future` 包装并不能让它在
+/// UI isolate 上变成非阻塞。这里把 hostId/sessionId 作为参数传进 worker，
+/// worker 内重新加载动态库并调用，UI isolate 只等结果（AGENTS 7 / 9.4）。
+Future<HostCloseResult> closeSessionInWorker(
+  String hostId,
+  String sessionId,
+) async {
+  // 注入点接受的是**顶层函数 tear-off**（可发送对象），在 worker isolate 内被执行；
+  // 生产为 null 时走真实 FFI（_closeInNewIsolate）。
+  // 注意必须在 spawn 之前读进局部变量：closure 里直接读顶层 `_closeWorker`，
+  // 新 isolate 看到的是它自己的 null。
+  final worker = _closeWorker;
+  return Isolate.run(() {
+    if (worker != null) return worker(hostId, sessionId);
+    return _closeInNewIsolate(hostId, sessionId);
+  });
+}
+
+/// 测试注入点：同步函数，必须是可发送的顶层函数 tear-off；生产为 null 走真实 FFI。
+HostCloseResult Function(String, String)? _closeWorker;
+
+set closeWorker(HostCloseResult Function(String, String)? fn) =>
+    _closeWorker = fn;
+
+HostCloseResult _closeInNewIsolate(String hostId, String sessionId) {
+  final lib = _loadForWorker();
+  final fn = lib.lookupFunction<_CloseSessionC, _CloseSessionDart>(
+    'er_host_close_session',
+  );
+  // Rust 返回的 C 字符串必须由调用方释放：不调 er_free_string 就是每次调用泄漏一块。
+  final freeFn = lib.lookupFunction<_FreeStrC, _FreeStrDart>('er_free_string');
+  final hid = hostId.toNativeUtf8();
+  final sid = sessionId.toNativeUtf8();
+  final String raw;
+  try {
+    final ptr = fn(hid, sid);
+    try {
+      raw = ptr == nullptr ? '{}' : ptr.toDartString();
+    } finally {
+      if (ptr != nullptr) freeFn(ptr);
+    }
+  } finally {
+    calloc.free(hid);
+    calloc.free(sid);
+  }
+  final map = jsonDecode(raw) as Map<String, dynamic>;
+  return HostCloseResult(
+    ok: map['ok'] == true,
+    error: map['error']?.toString() ?? '',
+  );
+}
+
+/// worker isolate 内加载动态库（单例字段不跨 isolate 共享）。
+DynamicLibrary _loadForWorker() {
+  final candidates = <String>[
+    if (Platform.environment['ER_CORE_LIB'] != null)
+      Platform.environment['ER_CORE_LIB']!,
+    if (Platform.isWindows) ...<String>[
+      'er_ffi.dll',
+      '../core/target/release/er_ffi.dll',
+      '../core/target/debug/er_ffi.dll',
+    ],
+    if (Platform.isMacOS) ...<String>[
+      Directory(Platform.resolvedExecutable).parent.parent.path +
+          '/Frameworks/liber_ffi.dylib',
+      Directory(Platform.resolvedExecutable).parent.parent.path +
+          '/MacOS/liber_ffi.dylib',
+    ],
+    if (!Platform.isWindows) '../core/target/debug/liber_ffi.dylib',
+    if (!Platform.isWindows) '../core/target/release/liber_ffi.dylib',
+  ];
+  Object? last;
+  for (final path in candidates) {
+    if (!Platform.isWindows && !File(path).existsSync()) continue;
+    try {
+      return DynamicLibrary.open(path);
+    } catch (e) {
+      last = e;
+    }
+  }
+  throw StateError('er_ffi not found: $last');
 }

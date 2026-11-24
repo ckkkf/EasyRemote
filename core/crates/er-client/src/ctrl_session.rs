@@ -100,6 +100,54 @@ impl FpsCounter {
     }
 }
 
+/// attach 失败的结构化信息（ER-905 4.1(4)）。
+///
+/// 为什么要结构化：FFI 只回一个拼接字符串时，UI 无法区分
+/// code/name/message/trace_id，只能把整串（含内部 URL/body）贴到画面上。
+#[derive(Debug, Clone)]
+pub struct AttachError {
+    pub code: String,
+    pub name: String,
+    pub message: String,
+    pub retryable: bool,
+    pub trace_id: String,
+}
+
+impl From<crate::agent::AgentError> for AttachError {
+    /// AgentError 现在只是 String 包装，但底层失败往往来自 ServiceError；
+    /// 这里保守地用稳定分类 + 原文，避免把内部 URL 泄进 message。
+    fn from(e: crate::agent::AgentError) -> Self {
+        // 只处理**传输层/本地**错误：真正的网关错误走 ServiceError → AttachError，
+        // 保留 trace_id；这里绝不靠字符串猜 HTTP 状态。
+        let msg = e.to_string();
+        let (code, retryable) = if msg.contains("no peer handshake") {
+            ("HANDSHAKE", true)
+        } else {
+            ("AGENT", false)
+        };
+        Self {
+            code: code.into(),
+            name: String::new(),
+            // 只保留可读部分：剥离 URL 与 body=
+            message: msg.split(" body=").next().unwrap_or(&msg).to_string(),
+            retryable,
+            trace_id: String::new(),
+        }
+    }
+}
+
+impl From<crate::ServiceError> for AttachError {
+    fn from(e: crate::ServiceError) -> Self {
+        Self {
+            code: e.code,
+            name: e.name,
+            message: e.message,
+            retryable: e.retryable,
+            trace_id: e.trace_id,
+        }
+    }
+}
+
 pub struct CtrlSession {
     pub id: String,
     pub latest: Arc<Mutex<Option<Frame>>>,
@@ -131,28 +179,43 @@ pub fn connect(
     sms_code: &str,
     device_code: &str,
     password: &str,
-) -> Result<CtrlSession, String> {
+) -> Result<CtrlSession, AttachError> {
     let ctrl =
-        ControllerAgent::start(gateway, phone, sms_code, relay).map_err(|e| e.to_string())?;
+        ControllerAgent::start(gateway, phone, sms_code, relay).map_err(|e| AttachError {
+            code: "AGENT".into(),
+            name: String::new(),
+            message: e.to_string(),
+            retryable: false,
+            trace_id: String::new(),
+        })?;
     let session_id = ctrl
         .request_session(device_code, password)
-        .map_err(|e| e.to_string())?;
+        .map_err(AttachError::from)?;
 
     // 等被控端 consent 落地（真实产品里是对方点「接受」）
     std::thread::sleep(Duration::from_millis(1500));
     let (mut relay_cli, mut crypto, keys, msg) =
-        ctrl.begin(&session_id).map_err(|e| e.to_string())?;
+        ctrl.begin_ex(&session_id).map_err(AttachError::from)?;
     let _ = relay_cli.negotiate_p2p(&P2PConfig::new(
         &session_id,
         p2p_token(&session_id),
         Duration::from_secs(2),
     ));
     std::thread::sleep(Duration::from_millis(2500));
-    ctrl.announce(&mut relay_cli, &msg)
-        .map_err(|e| e.to_string())?;
-    ctrl.finish(&mut relay_cli, &mut crypto, &keys, &session_id)
-        .map_err(|e| e.to_string())?;
-    ctrl.mark_ready(&session_id).map_err(|e| e.to_string())?;
+    ctrl.announce(&mut relay_cli, &msg).map_err(|e| {
+        // 本地中继错误原文可能含地址/路径：只进日志，UI 用稳定文案。
+        eprintln!("attach announce error: {e}");
+        AttachError {
+            code: "RELAY".into(),
+            name: String::new(),
+            message: "中继连接失败，请稍后重试".into(),
+            retryable: true,
+            trace_id: String::new(),
+        }
+    })?;
+    ctrl.finish_ex(&mut relay_cli, &mut crypto, &keys, &session_id, None)
+        .map_err(AttachError::from)?;
+    ctrl.mark_ready_ex(&session_id).map_err(AttachError::from)?;
 
     let latest: Arc<Mutex<Option<Frame>>> = Arc::new(Mutex::new(None));
     let stats: Arc<Mutex<CtrlStats>> = Arc::new(Mutex::new(CtrlStats {
@@ -460,11 +523,17 @@ pub fn attach(
     device_id: &str,
     device_token: &str,
     session_id: &str,
-) -> Result<CtrlSession, String> {
+) -> Result<CtrlSession, AttachError> {
     let ctrl = ControllerAgent::from_session(gateway, token, device_id, device_token, relay)
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| AttachError {
+            code: "AGENT".into(),
+            name: String::new(),
+            message: e.to_string(),
+            retryable: false,
+            trace_id: String::new(),
+        })?;
     let (mut relay_cli, mut crypto, keys, msg) =
-        ctrl.begin(session_id).map_err(|e| e.to_string())?;
+        ctrl.begin_ex(session_id).map_err(AttachError::from)?;
     let _ = relay_cli.negotiate_p2p(&P2PConfig::new(
         session_id,
         p2p_token(session_id),
@@ -475,25 +544,43 @@ pub fn attach(
     // 中继会因对端未注册直接丢包，接着 finish 干等 15s —— 就是用户看到的
     // 「no peer handshake within 15s」。这里对齐到 3s，并且握手失败时重发（幂等）。
     std::thread::sleep(Duration::from_millis(3000));
-    ctrl.announce(&mut relay_cli, &msg)
-        .map_err(|e| e.to_string())?;
+    ctrl.announce(&mut relay_cli, &msg).map_err(|e| {
+        // 本地中继错误原文可能含地址/路径：只进日志，UI 用稳定文案。
+        eprintln!("attach announce error: {e}");
+        AttachError {
+            code: "RELAY".into(),
+            name: String::new(),
+            message: "中继连接失败，请稍后重试".into(),
+            retryable: true,
+            trace_id: String::new(),
+        }
+    })?;
+    // 三轮重试：失败保留**最后一次结构化原因**（含 trace_id），不再压成字符串。
+    let mut last_err: Option<AttachError> = None;
     let mut handshake_ok = false;
     for _ in 0..3 {
-        if ctrl
-            .finish(&mut relay_cli, &mut crypto, &keys, session_id)
-            .is_ok()
-        {
-            handshake_ok = true;
-            break;
+        match ctrl.finish_ex(&mut relay_cli, &mut crypto, &keys, session_id, Some(&msg)) {
+            Ok(()) => {
+                handshake_ok = true;
+                break;
+            }
+            Err(e) => {
+                last_err = Some(AttachError::from(e));
+                let _ = ctrl.rejoin(&mut relay_cli, session_id);
+                let _ = ctrl.announce(&mut relay_cli, &msg);
+            }
         }
-        let _ = ctrl.rejoin(&mut relay_cli, session_id);
-        let _ = ctrl.announce(&mut relay_cli, &msg);
     }
     if !handshake_ok {
-        return Err("handshake failed after 3 attempts".to_string());
+        return Err(last_err.unwrap_or(AttachError {
+            code: "HANDSHAKE".into(),
+            name: "NO_PEER_HANDSHAKE".into(),
+            message: "建立加密通道超时，请确认对方已开启被控".into(),
+            retryable: true,
+            trace_id: String::new(),
+        }));
     }
-    ctrl.mark_ready(session_id)
-        .map_err(|e| format!("mark ready: {e}"))?;
+    ctrl.mark_ready_ex(session_id).map_err(AttachError::from)?;
 
     let latest: Arc<Mutex<Option<Frame>>> = Arc::new(Mutex::new(None));
     let stats: Arc<Mutex<CtrlStats>> = Arc::new(Mutex::new(CtrlStats {

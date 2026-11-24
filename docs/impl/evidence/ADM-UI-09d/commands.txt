@@ -1,0 +1,101 @@
+# ADM-UI-09d 命令输出
+# 采集时间: 2026-11-23T14:37:26+0800
+# commit: 267a635
+
+$ (cd web-admin && npx tsc --noEmit)
+[exit=0]
+
+$ (cd web-admin && npm test -- --run)
+
+> easyremote-admin@0.2.13 test
+> vitest run --run
+
+
+ RUN  v2.1.9 /Users/ckkk/dev/code/Go/EasyRemote/web-admin
+
+ ✓ tests/routes.test.ts (5 tests) 6ms
+ ✓ tests/a11y.test.ts (3 tests) 1ms
+ ✓ tests/stack-conformance.test.ts (2 tests) 2ms
+ ✓ tests/dialog-usage.test.ts (2 tests) 2ms
+ ✓ tests/admin-scope.test.ts (4 tests) 6ms
+ ✓ tests/config-audit.test.ts (5 tests) 6ms
+ ✓ tests/dashboard-metrics.test.ts (6 tests) 16ms
+ ✓ tests/page-state.test.tsx (4 tests) 11ms
+ ✓ tests/error-envelope.test.ts (3 tests) 2ms
+ ✓ tests/kill-result.test.ts (4 tests) 1ms
+ ✓ tests/data-table.test.tsx (3 tests) 6ms
+ ✓ tests/gate.test.ts (3 tests) 2ms
+ ✓ tests/kill-reasons.test.ts (3 tests) 2ms
+ ✓ tests/session-states.test.ts (3 tests) 2ms
+ ✓ tests/ui-primitives.test.tsx (1 test) 5ms
+ ✓ tests/csp.test.ts (1 test) 2ms
+ ✓ tests/login.test.tsx (3 tests) 2ms
+
+ Test Files  17 passed (17)
+      Tests  55 passed (55)
+   Start at  14:37:26
+   Duration  613ms (transform 443ms, setup 0ms, collect 986ms, tests 75ms, environment 2ms, prepare 717ms)
+
+[exit=0]
+
+$ (cd web-admin && npm run build)
+
+> easyremote-admin@0.2.13 build
+> tsc -b && vite build
+
+vite v8.3.8 building client environment for production...
+transforming...
+✓ 148 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                   0.76 kB │ gzip:   0.51 kB
+dist/assets/index-CRSPGd-F.css   20.41 kB │ gzip:   5.34 kB
+dist/assets/index-D3fjSTtK.js   331.65 kB │ gzip: 103.05 kB
+
+✓ built in 269ms
+[exit=0]
+
+$ (cd . && python3 scripts/admin-ui-e2e-versions.py)
+PASS nav shows versions page
+PASS versions start empty
+PASS draft published -> windows	0.2.14	草稿	0%	否	—	2026/11/23 14:37:37	下线
+PASS draft rollout is 0 -> windows	0.2.14	草稿	0%	否	—	2026/11/23 14:37:37	下线
+PASS full with 50% blocked locally
+PASS rollout error explained
+PASS rolling published with 20%
+PASS publish writes audit
+PASS retire requires reason
+PASS retire marks version retired
+PASS retire writes audit
+PASS deep link survives reload
+PASS no versions nav without permission
+PASS forbidden on deep link -> ER | EasyRemote | 管理后台 | ▦ | 仪表盘 | ☰ | 用户 | ▤ | 设备 | ⇄ | 会话 | ◷ | 审计日志 | C | cs1 | 客服 | 退出登录 | 无权限 |
+E2E OK (14 checks)
+[exit=0]
+
+$ python3 scripts/admin-ui-baseline.py --out docs/impl/evidence/ADM-UI-09d/screens --compare-to docs/impl/evidence/ADM-UI-09c/screens/manifest.json
+shot a1-login {"form": 1, "inputs": 3, "submitLabel": "登录"}
+shot a2-dashboard {"metricCards": 15, "metricLabels": ["在线设备", "设备总数", "进行中会话", "待授权会话", "在线用户", "24h 新增设备", "建连成功率", "P2P 命中率", "中继占比", "延迟 P50", "延迟 P95", "帧率达成率", "会话异常中断率", "客户端崩溃率", "重连成功率"], "tables": 2, "nav": ["▦\n仪表盘", "☰\n用户", "▤\n设备", "⇄\n会话", "◷\n审计日志", "⚙\n配置中心", "☗\n管理员与角色", "⛨\n风控中心", "⬆\n版本管理"]}
+shot a3-users {"columns": ["账号 ID", "昵称", "手机号", "设备数", "状态", "注册时间", "最近登录", "操作"], "rows": 6, "filters": 2, "pager": "共 6 条"}
+shot a6-device-detail {"modalTitle": "906 640 361", "kvPairs": 11, "sessionRows": 4}
+shot a7-sessions {"columns": ["会话 ID", "主控", "被控", "状态", "时长", "开始时间", "操作"], "rows": 4, "states": ["等待授权", "已授权", "进行中", "已结束"]}
+shot a12-config {"columns": ["配置项", "当前值", "默认 / 范围", "说明"], "configRows": 4, "capabilityRows": 7}
+VISUAL DIFF:
+  - a2-dashboard.nav: ['▦\n仪表盘', '☰\n用户', '▤\n设备', '⇄\n会话', '◷\n审计日志', '⚙\n配置中心', '☗\n管理员与角色', '⛨\n风控中心'] -> ['▦\n仪表盘', '☰\n用户', '▤\n设备', '⇄\n会话', '◷\n审计日志', '⚙\n配置中心', '☗\n管理员与角色', '⛨\n风控中心', '⬆\n版本管理']
+BASELINE COMPARE FAILED
+[exit=1]  # 预期：导航新增「版本管理」一项
+
+$ bash scripts/gate.sh
+✓ built in 424ms
+  PASS
+
+== 汇总 ==
+  scripts   PASS
+  contract  PASS
+  go        PASS
+  rust      PASS
+  flutter   PASS
+  web       PASS
+
+GATE: PASS
+[exit=0]

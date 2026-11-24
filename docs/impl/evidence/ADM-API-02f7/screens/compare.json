@@ -1,0 +1,7 @@
+{
+  "comparedTo": "/Users/ckkk/dev/code/Go/EasyRemote/docs/impl/evidence/ADM-API-02f5/screens/manifest.json",
+  "diffs": [
+    "a7-sessions.columns: ['会话 ID', '主控', '被控', '状态', '时长', '开始时间', '操作'] -> ['会话 ID', '主控', '被控', '状态', '时长', '平均延迟', '结束原因', '链路', '开始时间', '操作']"
+  ],
+  "screens": 6
+}

@@ -100,13 +100,29 @@ func (s *Service) Login(ctx context.Context, phone, code string) (string, *store
 	hash := s.phoneHash(phone)
 	acc, err := s.store.GetAccountByPhoneHash(ctx, hash)
 	if errors.Is(err, store.ErrNotFound) {
-		acc = &store.Account{PhoneHash: hash, Status: "active"}
+		// PhoneEnc 是后台脱敏展示（138****8888）的唯一来源：建号不写它，
+		// 管理端列表就只能显示 "***"（ADM-02a）。与邮箱登录路径保持一致。
+		acc = &store.Account{PhoneHash: hash, PhoneEnc: phone, Status: "active"}
 		if err := s.store.CreateAccount(ctx, acc); err != nil {
 			return "", nil, errcode.New(errcode.SrvInternal, err.Error())
 		}
 	} else if err != nil {
 		return "", nil, errcode.New(errcode.SrvInternal, err.Error())
 	}
+	// 历史账号只有 PhoneHash：登录时手上有明文手机号，幂等回填 PhoneEnc，
+	// 否则后台 phone_mask 永远是 "***"（ADM-02b）。回填失败按存储错误处理，不静默吞掉。
+	if acc.PhoneEnc == "" {
+		if err := s.store.UpdateAccountPhoneEnc(ctx, acc.ID, phone); err != nil {
+			return "", nil, errcode.New(errcode.SrvInternal, err.Error())
+		}
+		acc.PhoneEnc = phone
+	}
+	// 最近登录时间由登录成功路径写入（ADM-API-03b），不是前端自己填的。
+	now := s.now()
+	if err := s.store.TouchAccountLogin(ctx, acc.ID, now); err != nil {
+		return "", nil, errcode.New(errcode.SrvInternal, err.Error())
+	}
+	acc.LastLoginAt = now
 	if acc.Status == "banned" {
 		return "", nil, errcode.New(errcode.AuthAccountBanned, acc.ID)
 	}

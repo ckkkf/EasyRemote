@@ -75,7 +75,7 @@ func (f *fixture) loginAs(phone string) *accountFixture {
 	body := map[string]any{}
 	f.postJSON("/v1/devices/bind", map[string]any{"platform": "test"},
 		map[string]string{"Authorization": "Bearer " + out.Token}, &body)
-	out.AccountID = str(body["account_id"])
+	// account_id 来自登录响应（BindResult 不含该字段，之前这行会把正确值覆盖成空串）。
 	out.DeviceID = str(body["device_id"])
 	out.DeviceCode = str(body["raw_code"])
 	out.DeviceToken = str(body["device_token"])

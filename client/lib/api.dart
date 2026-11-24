@@ -1,4 +1,7 @@
 import 'dart:async';
+
+import 'package:meta/meta.dart';
+
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -71,7 +74,20 @@ class GatewayClient {
   /// 拉取运行时配置（/v1/config 无需登录）。
   Future<void> loadRuntimeConfig() async {
     final data = await _get('/v1/config');
-    _runtime = ClientRuntimeConfig.fromJson(data).endpoints;
+    // 契约响应是 ClientConfigResult{config: {...}}，不是直接 ClientRuntimeConfig。
+    // 生成的嵌套 fromJson 只做 Map cast，这里显式解 endpoints，避免
+    // "type 'Null' is not a subtype of RuntimeEndpoints"。
+    final raw = data['config'];
+    final endpoints = raw is Map<String, dynamic> ? raw['endpoints'] : null;
+    if (endpoints is! Map<String, dynamic>) {
+      throw ApiException(
+        'SRV_INTERNAL',
+        '服务端 /v1/config 缺少 endpoints 对象',
+        name: 'SRV_INTERNAL',
+        retryable: false,
+      );
+    }
+    _runtime = RuntimeEndpoints.fromJson(endpoints);
   }
 
   /// 启动时配置没拉到（服务端晚起/网络闪断）时，在真正要用端点前再拉一次。
@@ -301,6 +317,31 @@ class GatewayClient {
   /// 刷新页面/重启客户端不该再走一遍登录：令牌存在 localStorage（Web）或
   /// ~/.easyremote/session.json（桌面），这里读回来并**真打一次 /v1/devices** 校验：
   /// 令牌过期/被吊销 → 清干净回登录页；服务端没起/断网 → 先用本地设备身份进主界面。
+  /// 测试用：注入运行时端点（relay 地址等），避免测试依赖 /v1/config。
+  @visibleForTesting
+  void debugAdoptRuntime(RuntimeEndpoints endpoints) {
+    _runtime = endpoints;
+  }
+
+  /// 测试用：直接注入已登录会话（不落盘、不请求网络）。
+  ///
+  /// 生产路径仍走 restoreSession/login；这里只是让 widget 测试能构造
+  /// 「已登录」的 client，从而验证 SessionPage 的 attach/错误/重连行为。
+  @visibleForTesting
+  void debugAdoptSession({
+    required String token,
+    required String deviceId,
+    String deviceToken = '',
+    String deviceCode = '',
+    String devicePlatform = 'test',
+  }) {
+    _token = token;
+    _deviceToken = deviceToken.isEmpty ? null : deviceToken;
+    _deviceId = deviceId;
+    _deviceCode = deviceCode;
+    _devicePlatform = devicePlatform;
+  }
+
   Future<DeviceInfo?> restoreSession() async {
     final stored = await loadSession();
     if (stored == null) return null;
@@ -606,19 +647,52 @@ class GatewayClient {
     }
   }
 
+  /// 关闭会话（GW-25 `POST /v1/sessions/close`）。
+  ///
+  /// 路径必须与 client/lib/contract.dart 里 GW-25 一致：手写成 `/v1/connect/close`
+  /// 会直接 404，主控「断开连接」永远失败（ER-905 实测踩过）。
+  ///
+  /// ER-905：主控「断开连接」必须先关领域会话再离开页面；
+  /// 只退 UI 会让被控端永远显示「正在被远程控制」。
+  /// 返回关闭后的权威状态；失败抛 ApiException（带 trace_id），调用方不得谎报成功。
+  Future<SessionStatus> closeSession(
+    String sessionId, {
+    String reason = 'controller_closed',
+  }) async {
+    final body = await _post('/v1/sessions/close', <String, dynamic>{
+      'session_id': sessionId,
+      'reason': reason,
+    }, device: true);
+    final raw = body['state'] as String? ?? '';
+    final state = raw == 'closed' || raw == 'ended'
+        ? SessionState.ended
+        : SessionState.idle;
+    return SessionStatus(state, reason: body['reason'] as String? ?? reason);
+  }
+
   Future<SessionStatus> sessionStatus(String sessionId) async {
     final body = await _get(
       '/v1/connect/status?session_id=$sessionId',
       device: true,
     );
+    // ER-905：closed 必须是终态。之前漏了这条分支，落到 idle，
+    // 于是被控端拒绝/超时/任一端断开后，主控仍然显示「等待对方授权」。
+    final rawReason = body['reason'] as String? ?? '';
     final state = switch (body['state'] as String? ?? '') {
       'requested' => SessionState.waitingConsent,
       'authorized' => SessionState.authorized,
       'active' => SessionState.active,
+      'closed' => SessionState.ended,
       'ended' => SessionState.ended,
       _ => SessionState.idle,
     };
-    return SessionStatus(state, message: body['reason'] as String? ?? '');
+    return SessionStatus(
+      state,
+      message: state == SessionState.ended
+          ? SessionCloseReason.fromServer(rawReason).userMessage
+          : rawReason,
+      reason: rawReason,
+    );
   }
 }
 

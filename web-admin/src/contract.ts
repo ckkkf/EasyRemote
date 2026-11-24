@@ -23,6 +23,29 @@ export type OkResult = {
 export type Overview = {
   devices_total: number;
   devices_online: number;
+  users_online: number;
+  quality_available: boolean;
+  latency_p50_ms: number;
+  latency_p95_ms: number;
+  relay_percent: number;
+  quality_samples: number;
+  stability_available: boolean;
+  closed_sessions: number;
+  abnormal_closes: number;
+  abnormal_close_rate: number;
+  connect_available: boolean;
+  connect_attempts: number;
+  connect_success_rate: number;
+  link_available: boolean;
+  p2p_hit_rate: number;
+  fps_available: boolean;
+  fps_target_rate: number;
+  devices_new_available: boolean;
+  devices_new_24h: number;
+  crash_available: boolean;
+  crash_rate: number;
+  reconnect_available: boolean;
+  reconnect_success_rate: number;
   sessions_active: number;
   sessions_pending: number;
   generated_at: string;
@@ -30,8 +53,11 @@ export type Overview = {
 
 export type UserRow = {
   id: string;
+  nickname: string;
   phone_mask: string;
   status: string;
+  device_count: number;
+  last_login_at?: string;
   created_at: string;
 };
 
@@ -40,6 +66,12 @@ export type DeviceRow = {
   device_code: string;
   account_id: string;
   platform: string;
+  device_name: string;
+  os_version: string;
+  client_version: string;
+  nat_type: string;
+  risk_flag: boolean;
+  risk_reason: string;
   online: boolean;
   last_seen: string;
 };
@@ -48,6 +80,10 @@ export type BindRequest = {
   platform: string;
   device_id?: string;
   device_token?: string;
+  device_name?: string;
+  os_version?: string;
+  client_version?: string;
+  nat_type?: string;
 };
 
 export type BindResult = {
@@ -66,6 +102,9 @@ export type SessionRow = {
   reason?: string;
   started_at: string;
   ended_at?: string;
+  latency_available: boolean;
+  avg_latency_ms: number;
+  link: string;
 };
 
 export type AuditRow = {
@@ -89,6 +128,236 @@ export type AdminSession = {
   expires_at: string;
 };
 
+export type KillRequestRow = {
+  id: string;
+  session_id: string;
+  reason: string;
+  requested_by: string;
+  requested_at: string;
+  expires_at: string;
+  status: string;
+  confirmed_by: string;
+  confirmed_at?: string;
+};
+
+export type KillRequestCreate = {
+  session_id: string;
+  reason: string;
+};
+
+export type KillConfirmRequest = {
+  request_id: string;
+};
+
+export type AuditExportResult = {
+  csv: string;
+  rows: number;
+  truncated: boolean;
+};
+
+export type BlacklistRow = {
+  id: string;
+  kind: string;
+  value: string;
+  note: string;
+  expires_at?: string;
+  created_at: string;
+  created_by: string;
+};
+
+export type BlacklistAddRequest = {
+  kind: string;
+  value: string;
+  note: string;
+  ttl_hours?: number;
+};
+
+export type BlacklistRemoveRequest = {
+  id: string;
+  reason: string;
+};
+
+export type RiskAlertRow = {
+  id: string;
+  kind: string;
+  subject: string;
+  detail: string;
+  ts: string;
+};
+
+export type ClientVersionRow = {
+  id: string;
+  platform: string;
+  version: string;
+  status: string;
+  rollout_percent: number;
+  force_update: boolean;
+  notes: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type VersionPublishRequest = {
+  platform: string;
+  version: string;
+  status: string;
+  rollout_percent: number;
+  force_update: boolean;
+  notes: string;
+};
+
+export type VersionRetireRequest = {
+  version_id: string;
+  reason: string;
+};
+
+export type SessionParty = {
+  device_id: string;
+  device_code: string;
+  platform: string;
+  os_version: string;
+  client_version: string;
+  online: boolean;
+};
+
+export type LinkSwitch = {
+  ts: string;
+  from: string;
+  to: string;
+};
+
+export type TimelineEntry = {
+  ts: string;
+  label: string;
+  detail: string;
+};
+
+export type SessionErrorRow = {
+  ts: string;
+  code: number;
+  name: string;
+  detail: string;
+  source: string;
+};
+
+export type SessionDetailResult = {
+  controller: SessionParty;
+  target: SessionParty;
+  link_switches: LinkSwitch[];
+  timeline: TimelineEntry[];
+  error_events: SessionErrorRow[];
+};
+
+export type CsvExportResult = {
+  csv: string;
+  rows: number;
+  truncated: boolean;
+};
+
+export type UserActionRequest = {
+  account_id: string;
+  reason: string;
+};
+
+export type AccountNoteResult = {
+  account_id: string;
+  note: string;
+  updated_by: string;
+  updated_at?: string;
+};
+
+export type AccountNoteSet = {
+  account_id: string;
+  note: string;
+};
+
+export type TrendPoint = {
+  bucket_start: string;
+  sessions_started: number;
+  connect_attempts: number;
+  connect_active: number;
+};
+
+export type TrendsResult = {
+  range: string;
+  bucket: string;
+  points: TrendPoint[];
+};
+
+export type AdminRow = {
+  id: string;
+  username: string;
+  role: string;
+  status: string;
+  mfa_enabled: boolean;
+};
+
+export type AdminUpdateRequest = {
+  admin_id: string;
+  role?: string;
+  status?: string;
+  reason: string;
+};
+
+export type DeviceQualityDay = {
+  date: string;
+  avg_latency_ms: number;
+  avg_loss_permille: number;
+  relay_percent: number;
+  samples: number;
+};
+
+export type DeviceQualityResult = {
+  device_id: string;
+  available: boolean;
+  days: DeviceQualityDay[];
+};
+
+export type QualitySample = {
+  ts: string;
+  latency_ms: number;
+  loss_permille: number;
+  fps: number;
+  tier: string;
+  relay: boolean;
+  link?: string;
+  target_fps?: number;
+};
+
+export type QualityReportRequest = {
+  session_id: string;
+  samples: QualitySample[];
+};
+
+export type SessionQualityResult = {
+  session_id: string;
+  available: boolean;
+  samples: QualitySample[];
+};
+
+export type ConfigHistoryEntry = {
+  id: string;
+  action: string;
+  actor: string;
+  before: string;
+  after: string;
+  result: string;
+  ts: string;
+};
+
+export type ConfigHistoryResult = {
+  items: ConfigHistoryEntry[];
+};
+
+export type AuditActionsResult = {
+  actions: string[];
+};
+
+export type DeviceActionRequest = {
+  device_id: string;
+  reason: string;
+};
+
 export type KillSessionResult = {
   closed: boolean;
   propagated: boolean;
@@ -103,16 +372,25 @@ export type ConfigField = {
   min?: number;
   max?: number;
   help: string;
+  group: string;
 };
 
 export type ConfigView = {
   config: Record<string, string>;
   fields: ConfigField[];
+  platform: string;
+  version: string;
 };
 
 export type ConfigPutResult = {
   config: Record<string, string>;
   audited: boolean;
+};
+
+export type ConfigPutRequest = {
+  values: Record<string, string>;
+  platform?: string;
+  version?: string;
 };
 
 export type LoginResult = {
@@ -290,6 +568,36 @@ export const ENDPOINTS: readonly EndpointSpec[] = [
   { id: 'ADM-09', method: 'GET', path: '/admin/v1/config', auth: 'admin', response: 'ConfigView', errors: ['ADMIN_SESSION_EXPIRED', 'ADMIN_FORBIDDEN'] },
   { id: 'ADM-10', method: 'PUT', path: '/admin/v1/config', auth: 'admin', response: 'ConfigPutResult', errors: ['ADMIN_SESSION_EXPIRED', 'ADMIN_FORBIDDEN', 'ADMIN_CONFIG_INVALID'] },
   { id: 'ADM-11', method: 'GET', path: '/admin/v1/audit', auth: 'admin', response: 'list<AuditRow>', errors: ['ADMIN_SESSION_EXPIRED', 'ADMIN_FORBIDDEN'] },
+  { id: 'ADM-12', method: 'POST', path: '/admin/v1/devices/force-offline', auth: 'admin', response: 'OkResult', errors: ['ADMIN_SESSION_EXPIRED', 'ADMIN_FORBIDDEN', 'ADMIN_REASON_REQUIRED', 'CONN_DEVICE_NOT_FOUND'] },
+  { id: 'ADM-13', method: 'POST', path: '/admin/v1/devices/unbind', auth: 'admin', response: 'OkResult', errors: ['ADMIN_SESSION_EXPIRED', 'ADMIN_FORBIDDEN', 'ADMIN_REASON_REQUIRED', 'CONN_DEVICE_NOT_FOUND'] },
+  { id: 'ADM-14', method: 'GET', path: '/admin/v1/audit/actions', auth: 'admin', response: 'AuditActionsResult', errors: ['ADMIN_SESSION_EXPIRED', 'ADMIN_FORBIDDEN'] },
+  { id: 'ADM-15', method: 'GET', path: '/admin/v1/config/history', auth: 'admin', response: 'ConfigHistoryResult', errors: ['ADMIN_SESSION_EXPIRED', 'ADMIN_FORBIDDEN'] },
+  { id: 'ADM-16', method: 'POST', path: '/admin/v1/config/rollback', auth: 'admin', response: 'ConfigPutResult', errors: ['ADMIN_SESSION_EXPIRED', 'ADMIN_FORBIDDEN', 'ADMIN_CONFIG_INVALID'] },
+  { id: 'ADM-17', method: 'GET', path: '/admin/v1/sessions/quality', auth: 'admin', response: 'SessionQualityResult', errors: ['ADMIN_SESSION_EXPIRED', 'ADMIN_FORBIDDEN'] },
+  { id: 'ADM-18', method: 'GET', path: '/admin/v1/devices/quality', auth: 'admin', response: 'DeviceQualityResult', errors: ['ADMIN_SESSION_EXPIRED', 'ADMIN_FORBIDDEN'] },
+  { id: 'ADM-19', method: 'POST', path: '/admin/v1/devices/flag-risk', auth: 'admin', response: 'OkResult', errors: ['ADMIN_SESSION_EXPIRED', 'ADMIN_FORBIDDEN', 'ADMIN_REASON_REQUIRED', 'CONN_DEVICE_NOT_FOUND'] },
+  { id: 'ADM-20', method: 'POST', path: '/admin/v1/devices/clear-risk', auth: 'admin', response: 'OkResult', errors: ['ADMIN_SESSION_EXPIRED', 'ADMIN_FORBIDDEN', 'ADMIN_REASON_REQUIRED', 'CONN_DEVICE_NOT_FOUND'] },
+  { id: 'ADM-21', method: 'GET', path: '/admin/v1/admins', auth: 'admin', response: 'list<AdminRow>', errors: ['ADMIN_SESSION_EXPIRED', 'ADMIN_FORBIDDEN'] },
+  { id: 'ADM-22', method: 'POST', path: '/admin/v1/admins/update', auth: 'admin', response: 'OkResult', errors: ['ADMIN_SESSION_EXPIRED', 'ADMIN_FORBIDDEN', 'ADMIN_REASON_REQUIRED'] },
+  { id: 'ADM-23', method: 'GET', path: '/admin/v1/versions', auth: 'admin', response: 'list<ClientVersionRow>', errors: ['ADMIN_SESSION_EXPIRED', 'ADMIN_FORBIDDEN'] },
+  { id: 'ADM-24', method: 'POST', path: '/admin/v1/versions', auth: 'admin', response: 'ClientVersionRow', errors: ['ADMIN_SESSION_EXPIRED', 'ADMIN_FORBIDDEN', 'ADMIN_CONFIG_INVALID'] },
+  { id: 'ADM-25', method: 'POST', path: '/admin/v1/versions/retire', auth: 'admin', response: 'OkResult', errors: ['ADMIN_SESSION_EXPIRED', 'ADMIN_FORBIDDEN', 'ADMIN_REASON_REQUIRED'] },
+  { id: 'ADM-26', method: 'GET', path: '/admin/v1/risk/blacklist', auth: 'admin', response: 'list<BlacklistRow>', errors: ['ADMIN_SESSION_EXPIRED', 'ADMIN_FORBIDDEN'] },
+  { id: 'ADM-27', method: 'POST', path: '/admin/v1/risk/blacklist', auth: 'admin', response: 'BlacklistRow', errors: ['ADMIN_SESSION_EXPIRED', 'ADMIN_FORBIDDEN', 'ADMIN_CONFIG_INVALID'] },
+  { id: 'ADM-28', method: 'POST', path: '/admin/v1/risk/blacklist/remove', auth: 'admin', response: 'OkResult', errors: ['ADMIN_SESSION_EXPIRED', 'ADMIN_FORBIDDEN', 'ADMIN_REASON_REQUIRED'] },
+  { id: 'ADM-29', method: 'GET', path: '/admin/v1/risk/alerts', auth: 'admin', response: 'list<RiskAlertRow>', errors: ['ADMIN_SESSION_EXPIRED', 'ADMIN_FORBIDDEN'] },
+  { id: 'ADM-30', method: 'GET', path: '/admin/v1/audit/export', auth: 'admin', response: 'AuditExportResult', errors: ['ADMIN_SESSION_EXPIRED', 'ADMIN_FORBIDDEN'] },
+  { id: 'ADM-31', method: 'POST', path: '/admin/v1/sessions/kill-request', auth: 'admin', response: 'KillRequestRow', errors: ['ADMIN_SESSION_EXPIRED', 'ADMIN_FORBIDDEN', 'ADMIN_REASON_REQUIRED', 'SESSION_NOT_FOUND'] },
+  { id: 'ADM-32', method: 'POST', path: '/admin/v1/sessions/kill-confirm', auth: 'admin', response: 'KillSessionResult', errors: ['ADMIN_SESSION_EXPIRED', 'ADMIN_FORBIDDEN', 'SESSION_NOT_FOUND'] },
+  { id: 'ADM-33', method: 'GET', path: '/admin/v1/sessions/kill-requests', auth: 'admin', response: 'list<KillRequestRow>', errors: ['ADMIN_SESSION_EXPIRED', 'ADMIN_FORBIDDEN'] },
+  { id: 'ADM-34', method: 'GET', path: '/admin/v1/stats/trends', auth: 'admin', response: 'TrendsResult', errors: ['ADMIN_SESSION_EXPIRED', 'ADMIN_FORBIDDEN'] },
+  { id: 'ADM-35', method: 'GET', path: '/admin/v1/users/sessions', auth: 'admin', response: 'list<SessionRow>', errors: ['ADMIN_SESSION_EXPIRED', 'ADMIN_FORBIDDEN'] },
+  { id: 'ADM-36', method: 'GET', path: '/admin/v1/users/note', auth: 'admin', response: 'AccountNoteResult', errors: ['ADMIN_SESSION_EXPIRED', 'ADMIN_FORBIDDEN'] },
+  { id: 'ADM-37', method: 'POST', path: '/admin/v1/users/note', auth: 'admin', response: 'OkResult', errors: ['ADMIN_SESSION_EXPIRED', 'ADMIN_FORBIDDEN'] },
+  { id: 'ADM-38', method: 'POST', path: '/admin/v1/users/unban', auth: 'admin', response: 'OkResult', errors: ['ADMIN_SESSION_EXPIRED', 'ADMIN_FORBIDDEN', 'ADMIN_REASON_REQUIRED'] },
+  { id: 'ADM-39', method: 'POST', path: '/admin/v1/users/kick', auth: 'admin', response: 'OkResult', errors: ['ADMIN_SESSION_EXPIRED', 'ADMIN_FORBIDDEN', 'ADMIN_REASON_REQUIRED'] },
+  { id: 'ADM-40', method: 'GET', path: '/admin/v1/users/export', auth: 'admin', response: 'CsvExportResult', errors: ['ADMIN_SESSION_EXPIRED', 'ADMIN_FORBIDDEN'] },
+  { id: 'ADM-41', method: 'GET', path: '/admin/v1/sessions/detail', auth: 'admin', response: 'SessionDetailResult', errors: ['ADMIN_SESSION_EXPIRED', 'ADMIN_FORBIDDEN', 'SESSION_NOT_FOUND'] },
   { id: 'GW-01', method: 'POST', path: '/v1/auth/sms', auth: 'none', response: 'OkResult', errors: ['AUTH_INVALID_CREDENTIAL', 'AUTH_SMS_RATE_LIMITED'] },
   { id: 'GW-02', method: 'POST', path: '/v1/auth/login', auth: 'none', response: 'LoginResult', errors: ['AUTH_INVALID_CREDENTIAL', 'AUTH_TOO_MANY_ATTEMPTS'] },
   { id: 'GW-03', method: 'GET', path: '/v1/devices', auth: 'bearer', response: 'DeviceListResult', errors: ['AUTH_TOKEN_EXPIRED', 'SRV_INTERNAL'] },
@@ -315,6 +623,8 @@ export const ENDPOINTS: readonly EndpointSpec[] = [
   { id: 'GW-23', method: 'POST', path: '/v1/files/', auth: 'bearer', response: 'FileTicketResult', errors: ['AUTH_TOKEN_EXPIRED', 'FILE_NOT_FOUND', 'CONN_DEVICE_NOT_FOUND'] },
   { id: 'GW-24', method: 'POST', path: '/v1/sessions/ready', auth: 'device', response: 'SessionStateResult', errors: ['SESSION_NOT_FOUND', 'ADMIN_FORBIDDEN', 'SESSION_AUTH_WINDOW_EXCEEDED'] },
   { id: 'GW-25', method: 'POST', path: '/v1/sessions/close', auth: 'device', response: 'SessionStateResult', errors: ['SESSION_NOT_FOUND', 'ADMIN_FORBIDDEN'] },
+  { id: 'GW-26', method: 'POST', path: '/v1/sessions/quality', auth: 'device', response: 'OkResult', errors: ['SESSION_NOT_FOUND', 'ADMIN_FORBIDDEN', 'SRV_INTERNAL'] },
+  { id: 'GW-27', method: 'POST', path: '/v1/sessions/health', auth: 'device', response: 'OkResult', errors: ['SESSION_NOT_FOUND', 'ADMIN_FORBIDDEN', 'SRV_INTERNAL'] },
   { id: 'SYS-01', method: 'GET', path: '/healthz', auth: 'none', response: 'OkResult', errors: ['[]'] },
   { id: 'SYS-02', method: 'GET', path: '/readyz', auth: 'none', response: 'OkResult', errors: ['SRV_DB_UNAVAILABLE', 'SRV_CACHE_UNAVAILABLE'] },
 ];

@@ -1,0 +1,138 @@
+# ADM-API-06b 命令输出
+# 采集时间: 2026-11-23T14:05:06+0800
+# commit: 267a635
+
+$ node scripts/gen-contract.mjs --check && node scripts/check-routes.mjs --strict
+✓ 三端契约一致（53 个类型 / 53 条接口）
+✓ 路由 method/path/auth 与契约一致（53 条端点）
+
+$ (cd server && go test ./internal/store/ ./internal/adminapi/ ./internal/adminhttp/ -run ClientVersions|VersionPublish|Envelope -v)
+testing: warning: no tests to run
+PASS
+ok  	github.com/easyremote/server/internal/store	0.198s [no tests to run]
+=== RUN   TestVersionPublishAndRetire
+--- PASS: TestVersionPublishAndRetire (0.00s)
+PASS
+ok  	github.com/easyremote/server/internal/adminapi	0.333s
+=== RUN   TestAdminEnvelopeContract
+2026/11/23 14:05:07 trace=Flxg5j3AeQrv8JNZ code=100001 name=AUTH_INVALID_CREDENTIAL detail=invalid credentials
+2026/11/23 14:05:07 trace=oZM25zTJP_kApWMY code=100001 name=AUTH_INVALID_CREDENTIAL detail=invalid credentials
+2026/11/23 14:05:07 trace=D21LGjoA9IASD6M7 code=700007 name=ADMIN_SESSION_EXPIRED detail=unauthorized
+2026/11/23 14:05:07 trace=mOFmhqDXg5YY0wgv code=700007 name=ADMIN_SESSION_EXPIRED detail=unauthorized
+2026/11/23 14:05:07 trace=9kIZLsC4_Ena0YwG code=700009 name=ADMIN_REASON_REQUIRED detail=reason required
+2026/11/23 14:05:07 trace=y1SBv6ufTOwuKk1y code=700007 name=ADMIN_SESSION_EXPIRED detail=unauthorized
+2026/11/23 14:05:07 trace=fXaOy6dDSb5z23tU code=700007 name=ADMIN_SESSION_EXPIRED detail=unauthorized
+2026/11/23 14:05:07 trace=E8Iyo07xUnmEhIS8 code=700007 name=ADMIN_SESSION_EXPIRED detail=unauthorized
+2026/11/23 14:05:07 trace=ure5hrkb0jw4qrSk code=700009 name=ADMIN_REASON_REQUIRED detail=reason required
+2026/11/23 14:05:07 trace=hUlouaGrEnzh9EuG code=700007 name=ADMIN_SESSION_EXPIRED detail=unauthorized
+2026/11/23 14:05:07 trace=RxP92AdmBFsgBC4k code=700007 name=ADMIN_SESSION_EXPIRED detail=unauthorized
+2026/11/23 14:05:07 trace=v4V4sWjHaL6xanca code=700010 name=ADMIN_CONFIG_INVALID detail=empty values
+2026/11/23 14:05:07 trace=sDeRQmjFW6F9ggFx code=700007 name=ADMIN_SESSION_EXPIRED detail=unauthorized
+2026/11/23 14:05:07 trace=ZhmgghEq_uX5wHDf code=700007 name=ADMIN_SESSION_EXPIRED detail=unauthorized
+2026/11/23 14:05:07 trace=8UU1j5LdyguUa-9t code=700009 name=ADMIN_REASON_REQUIRED detail=reason required
+2026/11/23 14:05:07 trace=jhVLmXpS3C0fqKii code=700007 name=ADMIN_SESSION_EXPIRED detail=unauthorized
+2026/11/23 14:05:07 trace=wGkM_uPcOyvDdAmf code=700009 name=ADMIN_REASON_REQUIRED detail=reason required
+2026/11/23 14:05:07 trace=VSgKI4ItyPCv60fb code=700007 name=ADMIN_SESSION_EXPIRED detail=unauthorized
+2026/11/23 14:05:07 trace=FppM6KlmLUgnnEv0 code=700007 name=ADMIN_SESSION_EXPIRED detail=unauthorized
+2026/11/23 14:05:07 trace=ZIIQF2yXL5yjrAXN code=700007 name=ADMIN_SESSION_EXPIRED detail=unauthorized
+2026/11/23 14:05:07 trace=vaN1NKJrIU5Rm4oW code=700010 name=ADMIN_CONFIG_INVALID detail=empty key
+2026/11/23 14:05:07 trace=r1wfKWr2SSBIHUc1 code=700007 name=ADMIN_SESSION_EXPIRED detail=unauthorized
+2026/11/23 14:05:07 trace=UO53TcZjPQfm1l-U code=700007 name=ADMIN_SESSION_EXPIRED detail=unauthorized
+2026/11/23 14:05:07 trace=mnug-8C9_My9lpRL code=700007 name=ADMIN_SESSION_EXPIRED detail=unauthorized
+2026/11/23 14:05:07 trace=lXAJ-FzazVqbPRdy code=700009 name=ADMIN_REASON_REQUIRED detail=reason required
+2026/11/23 14:05:07 trace=5rb_1vmIkuW6p3Xo code=700007 name=ADMIN_SESSION_EXPIRED detail=unauthorized
+2026/11/23 14:05:07 trace=inTIz-mXIFtjn6tk code=700009 name=ADMIN_REASON_REQUIRED detail=reason required
+2026/11/23 14:05:07 trace=QsWn_IDJPfojvWL5 code=700007 name=ADMIN_SESSION_EXPIRED detail=unauthorized
+2026/11/23 14:05:07 trace=xVawmxygUrjIi5Oc code=700007 name=ADMIN_SESSION_EXPIRED detail=unauthorized
+2026/11/23 14:05:07 trace=lgDI8jRGihYpv6ZM code=700009 name=ADMIN_REASON_REQUIRED detail=reason required
+2026/11/23 14:05:07 trace=keqg7PJpa9xNZSEL code=700007 name=ADMIN_SESSION_EXPIRED detail=unauthorized
+2026/11/23 14:05:07 trace=-yxJ2o23q-bQFbxV code=700007 name=ADMIN_SESSION_EXPIRED detail=unauthorized
+2026/11/23 14:05:07 trace=IiFm0MKEJ-oYaKpc code=700010 name=ADMIN_CONFIG_INVALID detail=unknown platform: 
+2026/11/23 14:05:07 trace=RFSVlbr5ls-1eM29 code=700007 name=ADMIN_SESSION_EXPIRED detail=unauthorized
+2026/11/23 14:05:07 trace=wU7OVVlQLDUYPZfr code=700009 name=ADMIN_REASON_REQUIRED detail=reason required
+2026/11/23 14:05:07 trace=2yT13I0RLbXbeiU3 code=700007 name=ADMIN_SESSION_EXPIRED detail=unauthorized
+2026/11/23 14:05:07 trace=ilpZTMowW1onL6r8 code=700011 name=SRV_ROUTE_NOT_FOUND detail=GET /admin/v1/does-not-exist
+    contract_test.go:108: 全部 53 条接口响应形状已对齐
+--- PASS: TestAdminEnvelopeContract (0.00s)
+=== RUN   TestListUsers_HTTPEnvelope
+--- PASS: TestListUsers_HTTPEnvelope (0.00s)
+PASS
+ok  	github.com/easyremote/server/internal/adminhttp	0.489s
+[exit=0]
+
+$ (cd web-admin && npx tsc --noEmit)
+[exit=0]
+
+$ (cd web-admin && npm test -- --run)
+
+> easyremote-admin@0.2.13 test
+> vitest run --run
+
+
+ RUN  v2.1.9 /Users/ckkk/dev/code/Go/EasyRemote/web-admin
+
+ ✓ tests/dialog-usage.test.ts (2 tests) 1ms
+ ✓ tests/a11y.test.ts (3 tests) 2ms
+ ✓ tests/stack-conformance.test.ts (2 tests) 3ms
+ ✓ tests/routes.test.ts (5 tests) 3ms
+ ✓ tests/admin-scope.test.ts (4 tests) 4ms
+ ✓ tests/dashboard-metrics.test.ts (6 tests) 3ms
+ ✓ tests/config-audit.test.ts (5 tests) 3ms
+ ✓ tests/error-envelope.test.ts (3 tests) 1ms
+ ✓ tests/page-state.test.tsx (4 tests) 7ms
+ ✓ tests/kill-result.test.ts (4 tests) 1ms
+ ✓ tests/data-table.test.tsx (3 tests) 5ms
+ ✓ tests/kill-reasons.test.ts (3 tests) 2ms
+ ✓ tests/gate.test.ts (3 tests) 3ms
+ ✓ tests/session-states.test.ts (3 tests) 4ms
+ ✓ tests/ui-primitives.test.tsx (1 test) 11ms
+ ✓ tests/csp.test.ts (1 test) 1ms
+ ✓ tests/login.test.tsx (3 tests) 1ms
+
+ Test Files  17 passed (17)
+      Tests  55 passed (55)
+   Start at  14:05:08
+   Duration  568ms (transform 458ms, setup 0ms, collect 976ms, tests 57ms, environment 2ms, prepare 614ms)
+
+[exit=0]
+
+$ (cd web-admin && npm run build)
+
+> easyremote-admin@0.2.13 build
+> tsc -b && vite build
+
+vite v8.3.8 building client environment for production...
+transforming...
+✓ 148 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                   0.76 kB │ gzip:  0.51 kB
+dist/assets/index-CRSPGd-F.css   20.41 kB │ gzip:  5.34 kB
+dist/assets/index-CWv_mys5.js   318.48 kB │ gzip: 99.99 kB
+
+✓ built in 254ms
+[exit=0]
+
+$ bash scripts/gate.sh
+✓ built in 294ms
+  PASS
+
+== 汇总 ==
+  scripts   PASS
+  contract  PASS
+  go        PASS
+  rust      PASS
+  flutter   PASS
+  web       PASS
+
+GATE: PASS
+[exit=0]
+
+$ (cd server && go test ./internal/store/ -run 'TestMemoryContract/ClientVersions' -v)
+=== RUN   TestMemoryContract
+=== RUN   TestMemoryContract/ClientVersions
+--- PASS: TestMemoryContract (0.00s)
+    --- PASS: TestMemoryContract/ClientVersions (0.00s)
+PASS
+ok  	github.com/easyremote/server/internal/store	0.359s
+[exit=0]

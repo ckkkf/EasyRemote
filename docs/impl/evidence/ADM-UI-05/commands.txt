@@ -1,0 +1,114 @@
+# ADM-UI-05a 命令输出
+# 采集时间: 2026-11-23T11:20:34+0800
+# commit: 267a635
+
+$ (cd web-admin && npx tsc --noEmit)
+[exit=0]
+
+$ (cd web-admin && npm test -- --run)
+
+> easyremote-admin@0.2.12 test
+> vitest run --run
+
+
+ RUN  v2.1.9 /Users/ckkk/dev/code/Go/EasyRemote/web-admin
+
+ ✓ tests/stack-conformance.test.ts (2 tests) 7ms
+ ✓ tests/dialog-usage.test.ts (2 tests) 2ms
+ ✓ tests/dashboard-metrics.test.ts (5 tests) 6ms
+ ✓ tests/routes.test.ts (5 tests) 12ms
+ ✓ tests/gate.test.ts (3 tests) 3ms
+ ✓ tests/error-envelope.test.ts (3 tests) 3ms
+ ✓ tests/data-table.test.tsx (3 tests) 9ms
+ ✓ tests/page-state.test.tsx (4 tests) 10ms
+ ✓ tests/csp.test.ts (1 test) 3ms
+ ✓ tests/ui-primitives.test.tsx (1 test) 7ms
+ ✓ tests/login.test.tsx (3 tests) 2ms
+
+ Test Files  11 passed (11)
+      Tests  32 passed (32)
+   Start at  11:20:35
+   Duration  960ms (transform 503ms, setup 0ms, collect 1.29s, tests 64ms, environment 2ms, prepare 986ms)
+
+[exit=0]
+
+$ (cd web-admin && npm run build)
+
+> easyremote-admin@0.2.12 build
+> tsc -b && vite build
+
+vite v8.3.8 building client environment for production...
+transforming...
+✓ 142 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                   0.76 kB │ gzip:  0.51 kB
+dist/assets/index-CseQ8Z61.css   19.78 kB │ gzip:  5.17 kB
+dist/assets/index-nflmlj_5.js   299.68 kB │ gzip: 95.59 kB
+
+✓ built in 429ms
+[exit=0]
+
+$ (cd . && node scripts/check-web-admin-stack.mjs --build)
+PASS TestTailwindWiredToGeneratedTokens · token 单一来源 + preflight 关闭
+PASS TestShadcnPrimitivesAreSource · 6 个源码 primitive
+PASS TestLoginHasNoDevCredentialsInBundle · 无开发口令泄漏（src + dist/index-nflmlj_5.js）
+PASS TestTailwindBuildEmitsUtility · index-CseQ8Z61.css · 品牌色 #1e4bdb + 工具类
+
+汇总: 4/4 通过
+[exit=0]
+
+$ (cd . && python3 scripts/admin-ui-e2e-users.py)
+PASS users table columns -> ['账号 ID', '手机号', '状态', '注册时间', '操作']
+PASS phone masked -> ['139****5000', '139****5001']
+PASS export disabled
+PASS more actions disabled
+PASS row opens detail route -> http://127.0.0.1:5398/users/acc-8a26c2f106cdd273
+PASS detail shows account section
+PASS detail shows masked phone
+PASS detail lists devices -> 2
+PASS sessions/notes marked unopened
+PASS deep link survives reload
+PASS back returns to list -> http://127.0.0.1:5398/users
+PASS unknown user shows not found
+E2E OK (12 checks)
+[exit=0]
+
+$ (cd . && python3 scripts/admin-ui-baseline.py --out docs/impl/evidence/ADM-UI-05/screens --compare-to docs/impl/evidence/ADM-UI-04/screens/manifest.json)
+shot a1-login {"form": 1, "inputs": 3, "submitLabel": "登录"}
+shot a2-dashboard {"metricCards": 15, "metricLabels": ["在线设备", "设备总数", "进行中会话", "待授权会话", "在线用户", "24h 新增设备", "建连成功率", "P2P 命中率", "中继占比", "延迟 P50", "延迟 P95", "帧率达成率", "会话异常中断率", "客户端崩溃率", "重连成功率"], "tables": 2, "nav": ["▦\n仪表盘", "☰\n用户", "▤\n设备", "⇄\n会话", "◷\n审计日志", "⚙\n配置中心"]}
+shot a3-users {"columns": ["账号 ID", "手机号", "状态", "注册时间", "操作"], "rows": 6, "filters": 2, "pager": "共 6 条"}
+shot a6-device-detail {"modalTitle": "设备详情 468 281 520", "kvPairs": 6, "sessionRows": 4}
+shot a7-sessions {"columns": ["会话 ID", "主控", "被控", "状态", "时长", "开始时间", "操作"], "rows": 4, "states": ["requested", "authorized", "active", "closed"]}
+shot a12-config {"columns": ["配置项", "当前值", "默认 / 范围", "说明"], "configRows": 4, "capabilityRows": 7}
+BASELINE COMPARE OK (6 屏 DOM 判据一致)
+screens: a1-login, a2-dashboard, a3-users, a6-device-detail, a7-sessions, a12-config
+font: Inter, "PingFang SC", "Microsoft YaHei", sans-serif
+BASELINE OK
+[exit=0]
+
+# 复核（设备码统一格式后重跑）
+$ (cd web-admin && npm run build)
+dist/assets/index-DjmO0Ua-.js   299.80 kB │ gzip: 95.61 kB
+
+✓ built in 309ms
+$ python3 scripts/admin-ui-e2e-users.py
+PASS deep link survives reload
+PASS back returns to list -> http://127.0.0.1:5398/users
+PASS unknown user shows not found
+E2E OK (12 checks)
+
+$ bash scripts/gate.sh
+✓ built in 378ms
+  PASS
+
+== 汇总 ==
+  scripts   PASS
+  contract  PASS
+  go        PASS
+  rust      PASS
+  flutter   PASS
+  web       PASS
+
+GATE: PASS
+[exit=0]

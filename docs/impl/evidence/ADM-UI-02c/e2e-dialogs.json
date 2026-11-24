@@ -1,0 +1,94 @@
+{
+  "generatedAt": "2026-11-24T08:40:34+0800",
+  "viewport": {
+    "width": 1360,
+    "height": 860
+  },
+  "checks": [
+    {
+      "name": "ban dialog role=dialog",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "ban dialog labelled by title",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "outside content is aria-hidden",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "ban dialog title",
+      "ok": true,
+      "detail": "封禁 acc-d2813ba2975aec57"
+    },
+    {
+      "name": "confirm disabled without reason",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "confirm disabled with 3 chars",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "confirm enabled with 4+ chars",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "focus stays inside dialog",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "escape closes without side effect",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "ban writes audit",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "ban takes effect",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "cancel writes no kill audit",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "kill writes audit",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "device row navigates to detail page",
+      "ok": true,
+      "detail": "http://127.0.0.1:5396/devices/dev-556c92120c9109d4"
+    },
+    {
+      "name": "user row navigates to detail page",
+      "ok": true,
+      "detail": "http://127.0.0.1:5396/users/acc-d2813ba2975aec57"
+    },
+    {
+      "name": "user detail has tables",
+      "ok": true,
+      "detail": ""
+    }
+  ],
+  "pageErrors": [],
+  "fixture": {
+    "session_id": "ses-8b1e9f73c3b646b3",
+    "controller_device": "682 987 229"
+  }
+}

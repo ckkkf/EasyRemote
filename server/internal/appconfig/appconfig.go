@@ -36,6 +36,14 @@ const (
 	KindBool Kind = "bool"
 )
 
+// 配置分组（ADM-API-05c1）：管理端按组渲染，口径与 pages.md A12 一致。
+const (
+	GroupQuality    = "画质"
+	GroupConnection = "连接"
+	GroupRateLimit  = "限流"
+	GroupSwitch     = "开关"
+)
+
 // Field 描述一个可配置项。
 type Field struct {
 	Key     string `json:"key"`
@@ -44,14 +52,15 @@ type Field struct {
 	Min     int64  `json:"min,omitempty"`
 	Max     int64  `json:"max,omitempty"`
 	Help    string `json:"help"`
+	Group   string `json:"group"`
 }
 
 // Fields 是白名单，顺序即管理端表单展示顺序。
 var Fields = []Field{
-	{Key: KeySessionMaxMinutes, Kind: KindInt, Default: "720", Min: 1, Max: 1440, Help: "单次会话最长时长（分钟）"},
-	{Key: KeyFileMaxBytes, Kind: KindInt, Default: "33554432", Min: 1024, Max: 33554432, Help: "单文件上传上限（字节，上限 32 MiB）"},
-	{Key: KeyDiagAutoRefreshSec, Kind: KindInt, Default: "30", Min: 5, Max: 300, Help: "诊断页自动刷新间隔（秒）"},
-	{Key: KeyClientForceUpdate, Kind: KindBool, Default: "false", Help: "true 时客户端提示必须升级"},
+	{Key: KeySessionMaxMinutes, Kind: KindInt, Default: "720", Min: 1, Max: 1440, Help: "单次会话最长时长（分钟）", Group: GroupConnection},
+	{Key: KeyFileMaxBytes, Kind: KindInt, Default: "33554432", Min: 1024, Max: 33554432, Help: "单文件上传上限（字节，上限 32 MiB）", Group: GroupRateLimit},
+	{Key: KeyDiagAutoRefreshSec, Kind: KindInt, Default: "30", Min: 5, Max: 300, Help: "诊断页自动刷新间隔（秒）", Group: GroupConnection},
+	{Key: KeyClientForceUpdate, Kind: KindBool, Default: "false", Help: "true 时客户端提示必须升级", Group: GroupSwitch},
 }
 
 // fieldByKey 索引。
@@ -107,12 +116,112 @@ func New(s store.Store) *Service {
 // SetClock 仅测试使用。
 func (s *Service) SetClock(f func() time.Time) { s.now = f }
 
-// All 返回「默认值 + 已覆盖值」的扁平映射。
-func (s *Service) All(ctx context.Context) (map[string]string, error) {
-	stored, err := s.store.ListConfig(ctx)
+// Platforms 是允许的作用域（"" = 全局）。
+var Platforms = []string{"", "windows", "macos", "android", "ios"}
+
+// IsPlatform 判断平台名是否合法（"" 表示全局）。
+func IsPlatform(platform string) bool {
+	for _, p := range Platforms {
+		if p == platform {
+			return true
+		}
+	}
+	return false
+}
+
+// AllFor 返回指定作用域下的生效值：默认值 ← 全局覆盖 ← 平台覆盖。
+// 平台为空时等价于 All（只叠加全局覆盖），保证既有调用方行为不变。
+func (s *Service) AllFor(ctx context.Context, platform string) (map[string]string, error) {
+	return s.AllForScope(ctx, platform, "")
+}
+
+// AllForScope 返回指定 (platform, version) 作用域的生效值。
+// 优先级：默认值 ← 全局 ← 平台（version 为空） ← 平台+版本（ADM-API-05d）。
+func (s *Service) AllForScope(ctx context.Context, platform, version string) (map[string]string, error) {
+	if !IsPlatform(platform) {
+		return nil, errcode.New(errcode.AdminConfigInvalid, "unknown platform: "+platform)
+	}
+	global, err := s.store.ListConfigOverrides(ctx, "", "")
 	if err != nil {
 		return nil, errcode.New(errcode.SrvInternal, err.Error())
 	}
+	platformScope := map[string]string{}
+	if platform != "" {
+		platformScope, err = s.store.ListConfigOverrides(ctx, platform, "")
+		if err != nil {
+			return nil, errcode.New(errcode.SrvInternal, err.Error())
+		}
+	}
+	versionScope := map[string]string{}
+	if platform != "" && version != "" {
+		versionScope, err = s.store.ListConfigOverrides(ctx, platform, version)
+		if err != nil {
+			return nil, errcode.New(errcode.SrvInternal, err.Error())
+		}
+	}
+	out := make(map[string]string, len(Fields))
+	for _, f := range Fields {
+		v := f.Default
+		if g, ok := global[f.Key]; ok {
+			v = g
+		}
+		if p, ok := platformScope[f.Key]; ok {
+			v = p
+		}
+		if ver, ok := versionScope[f.Key]; ok {
+			v = ver
+		}
+		out[f.Key] = v
+	}
+	return out, nil
+}
+
+// UpdateFor 在指定作用域写入配置并返回该作用域的新生效值。
+func (s *Service) UpdateFor(ctx context.Context, platform string, values map[string]string) (map[string]string, error) {
+	return s.UpdateForScope(ctx, platform, "", values)
+}
+
+// UpdateForScope 在 (platform, version) 作用域写入配置（ADM-API-05d）。
+func (s *Service) UpdateForScope(ctx context.Context, platform, version string, values map[string]string) (map[string]string, error) {
+	if !IsPlatform(platform) {
+		return nil, errcode.New(errcode.AdminConfigInvalid, "unknown platform: "+platform)
+	}
+	if version != "" && platform == "" {
+		return nil, errcode.New(errcode.AdminConfigInvalid, "version scope requires platform")
+	}
+	for k, v := range values {
+		if err := Validate(k, v); err != nil {
+			return nil, err
+		}
+	}
+	keys := make([]string, 0, len(values))
+	for k := range values {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		if err := s.store.SetConfigOverride(ctx, k, platform, version, values[k]); err != nil {
+			return nil, errcode.New(errcode.SrvInternal, err.Error())
+		}
+	}
+	return s.AllForScope(ctx, platform, version)
+}
+
+// All 返回「默认值 + 已覆盖值」的扁平映射。
+func (s *Service) All(ctx context.Context) (map[string]string, error) {
+	stored, err := s.store.ListConfigOverrides(ctx, "", "")
+	if err != nil {
+		// 兼容只实现了 ListConfig 的存储：回落到旧接口。
+		if stored, ferr := s.store.ListConfig(ctx); ferr == nil {
+			return s.mergeDefaults(stored), nil
+		}
+		return nil, errcode.New(errcode.SrvInternal, err.Error())
+	}
+	return s.mergeDefaults(stored), nil
+}
+
+// mergeDefaults 把覆盖值叠加到默认值上（缺省键回落默认值）。
+func (s *Service) mergeDefaults(stored map[string]string) map[string]string {
 	out := make(map[string]string, len(Fields))
 	for _, f := range Fields {
 		if v, ok := stored[f.Key]; ok {
@@ -121,7 +230,7 @@ func (s *Service) All(ctx context.Context) (map[string]string, error) {
 			out[f.Key] = f.Default
 		}
 	}
-	return out, nil
+	return out
 }
 
 // Get 读单个键（带默认值）。

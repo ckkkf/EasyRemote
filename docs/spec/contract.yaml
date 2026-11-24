@@ -17,19 +17,64 @@ types:
   Overview:
     devices_total: int
     devices_online: int
+    # users_online 是"至少有一台在线设备的账号数"（presence 权威判定），不是登录数。
+    users_online: int
+    # 质量指标来自客户端上报的采样（ADM-API-02e）；quality_available=false 时前端必须显示「数据未提供」。
+    quality_available: bool
+    latency_p50_ms: int
+    latency_p95_ms: int
+    relay_percent: int
+    quality_samples: int
+    # 稳定性（ADM-API-02f1）：窗口内结束的会话按结束原因归一统计；stability_available=false 表示窗口内没有结束会话。
+    stability_available: bool
+    closed_sessions: int
+    abnormal_closes: int
+    # 异常中断率（百分比，0-100），abnormal_closes / closed_sessions 四舍五入。
+    abnormal_close_rate: int
+    # 建连成功率（ADM-API-02f2）：窗口内进入 active 的尝试 / 总尝试；connect_available=false 表示窗口内没有尝试。
+    connect_available: bool
+    connect_attempts: int
+    connect_success_rate: int
+    # 链路与帧率（ADM-API-02f4）：仅统计客户端上报过对应字段的采样。
+    link_available: bool
+    p2p_hit_rate: int
+    fps_available: bool
+    fps_target_rate: int
+    # 24h 新增设备（ADM-API-02f6）：按设备绑定时间统计。
+    devices_new_available: bool
+    devices_new_24h: int
+    # 客户端健康（ADM-API-02f5）：崩溃率 = 崩溃事件 / 窗口内会话数 ×100；重连成功率 = 成功/尝试。
+    crash_available: bool
+    crash_rate: int
+    reconnect_available: bool
+    reconnect_success_rate: int
     sessions_active: int
     sessions_pending: int
     generated_at: time
   UserRow:
     id: string
+    # nickname 为空表示运营还没设置（没有资料编辑接口时保持空串，不造假名）。
+    nickname: string
     phone_mask: string
     status: string
+    # device_count 是该账号已绑定设备数（服务端一次聚合，前端不再自己数）。
+    device_count: int
+    # last_login_at 由登录成功路径写入；历史账号可能为空。
+    last_login_at: time?
     created_at: time
   DeviceRow:
     id: string
     device_code: string
     account_id: string
     platform: string
+    # 客户端上报的设备元信息（ADM-API-04a）；空串表示尚未上报。
+    device_name: string
+    os_version: string
+    client_version: string
+    nat_type: string
+    # 人工风险标记（ADM-API-04c）：列表可见，标记/解除都进审计。
+    risk_flag: bool
+    risk_reason: string
     online: bool
     last_seen: time
   # GW-04 请求体。platform 必填语义：空值落成 "unknown"，绝不猜成 "windows"。
@@ -39,6 +84,11 @@ types:
     platform: string
     device_id: string?
     device_token: string?
+    # 可选设备元信息：空值表示本次不上报，服务端保留旧值（ADM-API-04a）。
+    device_name: string?
+    os_version: string?
+    client_version: string?
+    nat_type: string?
   # 绑设备返回体。platform 必须是服务端归一化后的真值（客户端据此显示图标/能力），
   # 不允许客户端拿自己上报的字符串当结果显示——那会让 macOS 设备顶着别人的平台名。
   BindResult:
@@ -55,6 +105,11 @@ types:
     reason: string?
     started_at: time
     ended_at: time?
+    # 会话级质量摘要（ADM-API-02f7）：来自客户端采样；无采样时 latency_available=false。
+    latency_available: bool
+    avg_latency_ms: int
+    # 客户端上报的主导链路：p2p / relay / mixed / ""（未上报）。
+    link: string
   AuditRow:
     id: string
     actor: string
@@ -72,6 +127,199 @@ types:
     role: string
     permissions: list<string>
     expires_at: time
+  # 强制中断双人确认（ADM-API-07b1）：高危操作由第一人发起、第二人确认后才真正中断。
+  KillRequestRow:
+    id: string
+    session_id: string
+    reason: string
+    requested_by: string
+    requested_at: time
+    expires_at: time
+    # pending / confirmed / expired
+    status: string
+    confirmed_by: string
+    confirmed_at: time?
+  KillRequestCreate:
+    session_id: string
+    reason: string
+  KillConfirmRequest:
+    request_id: string
+  # 审计导出（ADM-API-05c2）：CSV 文本由服务端生成（含脱敏与转义），
+  # 仍走 JSON 信封，避免破坏「所有响应经 httpx.OK」的约束。
+  AuditExportResult:
+    csv: string
+    rows: int
+    # true 表示命中 limit 上限被截断（前端必须提示，不能假装导全了）。
+    truncated: bool
+  # 风控黑名单与告警（ADM-API-06c，A10）。
+  BlacklistRow:
+    id: string
+    # ip / device / account
+    kind: string
+    value: string
+    note: string
+    # 空表示永久
+    expires_at: time?
+    created_at: time
+    created_by: string
+  BlacklistAddRequest:
+    kind: string
+    value: string
+    note: string
+    # 0 表示永久；上限 8760 小时（一年）
+    ttl_hours: int?
+  BlacklistRemoveRequest:
+    id: string
+    reason: string
+  RiskAlertRow:
+    id: string
+    # 目前只有 blacklist_block
+    kind: string
+    subject: string
+    detail: string
+    ts: time
+  # 客户端版本与灰度（ADM-API-06b，A11）。
+  ClientVersionRow:
+    id: string
+    platform: string
+    version: string
+    # draft / rolling / full / retired
+    status: string
+    rollout_percent: int
+    force_update: bool
+    notes: string
+    created_at: time
+    updated_at: time
+  VersionPublishRequest:
+    platform: string
+    version: string
+    status: string
+    rollout_percent: int
+    force_update: bool
+    notes: string
+  VersionRetireRequest:
+    version_id: string
+    reason: string
+  # 会话详情扩展（ADM-API-03g）：双方设备、链路切换、状态时间线。
+  SessionParty:
+    device_id: string
+    device_code: string
+    platform: string
+    os_version: string
+    client_version: string
+    online: bool
+  LinkSwitch:
+    ts: time
+    from: string
+    to: string
+  TimelineEntry:
+    ts: time
+    label: string
+    detail: string
+  # 会话级错误事件（ADM-API-03h）：来自网关真实错误返回。
+  SessionErrorRow:
+    ts: time
+    code: int
+    name: string
+    detail: string
+    source: string
+  SessionDetailResult:
+    controller: SessionParty
+    target: SessionParty
+    link_switches: list<LinkSwitch>
+    timeline: list<TimelineEntry>
+    error_events: list<SessionErrorRow>
+  # 通用 CSV 导出（ADM-API-03e）：服务端生成、仍走 JSON 信封。
+  CsvExportResult:
+    csv: string
+    rows: int
+    truncated: bool
+  # 账号操作（ADM-API-03d）：解封 / 踢下线，都要求原因并写审计。
+  UserActionRequest:
+    account_id: string
+    reason: string
+  # 账号备注（ADM-API-03c）：运营备注，写操作进审计。
+  AccountNoteResult:
+    account_id: string
+    note: string
+    updated_by: string
+    updated_at: time?
+  AccountNoteSet:
+    account_id: string
+    note: string
+  # 时间桶趋势（ADM-API-02f3）：按小时/天聚合会话与建连。
+  TrendPoint:
+    bucket_start: time
+    sessions_started: int
+    connect_attempts: int
+    connect_active: int
+  TrendsResult:
+    range: string
+    bucket: string
+    points: list<TrendPoint>
+  # 管理员行（ADM-API-06a）：不暴露密码哈希与 TOTP 密钥，只给是否开启 MFA。
+  AdminRow:
+    id: string
+    username: string
+    role: string
+    status: string
+    mfa_enabled: bool
+  # 管理员改角色/启用禁用（ADM-22）：原因必填，禁止改自己、禁止移除最后一个超管。
+  AdminUpdateRequest:
+    admin_id: string
+    role: string?
+    status: string?
+    reason: string
+  # 设备按天质量聚合（ADM-API-02d）：设备 30 天曲线用。
+  DeviceQualityDay:
+    date: string
+    avg_latency_ms: int
+    avg_loss_permille: int
+    relay_percent: int
+    samples: int
+  DeviceQualityResult:
+    device_id: string
+    # available=false 表示窗口内没有采样，管理端不得画 0 曲线。
+    available: bool
+    days: list<DeviceQualityDay>
+  # 会话质量采样（ADM-API-02c）：客户端按秒上报，管理端只读。
+  QualitySample:
+    ts: time
+    latency_ms: int
+    loss_permille: int
+    fps: int
+    tier: string
+    relay: bool
+    # 客户端上报的实际链路（p2p / relay / 空=未上报）；服务端不反推 P2P。
+    link: string?
+    # 目标帧率（0/空=未上报），用于帧率达成率。
+    target_fps: int?
+  QualityReportRequest:
+    session_id: string
+    samples: list<QualitySample>
+  SessionQualityResult:
+    session_id: string
+    # available=false 表示该会话没有任何真实采样，管理端不得画 0 曲线。
+    available: bool
+    samples: list<QualitySample>
+  # 配置变更历史（ADM-15）：来自审计 before/after，按时间倒序。
+  ConfigHistoryEntry:
+    id: string
+    action: string
+    actor: string
+    before: string
+    after: string
+    result: string
+    ts: time
+  ConfigHistoryResult:
+    items: list<ConfigHistoryEntry>
+  # 审计合法动作集合（ADM-14）：筛选下拉用服务端真值，不再从当前页猜。
+  AuditActionsResult:
+    actions: list<string>
+  # 设备管理动作的请求体（ADM-12/13）：原因必填并进审计。
+  DeviceActionRequest:
+    device_id: string
+    reason: string
   KillSessionResult:
     closed: bool
     propagated: bool
@@ -84,12 +332,23 @@ types:
     min: int64?
     max: int64?
     help: string
+    # 分组（画质/连接/限流/开关）：管理端按组渲染，ADM-API-05c1。
+    group: string
   ConfigView:
     config: map<string>
     fields: list<ConfigField>
+    # 当前生效作用域："" = 全局，其余为平台名；version 为空表示"该平台任意版本"。
+    platform: string
+    version: string
   ConfigPutResult:
     config: map<string>
     audited: bool
+  # 配置写入（ADM-API-05c1）：platform 为空表示全局作用域。
+  ConfigPutRequest:
+    values: map<string>
+    platform: string?
+    # 版本作用域（ADM-API-05d）：需同时给 platform；空表示该平台任意版本。
+    version: string?
   LoginResult:
     token: string
     account_id: string
@@ -269,6 +528,186 @@ endpoints:
     auth: admin
     response: ConfigPutResult
     errors: ADMIN_SESSION_EXPIRED, ADMIN_FORBIDDEN, ADMIN_CONFIG_INVALID
+  ADM-12:
+    method: POST
+    path: /admin/v1/devices/force-offline
+    auth: admin
+    response: OkResult
+    errors: ADMIN_SESSION_EXPIRED, ADMIN_FORBIDDEN, ADMIN_REASON_REQUIRED, CONN_DEVICE_NOT_FOUND
+  ADM-41:
+    method: GET
+    path: /admin/v1/sessions/detail
+    auth: admin
+    response: SessionDetailResult
+    errors: ADMIN_SESSION_EXPIRED, ADMIN_FORBIDDEN, SESSION_NOT_FOUND
+  ADM-40:
+    method: GET
+    path: /admin/v1/users/export
+    auth: admin
+    response: CsvExportResult
+    errors: ADMIN_SESSION_EXPIRED, ADMIN_FORBIDDEN
+  ADM-38:
+    method: POST
+    path: /admin/v1/users/unban
+    auth: admin
+    response: OkResult
+    errors: ADMIN_SESSION_EXPIRED, ADMIN_FORBIDDEN, ADMIN_REASON_REQUIRED
+  ADM-39:
+    method: POST
+    path: /admin/v1/users/kick
+    auth: admin
+    response: OkResult
+    errors: ADMIN_SESSION_EXPIRED, ADMIN_FORBIDDEN, ADMIN_REASON_REQUIRED
+  ADM-35:
+    method: GET
+    path: /admin/v1/users/sessions
+    auth: admin
+    response: list<SessionRow>
+    errors: ADMIN_SESSION_EXPIRED, ADMIN_FORBIDDEN
+  ADM-36:
+    method: GET
+    path: /admin/v1/users/note
+    auth: admin
+    response: AccountNoteResult
+    errors: ADMIN_SESSION_EXPIRED, ADMIN_FORBIDDEN
+  ADM-37:
+    method: POST
+    path: /admin/v1/users/note
+    auth: admin
+    response: OkResult
+    errors: ADMIN_SESSION_EXPIRED, ADMIN_FORBIDDEN
+  ADM-34:
+    method: GET
+    path: /admin/v1/stats/trends
+    auth: admin
+    response: TrendsResult
+    errors: ADMIN_SESSION_EXPIRED, ADMIN_FORBIDDEN
+  ADM-31:
+    method: POST
+    path: /admin/v1/sessions/kill-request
+    auth: admin
+    response: KillRequestRow
+    errors: ADMIN_SESSION_EXPIRED, ADMIN_FORBIDDEN, ADMIN_REASON_REQUIRED, SESSION_NOT_FOUND
+  ADM-32:
+    method: POST
+    path: /admin/v1/sessions/kill-confirm
+    auth: admin
+    response: KillSessionResult
+    errors: ADMIN_SESSION_EXPIRED, ADMIN_FORBIDDEN, SESSION_NOT_FOUND
+  ADM-33:
+    method: GET
+    path: /admin/v1/sessions/kill-requests
+    auth: admin
+    response: list<KillRequestRow>
+    errors: ADMIN_SESSION_EXPIRED, ADMIN_FORBIDDEN
+  ADM-30:
+    method: GET
+    path: /admin/v1/audit/export
+    auth: admin
+    response: AuditExportResult
+    errors: ADMIN_SESSION_EXPIRED, ADMIN_FORBIDDEN
+  ADM-26:
+    method: GET
+    path: /admin/v1/risk/blacklist
+    auth: admin
+    response: list<BlacklistRow>
+    errors: ADMIN_SESSION_EXPIRED, ADMIN_FORBIDDEN
+  ADM-27:
+    method: POST
+    path: /admin/v1/risk/blacklist
+    auth: admin
+    response: BlacklistRow
+    errors: ADMIN_SESSION_EXPIRED, ADMIN_FORBIDDEN, ADMIN_CONFIG_INVALID
+  ADM-28:
+    method: POST
+    path: /admin/v1/risk/blacklist/remove
+    auth: admin
+    response: OkResult
+    errors: ADMIN_SESSION_EXPIRED, ADMIN_FORBIDDEN, ADMIN_REASON_REQUIRED
+  ADM-29:
+    method: GET
+    path: /admin/v1/risk/alerts
+    auth: admin
+    response: list<RiskAlertRow>
+    errors: ADMIN_SESSION_EXPIRED, ADMIN_FORBIDDEN
+  ADM-23:
+    method: GET
+    path: /admin/v1/versions
+    auth: admin
+    response: list<ClientVersionRow>
+    errors: ADMIN_SESSION_EXPIRED, ADMIN_FORBIDDEN
+  ADM-24:
+    method: POST
+    path: /admin/v1/versions
+    auth: admin
+    response: ClientVersionRow
+    errors: ADMIN_SESSION_EXPIRED, ADMIN_FORBIDDEN, ADMIN_CONFIG_INVALID
+  ADM-25:
+    method: POST
+    path: /admin/v1/versions/retire
+    auth: admin
+    response: OkResult
+    errors: ADMIN_SESSION_EXPIRED, ADMIN_FORBIDDEN, ADMIN_REASON_REQUIRED
+  ADM-21:
+    method: GET
+    path: /admin/v1/admins
+    auth: admin
+    response: list<AdminRow>
+    errors: ADMIN_SESSION_EXPIRED, ADMIN_FORBIDDEN
+  ADM-22:
+    method: POST
+    path: /admin/v1/admins/update
+    auth: admin
+    response: OkResult
+    errors: ADMIN_SESSION_EXPIRED, ADMIN_FORBIDDEN, ADMIN_REASON_REQUIRED
+  ADM-19:
+    method: POST
+    path: /admin/v1/devices/flag-risk
+    auth: admin
+    response: OkResult
+    errors: ADMIN_SESSION_EXPIRED, ADMIN_FORBIDDEN, ADMIN_REASON_REQUIRED, CONN_DEVICE_NOT_FOUND
+  ADM-20:
+    method: POST
+    path: /admin/v1/devices/clear-risk
+    auth: admin
+    response: OkResult
+    errors: ADMIN_SESSION_EXPIRED, ADMIN_FORBIDDEN, ADMIN_REASON_REQUIRED, CONN_DEVICE_NOT_FOUND
+  ADM-13:
+    method: POST
+    path: /admin/v1/devices/unbind
+    auth: admin
+    response: OkResult
+    errors: ADMIN_SESSION_EXPIRED, ADMIN_FORBIDDEN, ADMIN_REASON_REQUIRED, CONN_DEVICE_NOT_FOUND
+  ADM-18:
+    method: GET
+    path: /admin/v1/devices/quality
+    auth: admin
+    response: DeviceQualityResult
+    errors: ADMIN_SESSION_EXPIRED, ADMIN_FORBIDDEN
+  ADM-17:
+    method: GET
+    path: /admin/v1/sessions/quality
+    auth: admin
+    response: SessionQualityResult
+    errors: ADMIN_SESSION_EXPIRED, ADMIN_FORBIDDEN
+  ADM-15:
+    method: GET
+    path: /admin/v1/config/history
+    auth: admin
+    response: ConfigHistoryResult
+    errors: ADMIN_SESSION_EXPIRED, ADMIN_FORBIDDEN
+  ADM-16:
+    method: POST
+    path: /admin/v1/config/rollback
+    auth: admin
+    response: ConfigPutResult
+    errors: ADMIN_SESSION_EXPIRED, ADMIN_FORBIDDEN, ADMIN_CONFIG_INVALID
+  ADM-14:
+    method: GET
+    path: /admin/v1/audit/actions
+    auth: admin
+    response: AuditActionsResult
+    errors: ADMIN_SESSION_EXPIRED, ADMIN_FORBIDDEN
   ADM-11:
     method: GET
     path: /admin/v1/audit
@@ -411,6 +850,20 @@ endpoints:
     auth: device
     response: SessionStateResult
     errors: SESSION_NOT_FOUND, ADMIN_FORBIDDEN
+  # 客户端健康事件上报（ADM-API-02f5）：崩溃 / 重连尝试 / 重连成功。
+  GW-27:
+    method: POST
+    path: /v1/sessions/health
+    auth: device
+    response: OkResult
+    errors: SESSION_NOT_FOUND, ADMIN_FORBIDDEN, SRV_INTERNAL
+  # 会话质量采样上报：会话双方设备凭证上报，服务端按会话存储（ADM-API-02c）。
+  GW-26:
+    method: POST
+    path: /v1/sessions/quality
+    auth: device
+    response: OkResult
+    errors: SESSION_NOT_FOUND, ADMIN_FORBIDDEN, SRV_INTERNAL
   # 数据面就绪：双方各自在握手完成后调用；两端都 ready 才进入 active。
   GW-24:
     method: POST

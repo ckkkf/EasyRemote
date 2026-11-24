@@ -76,4 +76,31 @@ void main() {
     expect(cfg.sessionMaxMinutes, 720);
     expect(cfg.fileMaxBytes, 1024);
   });
+  test('TestRuntimeConfigUnwrapsConfigEnvelope', () async {
+    final client = clientReturning({
+      'code': 0,
+      'name': 'OK',
+      'data': {
+        'config': {
+          'endpoints': {
+            'gateway_url': 'http://127.0.0.1:18090',
+            'signal_url': 'http://127.0.0.1:18090',
+            'relay_addr': '127.0.0.1:19000',
+            'stun_url': '',
+            'webtransport_url': '',
+            'tls_required': false,
+          },
+          'session': {'max_minutes': 720},
+          'file': {'max_bytes': 1024},
+          'diag': {'auto_refresh_secs': 30},
+          'client': {'force_update': false},
+          'capabilities': <String, bool>{},
+        },
+      },
+      'trace_id': 't',
+    }, 200);
+    await client.loadRuntimeConfig();
+    expect(client.relayAddr, '127.0.0.1:19000');
+    expect(client.gatewayURL, 'http://127.0.0.1:18090');
+  });
 }

@@ -132,8 +132,12 @@ pub unsafe extern "C" fn er_ctrl_connect(
                 ))
             }
             Err(e) => into_c_string(&format!(
-                "{{\"ok\":false,\"error\":\"{}\"}}",
-                escape_json(&e)
+                "{{\"ok\":false,\"error\":{{\"code\":\"{}\",\"name\":\"{}\",\"message\":\"{}\",\"retryable\":{},\"trace_id\":\"{}\"}}}}",
+                escape_json(&e.code),
+                escape_json(&e.name),
+                escape_json(&e.message),
+                e.retryable,
+                escape_json(&e.trace_id)
             )),
         }
     }));
@@ -346,8 +350,12 @@ pub unsafe extern "C" fn er_ctrl_attach(
                 ))
             }
             Err(e) => into_c_string(&format!(
-                "{{\"ok\":false,\"error\":\"{}\"}}",
-                escape_json(&e)
+                "{{\"ok\":false,\"error\":{{\"code\":\"{}\",\"name\":\"{}\",\"message\":\"{}\",\"retryable\":{},\"trace_id\":\"{}\"}}}}",
+                escape_json(&e.code),
+                escape_json(&e.name),
+                escape_json(&e.message),
+                e.retryable,
+                escape_json(&e.trace_id)
             )),
         }
     }));

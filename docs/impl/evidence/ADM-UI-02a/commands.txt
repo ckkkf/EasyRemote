@@ -1,0 +1,79 @@
+# ADM-UI-02a 命令输出
+# 采集时间: 2026-11-23T10:35:27+0800
+# commit: 267a635
+
+$ (cd web-admin && npx tsc --noEmit)
+[exit=0]
+
+$ (cd web-admin && npm test -- --run)
+
+> easyremote-admin@0.2.12 test
+> vitest run --run
+
+
+ RUN  v2.1.9 /Users/ckkk/dev/code/Go/EasyRemote/web-admin
+
+ ✓ tests/csp.test.ts (1 test) 3ms
+ ✓ tests/error-envelope.test.ts (3 tests) 3ms
+ ✓ tests/routes.test.ts (5 tests) 4ms
+ ✓ tests/gate.test.ts (3 tests) 6ms
+ ✓ tests/stack-conformance.test.ts (2 tests) 7ms
+ ✓ tests/ui-primitives.test.tsx (1 test) 15ms
+
+ Test Files  6 passed (6)
+      Tests  15 passed (15)
+   Start at  10:35:28
+   Duration  728ms (transform 163ms, setup 0ms, collect 322ms, tests 38ms, environment 1ms, prepare 616ms)
+
+[exit=0]
+
+$ (cd web-admin && npm run build)
+
+> easyremote-admin@0.2.12 build
+> tsc -b && vite build
+
+vite v8.3.8 building client environment for production...
+transforming...
+✓ 76 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                   0.76 kB │ gzip:  0.51 kB
+dist/assets/index-CHVlNU0n.css   18.52 kB │ gzip:  4.77 kB
+dist/assets/index-PuhuJCGm.js   253.95 kB │ gzip: 80.34 kB
+
+✓ built in 303ms
+[exit=0]
+
+$ (cd . && python3 scripts/admin-ui-e2e-routes.py)
+PASS deep link /users renders page -> 用户
+PASS deep link /users keeps URL -> http://127.0.0.1:5394/users
+PASS deep link /users has data rows -> 1
+PASS reload keeps route -> http://127.0.0.1:5394/users
+PASS reload keeps page title
+PASS deep link /config renders config table
+PASS deep link /config title
+PASS unknown path renders notfound -> 页面不存在
+PASS nav click updates URL -> http://127.0.0.1:5394/audit
+PASS nav click updates title
+PASS nav active state follows route -> ◷
+审计日志
+PASS /login redirects when authenticated -> http://127.0.0.1:5394/dashboard
+PASS anon deep link lands on login -> http://127.0.0.1:5394/login
+PASS anon sees no admin table
+E2E OK (14 checks)
+[exit=0]
+
+$ bash scripts/gate.sh
+✓ built in 387ms
+  PASS
+
+== 汇总 ==
+  scripts   PASS
+  contract  PASS
+  go        PASS
+  rust      PASS
+  flutter   PASS
+  web       PASS
+
+GATE: PASS
+[exit=0]

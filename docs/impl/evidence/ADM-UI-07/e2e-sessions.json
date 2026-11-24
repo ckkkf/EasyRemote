@@ -1,0 +1,246 @@
+{
+  "generatedAt": "2026-11-24T08:40:06+0800",
+  "viewport": {
+    "width": 1360,
+    "height": 860
+  },
+  "checks": [
+    {
+      "name": "session columns",
+      "ok": true,
+      "detail": [
+        "会话 ID",
+        "主控",
+        "被控",
+        "状态",
+        "时长",
+        "平均延迟",
+        "结束原因",
+        "链路",
+        "开始时间",
+        "操作"
+      ]
+    },
+    {
+      "name": "session latency and link from samples",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "future time range returns no sessions",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "device filter narrows rows",
+      "ok": true,
+      "detail": "dev-d67b2551c7ffbd51"
+    },
+    {
+      "name": "link filter matches link column",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "abnormal filter returns only abnormal closed sessions",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "state filter has machine states",
+      "ok": true,
+      "detail": [
+        "全部状态",
+        "等待授权（requested）",
+        "已授权（authorized）",
+        "进行中（active）",
+        "已结束（closed）"
+      ]
+    },
+    {
+      "name": "state filter has no 'ended'",
+      "ok": true,
+      "detail": [
+        "全部状态",
+        "等待授权（requested）",
+        "已授权（authorized）",
+        "进行中（active）",
+        "已结束（closed）"
+      ]
+    },
+    {
+      "name": "closed filter returns rows",
+      "ok": true,
+      "detail": [
+        "已结束"
+      ]
+    },
+    {
+      "name": "closed rows labelled",
+      "ok": true,
+      "detail": [
+        "已结束"
+      ]
+    },
+    {
+      "name": "kill disabled on closed row",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "kill dialog requires category",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "kill dialog enabled after category",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "kill dialog shows audited reason",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "cancel writes no kill audit",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "kill writes audit",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "kill closes session",
+      "ok": true,
+      "detail": {
+        "id": "ses-a4c7081a6a2f391e",
+        "controller_id": "dev-d67b2551c7ffbd51",
+        "target_id": "dev-00fd6d7508c08910",
+        "state": "closed",
+        "reason": "admin: 安全应急",
+        "started_at": "2026-11-24T00:39:58.537313Z",
+        "ended_at": "2026-11-24T00:40:00.789551Z",
+        "latency_available": true,
+        "avg_latency_ms": 34,
+        "link": "relay"
+      }
+    },
+    {
+      "name": "row opens session detail",
+      "ok": true,
+      "detail": "http://127.0.0.1:5400/sessions/ses-e3909d0d615bc118"
+    },
+    {
+      "name": "detail shows session fields",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "unsampled session shows no data",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "quality samples rendered",
+      "ok": true,
+      "detail": 3
+    },
+    {
+      "name": "quality summary computed",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "quality link column shows relay",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "session error timeline recorded",
+      "ok": true,
+      "detail": 1
+    },
+    {
+      "name": "error timeline shows code and source",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "session parties listed",
+      "ok": true,
+      "detail": 2
+    },
+    {
+      "name": "link switch recorded",
+      "ok": true,
+      "detail": "时间\t从\t到 | 2026/11/24 08:39:57\tp2p\trelay"
+    },
+    {
+      "name": "timeline rendered",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "deep link survives reload",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "back returns to list",
+      "ok": true,
+      "detail": "http://127.0.0.1:5400/sessions"
+    },
+    {
+      "name": "dual request requires reason",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "pending request listed",
+      "ok": true,
+      "detail": "ses-3bf311af2149228d"
+    },
+    {
+      "name": "dual request writes audit",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "requester cannot confirm own request",
+      "ok": true,
+      "detail": "没有权限执行该操作 | 700005 ADMIN_FORBIDDEN · trace rNYxFha4bP8RLHdF | 复制 trace"
+    },
+    {
+      "name": "second admin confirmed and closed session",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "session closed after confirmation",
+      "ok": true,
+      "detail": "ses-3bf311af2149228d"
+    },
+    {
+      "name": "confirm writes audit",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "unknown session shows not found",
+      "ok": true,
+      "detail": ""
+    }
+  ],
+  "pageErrors": [],
+  "fixture": {
+    "requested": "ses-e3909d0d615bc118",
+    "authorized": "ses-3bf311af2149228d",
+    "active": "ses-a4c7081a6a2f391e",
+    "closed": "ses-0b78f6c4eb75779f",
+    "controller_token": "0kGJEQHb4LT2KxCtUEa1u70WmwkqL7p_oKuEo3WITZE",
+    "target_token": "B7nwjbFWiCga8xUroCo6fqVCF7lYVIPW2nQ6gRD5p6w"
+  }
+}

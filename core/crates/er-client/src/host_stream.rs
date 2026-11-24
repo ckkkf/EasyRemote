@@ -249,7 +249,7 @@ fn run_host_stream(
             if last_state_check.elapsed() >= std::time::Duration::from_secs(1) {
                 last_state_check = std::time::Instant::now();
                 if let Ok(state) = target.session_state(&session_id) {
-                    if state == "closed" || state == "failed" || state == "ended" {
+                    if peer_closed(&state) {
                         break;
                     }
                 }
@@ -451,4 +451,29 @@ pub fn decide_consent(host_id: &str, session_id: &str, accepted: bool) -> bool {
         return false;
     };
     h.consent.decide(session_id, accepted)
+}
+
+// 会话状态是否意味着「对端已关闭，被控端必须立刻停止数据面」。
+//
+// 抽成函数的原因：这是 ER-905 的 deadline 收敛判据，必须能被单测直接断言，
+// 而不是散落在两处 `if state == ` 里靠读代码相信。
+pub fn peer_closed(state: &str) -> bool {
+    matches!(state, "closed" | "failed" | "ended")
+}
+
+#[cfg(test)]
+mod deadline_tests {
+    use super::peer_closed;
+
+    /// ER-905：close 后必须立即停止采集/输入（1s 轮询命中即 break）。
+    #[test]
+    fn peer_closed_state_predicate_matches_close_states() {
+        assert!(peer_closed("closed"), "closed 必须触发停止");
+        assert!(peer_closed("ended"), "ended 必须触发停止");
+        assert!(peer_closed("failed"), "failed 必须触发停止");
+        assert!(!peer_closed("authorized"), "authorized 不得停止");
+        assert!(!peer_closed("active"), "active 不得停止");
+        assert!(!peer_closed("requested"), "requested 不得停止");
+        assert!(!peer_closed(""), "空状态不得误停");
+    }
 }

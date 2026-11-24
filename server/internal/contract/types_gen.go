@@ -11,36 +11,72 @@ type OkResult struct {
 
 // Overview 的字段定义见 docs/spec/contract.yaml。
 type Overview struct {
-	DevicesTotal    int       `json:"devices_total"`
-	DevicesOnline   int       `json:"devices_online"`
-	SessionsActive  int       `json:"sessions_active"`
-	SessionsPending int       `json:"sessions_pending"`
-	GeneratedAt     time.Time `json:"generated_at"`
+	DevicesTotal         int       `json:"devices_total"`
+	DevicesOnline        int       `json:"devices_online"`
+	UsersOnline          int       `json:"users_online"`
+	QualityAvailable     bool      `json:"quality_available"`
+	LatencyP50Ms         int       `json:"latency_p50_ms"`
+	LatencyP95Ms         int       `json:"latency_p95_ms"`
+	RelayPercent         int       `json:"relay_percent"`
+	QualitySamples       int       `json:"quality_samples"`
+	StabilityAvailable   bool      `json:"stability_available"`
+	ClosedSessions       int       `json:"closed_sessions"`
+	AbnormalCloses       int       `json:"abnormal_closes"`
+	AbnormalCloseRate    int       `json:"abnormal_close_rate"`
+	ConnectAvailable     bool      `json:"connect_available"`
+	ConnectAttempts      int       `json:"connect_attempts"`
+	ConnectSuccessRate   int       `json:"connect_success_rate"`
+	LinkAvailable        bool      `json:"link_available"`
+	P2pHitRate           int       `json:"p2p_hit_rate"`
+	FpsAvailable         bool      `json:"fps_available"`
+	FpsTargetRate        int       `json:"fps_target_rate"`
+	DevicesNewAvailable  bool      `json:"devices_new_available"`
+	DevicesNew24h        int       `json:"devices_new_24h"`
+	CrashAvailable       bool      `json:"crash_available"`
+	CrashRate            int       `json:"crash_rate"`
+	ReconnectAvailable   bool      `json:"reconnect_available"`
+	ReconnectSuccessRate int       `json:"reconnect_success_rate"`
+	SessionsActive       int       `json:"sessions_active"`
+	SessionsPending      int       `json:"sessions_pending"`
+	GeneratedAt          time.Time `json:"generated_at"`
 }
 
 // UserRow 的字段定义见 docs/spec/contract.yaml。
 type UserRow struct {
-	ID        string    `json:"id"`
-	PhoneMask string    `json:"phone_mask"`
-	Status    string    `json:"status"`
-	CreatedAt time.Time `json:"created_at"`
+	ID          string    `json:"id"`
+	Nickname    string    `json:"nickname"`
+	PhoneMask   string    `json:"phone_mask"`
+	Status      string    `json:"status"`
+	DeviceCount int       `json:"device_count"`
+	LastLoginAt time.Time `json:"last_login_at,omitempty"`
+	CreatedAt   time.Time `json:"created_at"`
 }
 
 // DeviceRow 的字段定义见 docs/spec/contract.yaml。
 type DeviceRow struct {
-	ID         string    `json:"id"`
-	DeviceCode string    `json:"device_code"`
-	AccountID  string    `json:"account_id"`
-	Platform   string    `json:"platform"`
-	Online     bool      `json:"online"`
-	LastSeen   time.Time `json:"last_seen"`
+	ID            string    `json:"id"`
+	DeviceCode    string    `json:"device_code"`
+	AccountID     string    `json:"account_id"`
+	Platform      string    `json:"platform"`
+	DeviceName    string    `json:"device_name"`
+	OsVersion     string    `json:"os_version"`
+	ClientVersion string    `json:"client_version"`
+	NatType       string    `json:"nat_type"`
+	RiskFlag      bool      `json:"risk_flag"`
+	RiskReason    string    `json:"risk_reason"`
+	Online        bool      `json:"online"`
+	LastSeen      time.Time `json:"last_seen"`
 }
 
 // BindRequest 的字段定义见 docs/spec/contract.yaml。
 type BindRequest struct {
-	Platform    string `json:"platform"`
-	DeviceID    string `json:"device_id,omitempty"`
-	DeviceToken string `json:"device_token,omitempty"`
+	Platform      string `json:"platform"`
+	DeviceID      string `json:"device_id,omitempty"`
+	DeviceToken   string `json:"device_token,omitempty"`
+	DeviceName    string `json:"device_name,omitempty"`
+	OsVersion     string `json:"os_version,omitempty"`
+	ClientVersion string `json:"client_version,omitempty"`
+	NatType       string `json:"nat_type,omitempty"`
 }
 
 // BindResult 的字段定义见 docs/spec/contract.yaml。
@@ -54,13 +90,16 @@ type BindResult struct {
 
 // SessionRow 的字段定义见 docs/spec/contract.yaml。
 type SessionRow struct {
-	ID           string    `json:"id"`
-	ControllerID string    `json:"controller_id"`
-	TargetID     string    `json:"target_id"`
-	State        string    `json:"state"`
-	Reason       string    `json:"reason,omitempty"`
-	StartedAt    time.Time `json:"started_at"`
-	EndedAt      time.Time `json:"ended_at,omitempty"`
+	ID               string    `json:"id"`
+	ControllerID     string    `json:"controller_id"`
+	TargetID         string    `json:"target_id"`
+	State            string    `json:"state"`
+	Reason           string    `json:"reason,omitempty"`
+	StartedAt        time.Time `json:"started_at"`
+	EndedAt          time.Time `json:"ended_at,omitempty"`
+	LatencyAvailable bool      `json:"latency_available"`
+	AvgLatencyMs     int       `json:"avg_latency_ms"`
+	Link             string    `json:"link"`
 }
 
 // AuditRow 的字段定义见 docs/spec/contract.yaml。
@@ -86,6 +125,269 @@ type AdminSession struct {
 	ExpiresAt   time.Time `json:"expires_at"`
 }
 
+// KillRequestRow 的字段定义见 docs/spec/contract.yaml。
+type KillRequestRow struct {
+	ID          string    `json:"id"`
+	SessionID   string    `json:"session_id"`
+	Reason      string    `json:"reason"`
+	RequestedBy string    `json:"requested_by"`
+	RequestedAt time.Time `json:"requested_at"`
+	ExpiresAt   time.Time `json:"expires_at"`
+	Status      string    `json:"status"`
+	ConfirmedBy string    `json:"confirmed_by"`
+	ConfirmedAt time.Time `json:"confirmed_at,omitempty"`
+}
+
+// KillRequestCreate 的字段定义见 docs/spec/contract.yaml。
+type KillRequestCreate struct {
+	SessionID string `json:"session_id"`
+	Reason    string `json:"reason"`
+}
+
+// KillConfirmRequest 的字段定义见 docs/spec/contract.yaml。
+type KillConfirmRequest struct {
+	RequestID string `json:"request_id"`
+}
+
+// AuditExportResult 的字段定义见 docs/spec/contract.yaml。
+type AuditExportResult struct {
+	Csv       string `json:"csv"`
+	Rows      int    `json:"rows"`
+	Truncated bool   `json:"truncated"`
+}
+
+// BlacklistRow 的字段定义见 docs/spec/contract.yaml。
+type BlacklistRow struct {
+	ID        string    `json:"id"`
+	Kind      string    `json:"kind"`
+	Value     string    `json:"value"`
+	Note      string    `json:"note"`
+	ExpiresAt time.Time `json:"expires_at,omitempty"`
+	CreatedAt time.Time `json:"created_at"`
+	CreatedBy string    `json:"created_by"`
+}
+
+// BlacklistAddRequest 的字段定义见 docs/spec/contract.yaml。
+type BlacklistAddRequest struct {
+	Kind     string `json:"kind"`
+	Value    string `json:"value"`
+	Note     string `json:"note"`
+	TtlHours int    `json:"ttl_hours,omitempty"`
+}
+
+// BlacklistRemoveRequest 的字段定义见 docs/spec/contract.yaml。
+type BlacklistRemoveRequest struct {
+	ID     string `json:"id"`
+	Reason string `json:"reason"`
+}
+
+// RiskAlertRow 的字段定义见 docs/spec/contract.yaml。
+type RiskAlertRow struct {
+	ID      string    `json:"id"`
+	Kind    string    `json:"kind"`
+	Subject string    `json:"subject"`
+	Detail  string    `json:"detail"`
+	TS      time.Time `json:"ts"`
+}
+
+// ClientVersionRow 的字段定义见 docs/spec/contract.yaml。
+type ClientVersionRow struct {
+	ID             string    `json:"id"`
+	Platform       string    `json:"platform"`
+	Version        string    `json:"version"`
+	Status         string    `json:"status"`
+	RolloutPercent int       `json:"rollout_percent"`
+	ForceUpdate    bool      `json:"force_update"`
+	Notes          string    `json:"notes"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
+}
+
+// VersionPublishRequest 的字段定义见 docs/spec/contract.yaml。
+type VersionPublishRequest struct {
+	Platform       string `json:"platform"`
+	Version        string `json:"version"`
+	Status         string `json:"status"`
+	RolloutPercent int    `json:"rollout_percent"`
+	ForceUpdate    bool   `json:"force_update"`
+	Notes          string `json:"notes"`
+}
+
+// VersionRetireRequest 的字段定义见 docs/spec/contract.yaml。
+type VersionRetireRequest struct {
+	VersionID string `json:"version_id"`
+	Reason    string `json:"reason"`
+}
+
+// SessionParty 的字段定义见 docs/spec/contract.yaml。
+type SessionParty struct {
+	DeviceID      string `json:"device_id"`
+	DeviceCode    string `json:"device_code"`
+	Platform      string `json:"platform"`
+	OsVersion     string `json:"os_version"`
+	ClientVersion string `json:"client_version"`
+	Online        bool   `json:"online"`
+}
+
+// LinkSwitch 的字段定义见 docs/spec/contract.yaml。
+type LinkSwitch struct {
+	TS   time.Time `json:"ts"`
+	From string    `json:"from"`
+	To   string    `json:"to"`
+}
+
+// TimelineEntry 的字段定义见 docs/spec/contract.yaml。
+type TimelineEntry struct {
+	TS     time.Time `json:"ts"`
+	Label  string    `json:"label"`
+	Detail string    `json:"detail"`
+}
+
+// SessionErrorRow 的字段定义见 docs/spec/contract.yaml。
+type SessionErrorRow struct {
+	TS     time.Time `json:"ts"`
+	Code   int       `json:"code"`
+	Name   string    `json:"name"`
+	Detail string    `json:"detail"`
+	Source string    `json:"source"`
+}
+
+// SessionDetailResult 的字段定义见 docs/spec/contract.yaml。
+type SessionDetailResult struct {
+	Controller   SessionParty      `json:"controller"`
+	Target       SessionParty      `json:"target"`
+	LinkSwitches []LinkSwitch      `json:"link_switches"`
+	Timeline     []TimelineEntry   `json:"timeline"`
+	ErrorEvents  []SessionErrorRow `json:"error_events"`
+}
+
+// CsvExportResult 的字段定义见 docs/spec/contract.yaml。
+type CsvExportResult struct {
+	Csv       string `json:"csv"`
+	Rows      int    `json:"rows"`
+	Truncated bool   `json:"truncated"`
+}
+
+// UserActionRequest 的字段定义见 docs/spec/contract.yaml。
+type UserActionRequest struct {
+	AccountID string `json:"account_id"`
+	Reason    string `json:"reason"`
+}
+
+// AccountNoteResult 的字段定义见 docs/spec/contract.yaml。
+type AccountNoteResult struct {
+	AccountID string    `json:"account_id"`
+	Note      string    `json:"note"`
+	UpdatedBy string    `json:"updated_by"`
+	UpdatedAt time.Time `json:"updated_at,omitempty"`
+}
+
+// AccountNoteSet 的字段定义见 docs/spec/contract.yaml。
+type AccountNoteSet struct {
+	AccountID string `json:"account_id"`
+	Note      string `json:"note"`
+}
+
+// TrendPoint 的字段定义见 docs/spec/contract.yaml。
+type TrendPoint struct {
+	BucketStart     time.Time `json:"bucket_start"`
+	SessionsStarted int       `json:"sessions_started"`
+	ConnectAttempts int       `json:"connect_attempts"`
+	ConnectActive   int       `json:"connect_active"`
+}
+
+// TrendsResult 的字段定义见 docs/spec/contract.yaml。
+type TrendsResult struct {
+	Range  string       `json:"range"`
+	Bucket string       `json:"bucket"`
+	Points []TrendPoint `json:"points"`
+}
+
+// AdminRow 的字段定义见 docs/spec/contract.yaml。
+type AdminRow struct {
+	ID         string `json:"id"`
+	Username   string `json:"username"`
+	Role       string `json:"role"`
+	Status     string `json:"status"`
+	MfaEnabled bool   `json:"mfa_enabled"`
+}
+
+// AdminUpdateRequest 的字段定义见 docs/spec/contract.yaml。
+type AdminUpdateRequest struct {
+	AdminID string `json:"admin_id"`
+	Role    string `json:"role,omitempty"`
+	Status  string `json:"status,omitempty"`
+	Reason  string `json:"reason"`
+}
+
+// DeviceQualityDay 的字段定义见 docs/spec/contract.yaml。
+type DeviceQualityDay struct {
+	Date            string `json:"date"`
+	AvgLatencyMs    int    `json:"avg_latency_ms"`
+	AvgLossPermille int    `json:"avg_loss_permille"`
+	RelayPercent    int    `json:"relay_percent"`
+	Samples         int    `json:"samples"`
+}
+
+// DeviceQualityResult 的字段定义见 docs/spec/contract.yaml。
+type DeviceQualityResult struct {
+	DeviceID  string             `json:"device_id"`
+	Available bool               `json:"available"`
+	Days      []DeviceQualityDay `json:"days"`
+}
+
+// QualitySample 的字段定义见 docs/spec/contract.yaml。
+type QualitySample struct {
+	TS           time.Time `json:"ts"`
+	LatencyMs    int       `json:"latency_ms"`
+	LossPermille int       `json:"loss_permille"`
+	Fps          int       `json:"fps"`
+	Tier         string    `json:"tier"`
+	Relay        bool      `json:"relay"`
+	Link         string    `json:"link,omitempty"`
+	TargetFps    int       `json:"target_fps,omitempty"`
+}
+
+// QualityReportRequest 的字段定义见 docs/spec/contract.yaml。
+type QualityReportRequest struct {
+	SessionID string          `json:"session_id"`
+	Samples   []QualitySample `json:"samples"`
+}
+
+// SessionQualityResult 的字段定义见 docs/spec/contract.yaml。
+type SessionQualityResult struct {
+	SessionID string          `json:"session_id"`
+	Available bool            `json:"available"`
+	Samples   []QualitySample `json:"samples"`
+}
+
+// ConfigHistoryEntry 的字段定义见 docs/spec/contract.yaml。
+type ConfigHistoryEntry struct {
+	ID     string    `json:"id"`
+	Action string    `json:"action"`
+	Actor  string    `json:"actor"`
+	Before string    `json:"before"`
+	After  string    `json:"after"`
+	Result string    `json:"result"`
+	TS     time.Time `json:"ts"`
+}
+
+// ConfigHistoryResult 的字段定义见 docs/spec/contract.yaml。
+type ConfigHistoryResult struct {
+	Items []ConfigHistoryEntry `json:"items"`
+}
+
+// AuditActionsResult 的字段定义见 docs/spec/contract.yaml。
+type AuditActionsResult struct {
+	Actions []string `json:"actions"`
+}
+
+// DeviceActionRequest 的字段定义见 docs/spec/contract.yaml。
+type DeviceActionRequest struct {
+	DeviceID string `json:"device_id"`
+	Reason   string `json:"reason"`
+}
+
 // KillSessionResult 的字段定义见 docs/spec/contract.yaml。
 type KillSessionResult struct {
 	Closed     bool   `json:"closed"`
@@ -102,18 +404,28 @@ type ConfigField struct {
 	Min     int64  `json:"min,omitempty"`
 	Max     int64  `json:"max,omitempty"`
 	Help    string `json:"help"`
+	Group   string `json:"group"`
 }
 
 // ConfigView 的字段定义见 docs/spec/contract.yaml。
 type ConfigView struct {
-	Config map[string]string `json:"config"`
-	Fields []ConfigField     `json:"fields"`
+	Config   map[string]string `json:"config"`
+	Fields   []ConfigField     `json:"fields"`
+	Platform string            `json:"platform"`
+	Version  string            `json:"version"`
 }
 
 // ConfigPutResult 的字段定义见 docs/spec/contract.yaml。
 type ConfigPutResult struct {
 	Config  map[string]string `json:"config"`
 	Audited bool              `json:"audited"`
+}
+
+// ConfigPutRequest 的字段定义见 docs/spec/contract.yaml。
+type ConfigPutRequest struct {
+	Values   map[string]string `json:"values"`
+	Platform string            `json:"platform,omitempty"`
+	Version  string            `json:"version,omitempty"`
 }
 
 // LoginResult 的字段定义见 docs/spec/contract.yaml。
@@ -319,6 +631,36 @@ var Endpoints = []Endpoint{
 	{ID: "ADM-09", Method: "GET", Path: "/admin/v1/config", Auth: "admin", Response: "ConfigView", Errors: []string{"ADMIN_SESSION_EXPIRED", "ADMIN_FORBIDDEN"}},
 	{ID: "ADM-10", Method: "PUT", Path: "/admin/v1/config", Auth: "admin", Response: "ConfigPutResult", Errors: []string{"ADMIN_SESSION_EXPIRED", "ADMIN_FORBIDDEN", "ADMIN_CONFIG_INVALID"}},
 	{ID: "ADM-11", Method: "GET", Path: "/admin/v1/audit", Auth: "admin", Response: "list<AuditRow>", Errors: []string{"ADMIN_SESSION_EXPIRED", "ADMIN_FORBIDDEN"}},
+	{ID: "ADM-12", Method: "POST", Path: "/admin/v1/devices/force-offline", Auth: "admin", Response: "OkResult", Errors: []string{"ADMIN_SESSION_EXPIRED", "ADMIN_FORBIDDEN", "ADMIN_REASON_REQUIRED", "CONN_DEVICE_NOT_FOUND"}},
+	{ID: "ADM-13", Method: "POST", Path: "/admin/v1/devices/unbind", Auth: "admin", Response: "OkResult", Errors: []string{"ADMIN_SESSION_EXPIRED", "ADMIN_FORBIDDEN", "ADMIN_REASON_REQUIRED", "CONN_DEVICE_NOT_FOUND"}},
+	{ID: "ADM-14", Method: "GET", Path: "/admin/v1/audit/actions", Auth: "admin", Response: "AuditActionsResult", Errors: []string{"ADMIN_SESSION_EXPIRED", "ADMIN_FORBIDDEN"}},
+	{ID: "ADM-15", Method: "GET", Path: "/admin/v1/config/history", Auth: "admin", Response: "ConfigHistoryResult", Errors: []string{"ADMIN_SESSION_EXPIRED", "ADMIN_FORBIDDEN"}},
+	{ID: "ADM-16", Method: "POST", Path: "/admin/v1/config/rollback", Auth: "admin", Response: "ConfigPutResult", Errors: []string{"ADMIN_SESSION_EXPIRED", "ADMIN_FORBIDDEN", "ADMIN_CONFIG_INVALID"}},
+	{ID: "ADM-17", Method: "GET", Path: "/admin/v1/sessions/quality", Auth: "admin", Response: "SessionQualityResult", Errors: []string{"ADMIN_SESSION_EXPIRED", "ADMIN_FORBIDDEN"}},
+	{ID: "ADM-18", Method: "GET", Path: "/admin/v1/devices/quality", Auth: "admin", Response: "DeviceQualityResult", Errors: []string{"ADMIN_SESSION_EXPIRED", "ADMIN_FORBIDDEN"}},
+	{ID: "ADM-19", Method: "POST", Path: "/admin/v1/devices/flag-risk", Auth: "admin", Response: "OkResult", Errors: []string{"ADMIN_SESSION_EXPIRED", "ADMIN_FORBIDDEN", "ADMIN_REASON_REQUIRED", "CONN_DEVICE_NOT_FOUND"}},
+	{ID: "ADM-20", Method: "POST", Path: "/admin/v1/devices/clear-risk", Auth: "admin", Response: "OkResult", Errors: []string{"ADMIN_SESSION_EXPIRED", "ADMIN_FORBIDDEN", "ADMIN_REASON_REQUIRED", "CONN_DEVICE_NOT_FOUND"}},
+	{ID: "ADM-21", Method: "GET", Path: "/admin/v1/admins", Auth: "admin", Response: "list<AdminRow>", Errors: []string{"ADMIN_SESSION_EXPIRED", "ADMIN_FORBIDDEN"}},
+	{ID: "ADM-22", Method: "POST", Path: "/admin/v1/admins/update", Auth: "admin", Response: "OkResult", Errors: []string{"ADMIN_SESSION_EXPIRED", "ADMIN_FORBIDDEN", "ADMIN_REASON_REQUIRED"}},
+	{ID: "ADM-23", Method: "GET", Path: "/admin/v1/versions", Auth: "admin", Response: "list<ClientVersionRow>", Errors: []string{"ADMIN_SESSION_EXPIRED", "ADMIN_FORBIDDEN"}},
+	{ID: "ADM-24", Method: "POST", Path: "/admin/v1/versions", Auth: "admin", Response: "ClientVersionRow", Errors: []string{"ADMIN_SESSION_EXPIRED", "ADMIN_FORBIDDEN", "ADMIN_CONFIG_INVALID"}},
+	{ID: "ADM-25", Method: "POST", Path: "/admin/v1/versions/retire", Auth: "admin", Response: "OkResult", Errors: []string{"ADMIN_SESSION_EXPIRED", "ADMIN_FORBIDDEN", "ADMIN_REASON_REQUIRED"}},
+	{ID: "ADM-26", Method: "GET", Path: "/admin/v1/risk/blacklist", Auth: "admin", Response: "list<BlacklistRow>", Errors: []string{"ADMIN_SESSION_EXPIRED", "ADMIN_FORBIDDEN"}},
+	{ID: "ADM-27", Method: "POST", Path: "/admin/v1/risk/blacklist", Auth: "admin", Response: "BlacklistRow", Errors: []string{"ADMIN_SESSION_EXPIRED", "ADMIN_FORBIDDEN", "ADMIN_CONFIG_INVALID"}},
+	{ID: "ADM-28", Method: "POST", Path: "/admin/v1/risk/blacklist/remove", Auth: "admin", Response: "OkResult", Errors: []string{"ADMIN_SESSION_EXPIRED", "ADMIN_FORBIDDEN", "ADMIN_REASON_REQUIRED"}},
+	{ID: "ADM-29", Method: "GET", Path: "/admin/v1/risk/alerts", Auth: "admin", Response: "list<RiskAlertRow>", Errors: []string{"ADMIN_SESSION_EXPIRED", "ADMIN_FORBIDDEN"}},
+	{ID: "ADM-30", Method: "GET", Path: "/admin/v1/audit/export", Auth: "admin", Response: "AuditExportResult", Errors: []string{"ADMIN_SESSION_EXPIRED", "ADMIN_FORBIDDEN"}},
+	{ID: "ADM-31", Method: "POST", Path: "/admin/v1/sessions/kill-request", Auth: "admin", Response: "KillRequestRow", Errors: []string{"ADMIN_SESSION_EXPIRED", "ADMIN_FORBIDDEN", "ADMIN_REASON_REQUIRED", "SESSION_NOT_FOUND"}},
+	{ID: "ADM-32", Method: "POST", Path: "/admin/v1/sessions/kill-confirm", Auth: "admin", Response: "KillSessionResult", Errors: []string{"ADMIN_SESSION_EXPIRED", "ADMIN_FORBIDDEN", "SESSION_NOT_FOUND"}},
+	{ID: "ADM-33", Method: "GET", Path: "/admin/v1/sessions/kill-requests", Auth: "admin", Response: "list<KillRequestRow>", Errors: []string{"ADMIN_SESSION_EXPIRED", "ADMIN_FORBIDDEN"}},
+	{ID: "ADM-34", Method: "GET", Path: "/admin/v1/stats/trends", Auth: "admin", Response: "TrendsResult", Errors: []string{"ADMIN_SESSION_EXPIRED", "ADMIN_FORBIDDEN"}},
+	{ID: "ADM-35", Method: "GET", Path: "/admin/v1/users/sessions", Auth: "admin", Response: "list<SessionRow>", Errors: []string{"ADMIN_SESSION_EXPIRED", "ADMIN_FORBIDDEN"}},
+	{ID: "ADM-36", Method: "GET", Path: "/admin/v1/users/note", Auth: "admin", Response: "AccountNoteResult", Errors: []string{"ADMIN_SESSION_EXPIRED", "ADMIN_FORBIDDEN"}},
+	{ID: "ADM-37", Method: "POST", Path: "/admin/v1/users/note", Auth: "admin", Response: "OkResult", Errors: []string{"ADMIN_SESSION_EXPIRED", "ADMIN_FORBIDDEN"}},
+	{ID: "ADM-38", Method: "POST", Path: "/admin/v1/users/unban", Auth: "admin", Response: "OkResult", Errors: []string{"ADMIN_SESSION_EXPIRED", "ADMIN_FORBIDDEN", "ADMIN_REASON_REQUIRED"}},
+	{ID: "ADM-39", Method: "POST", Path: "/admin/v1/users/kick", Auth: "admin", Response: "OkResult", Errors: []string{"ADMIN_SESSION_EXPIRED", "ADMIN_FORBIDDEN", "ADMIN_REASON_REQUIRED"}},
+	{ID: "ADM-40", Method: "GET", Path: "/admin/v1/users/export", Auth: "admin", Response: "CsvExportResult", Errors: []string{"ADMIN_SESSION_EXPIRED", "ADMIN_FORBIDDEN"}},
+	{ID: "ADM-41", Method: "GET", Path: "/admin/v1/sessions/detail", Auth: "admin", Response: "SessionDetailResult", Errors: []string{"ADMIN_SESSION_EXPIRED", "ADMIN_FORBIDDEN", "SESSION_NOT_FOUND"}},
 	{ID: "GW-01", Method: "POST", Path: "/v1/auth/sms", Auth: "none", Response: "OkResult", Errors: []string{"AUTH_INVALID_CREDENTIAL", "AUTH_SMS_RATE_LIMITED"}},
 	{ID: "GW-02", Method: "POST", Path: "/v1/auth/login", Auth: "none", Response: "LoginResult", Errors: []string{"AUTH_INVALID_CREDENTIAL", "AUTH_TOO_MANY_ATTEMPTS"}},
 	{ID: "GW-03", Method: "GET", Path: "/v1/devices", Auth: "bearer", Response: "DeviceListResult", Errors: []string{"AUTH_TOKEN_EXPIRED", "SRV_INTERNAL"}},
@@ -344,6 +686,8 @@ var Endpoints = []Endpoint{
 	{ID: "GW-23", Method: "POST", Path: "/v1/files/", Auth: "bearer", Response: "FileTicketResult", Errors: []string{"AUTH_TOKEN_EXPIRED", "FILE_NOT_FOUND", "CONN_DEVICE_NOT_FOUND"}},
 	{ID: "GW-24", Method: "POST", Path: "/v1/sessions/ready", Auth: "device", Response: "SessionStateResult", Errors: []string{"SESSION_NOT_FOUND", "ADMIN_FORBIDDEN", "SESSION_AUTH_WINDOW_EXCEEDED"}},
 	{ID: "GW-25", Method: "POST", Path: "/v1/sessions/close", Auth: "device", Response: "SessionStateResult", Errors: []string{"SESSION_NOT_FOUND", "ADMIN_FORBIDDEN"}},
+	{ID: "GW-26", Method: "POST", Path: "/v1/sessions/quality", Auth: "device", Response: "OkResult", Errors: []string{"SESSION_NOT_FOUND", "ADMIN_FORBIDDEN", "SRV_INTERNAL"}},
+	{ID: "GW-27", Method: "POST", Path: "/v1/sessions/health", Auth: "device", Response: "OkResult", Errors: []string{"SESSION_NOT_FOUND", "ADMIN_FORBIDDEN", "SRV_INTERNAL"}},
 	{ID: "SYS-01", Method: "GET", Path: "/healthz", Auth: "none", Response: "OkResult", Errors: []string{"[]"}},
 	{ID: "SYS-02", Method: "GET", Path: "/readyz", Auth: "none", Response: "OkResult", Errors: []string{"SRV_DB_UNAVAILABLE", "SRV_CACHE_UNAVAILABLE"}},
 }

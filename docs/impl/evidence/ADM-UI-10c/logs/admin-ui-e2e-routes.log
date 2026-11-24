@@ -1,0 +1,15 @@
+PASS deep link /users renders page -> 用户
+PASS deep link /users keeps URL -> http://127.0.0.1:5394/users
+PASS deep link /users has data rows -> 1
+PASS reload keeps route -> http://127.0.0.1:5394/users
+PASS reload keeps page title
+PASS deep link /config renders config table
+PASS deep link /config title
+PASS unknown path renders notfound -> 页面不存在
+PASS nav click updates URL -> http://127.0.0.1:5394/audit
+PASS nav click updates title
+PASS nav active state follows route -> 审计日志
+PASS /login redirects when authenticated -> http://127.0.0.1:5394/dashboard
+PASS anon deep link lands on login -> http://127.0.0.1:5394/login
+PASS anon sees no admin table
+E2E OK (14 checks)

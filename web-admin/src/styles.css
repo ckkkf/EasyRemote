@@ -1,23 +1,7 @@
 :root {
-  --brand: #1e4bdb;
-  --brand-soft: #d5e3ff;
-  --brand-ink: #020469;
-  --ink: #1a1c1e;
-  --ink-2: #474b56;
-  --ink-3: #777c87;
-  --line: #c6ccd8;
-  --line-2: #e5e9f2;
-  --surface: #fbfcff;
-  --surface-2: #f4f6fb;
-  --surface-3: #eff1f5;
-  --ok: #2a6239;
-  --ok-bg: #c8f6d0;
-  --warn: #78510b;
-  --warn-bg: #fee4c1;
-  --danger: #aa2422;
-  --danger-bg: #ffd8d3;
-  --radius: 16px;
-  --mono: 'SF Mono', 'JetBrains Mono', Menlo, monospace;
+  /* 布局用的极少量常量：字体栈与侧栏宽度；颜色全部来自 shadcn 主题变量。 */
+  --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  --side-w: 232px;
 }
 
 * { box-sizing: border-box; }
@@ -26,8 +10,8 @@ html, body, #root { height: 100%; }
 
 body {
   margin: 0;
-  background: var(--surface-2);
-  color: var(--ink);
+  background: hsl(var(--muted));
+  color: hsl(var(--foreground));
   font: 14px/1.55 'Inter', 'PingFang SC', 'Microsoft YaHei', sans-serif;
   -webkit-font-smoothing: antialiased;
 }
@@ -41,7 +25,7 @@ button { cursor: pointer; }
 
 .login-brand {
   background: linear-gradient(160deg, #1e4bdb 0%, #3f63e4 55%, #7a93f0 100%);
-  color: #fff;
+  color: hsl(var(--background));
   padding: 64px 56px;
   display: flex;
   flex-direction: column;
@@ -63,24 +47,17 @@ button { cursor: pointer; }
 }
 .login-ver { margin-top: 28px; font-size: 11.5px; color: rgba(255,255,255,.7); }
 
-.login-form-wrap { display: grid; place-items: center; background: var(--surface); padding: 32px; }
-.login-form { width: min(360px, 100%); display: grid; gap: 8px; }
-.login-form h2 { margin: 0 0 2px; font-size: 26px; }
-.login-form label { font-size: 12px; font-weight: 600; color: var(--ink-2); margin-top: 10px; }
-.login-form input {
-  height: 44px; padding: 0 14px; border-radius: 12px;
-  border: 1px solid var(--line); background: #fff;
-}
-.login-form input:focus { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px rgba(30,75,219,.12); }
-.login-form .hint { color: var(--ink-3); font-size: 11.5px; margin-top: 12px; }
+.login-form-wrap { display: grid; place-items: center; background: hsl(var(--background)); padding: 32px; }
+/* 登录表单已迁到 shadcn primitives（ADM-UI-03）：高度/圆角/边框/焦点环由
+   components/ui/input.tsx 与 button.tsx 统一提供，这里不再维护第二套控件样式。 */
 
 /* ---------- 布局 ---------- */
 
 .shell { display: grid; grid-template-columns: 232px 1fr; min-height: 100vh; }
 
 .side {
-  background: var(--surface);
-  border-right: 1px solid var(--line-2);
+  background: hsl(var(--background));
+  border-right: 1px solid hsl(var(--border));
   padding: 16px 12px;
   display: flex; flex-direction: column; gap: 14px;
   position: sticky; top: 0; height: 100vh;
@@ -89,166 +66,152 @@ button { cursor: pointer; }
 .brand .logo {
   width: 36px; height: 36px; border-radius: 11px;
   background: linear-gradient(140deg, #1e4bdb, #4c6fe8);
-  color: #fff; font-weight: 700; display: grid; place-items: center; font-size: 13px;
+  color: hsl(var(--background)); font-weight: 700; display: grid; place-items: center; font-size: 13px;
 }
 .brand strong { display: block; font-size: 14.5px; }
-.brand span { color: var(--ink-3); font-size: 11.5px; }
+.brand span { color: hsl(var(--muted-foreground)); font-size: 11.5px; }
 
 .side nav { display: grid; gap: 4px; }
+/* 导航项：对齐 shadcn 的 sidebar/menu 节奏（ADM-UI-11b）——36px 高、8px 圆角、
+   悬停用 surface-3、选中用品牌浅底 + 中等字重，图标 16px 线性。 */
 .nav {
-  display: flex; align-items: center; gap: 10px;
-  height: 44px; padding: 0 12px; border-radius: 12px;
-  border: 0; background: transparent; color: var(--ink-2);
-  font-size: 13.5px; font-weight: 500; text-align: left;
+  display: flex; align-items: center; gap: 8px;
+  height: 36px; padding: 0 10px; border-radius: var(--radius);
+  border: 0; background: transparent; color: hsl(var(--muted-foreground));
+  font-size: 13px; font-weight: 500; text-align: left;
+  transition: background-color .15s ease, color .15s ease;
 }
-.nav:hover { background: var(--surface-3); }
-.nav.active { background: var(--brand-soft); color: var(--brand-ink); font-weight: 600; }
-.nav-ico { width: 20px; text-align: center; font-size: 15px; }
+.nav:hover { background: hsl(var(--accent)); color: hsl(var(--foreground)); }
+.nav.active { background: hsl(var(--secondary)); color: hsl(var(--primary)); font-weight: 600; }
+.nav-ico { width: 16px; height: 16px; flex: none; }
 
-.side-foot { margin-top: auto; display: grid; gap: 8px; padding: 12px 8px 4px; border-top: 1px solid var(--line-2); }
+.side-foot { margin-top: auto; display: grid; gap: 8px; padding: 12px 8px 4px; border-top: 1px solid hsl(var(--border)); }
 .who { display: flex; align-items: center; gap: 9px; }
 .who .avatar {
   width: 28px; height: 28px; border-radius: 50%;
-  background: var(--brand-soft); color: var(--brand-ink);
+  background: hsl(var(--secondary)); color: hsl(var(--primary));
   display: grid; place-items: center; font-size: 12px; font-weight: 700;
 }
 .who strong { display: block; font-size: 12.5px; }
-.who span { color: var(--ink-3); font-size: 11px; }
+.who span { color: hsl(var(--muted-foreground)); font-size: 11px; }
 
-.main { padding: 24px 28px 40px; display: grid; align-content: start; gap: 16px; }
-.topbar { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.main {
+  padding: 24px 28px 40px;
+  display: grid;
+  align-content: start;
+  gap: 16px;
+  /* 网格子项默认 min-width:auto，宽表格会把整页顶出视口（ADM-UI-10c 响应式审计发现）。 */
+  min-width: 0;
+}
+.topbar {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 12px 16px;
+  flex-wrap: wrap; min-width: 0;
+}
+/* 顶栏里的标题块与操作区都必须能收缩，否则窄屏下会把整页顶出视口（ADM-UI-10）。 */
+.topbar > div { min-width: 0; }
+.top-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; min-width: 0; max-width: 100%; }
+/* 顶栏按钮在窄屏可以换行，否则 nowrap 会把 header 顶出视口。 */
+.top-actions button { white-space: normal; }
 .topbar h2 { margin: 0; font-size: 22px; letter-spacing: -.3px; }
-.topbar p { margin: 3px 0 0; color: var(--ink-3); font-size: 12.5px; }
+.topbar p { margin: 3px 0 0; color: hsl(var(--muted-foreground)); font-size: 12.5px; }
+.top-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
 
 /* ---------- 通用 ---------- */
 
 .stack { display: grid; gap: 16px; }
 .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 
-.card {
-  background: var(--surface);
-  border: 1px solid var(--line-2);
-  border-radius: var(--radius);
-  padding: 16px 18px;
-}
-.card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
-.card-head h3 { margin: 0; font-size: 15px; }
-.card-head p { margin: 2px 0 0; color: var(--ink-3); font-size: 11.5px; }
-.card-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
 
 .metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
 .metric {
-  text-align: left; border: 1px solid var(--line-2); background: var(--surface);
+  text-align: left; border: 1px solid hsl(var(--border)); background: hsl(var(--background));
   border-radius: var(--radius); padding: 16px 18px; display: grid; gap: 4px;
 }
-.metric:hover { border-color: var(--brand); }
-.metric span { color: var(--ink-3); font-size: 12px; }
+.metric:hover { border-color: hsl(var(--primary)); }
+.metric span { color: hsl(var(--muted-foreground)); font-size: 12px; }
 .metric strong { font-size: 30px; line-height: 1.15; letter-spacing: -.5px; }
-.metric em { color: var(--ink-3); font-size: 11.5px; font-style: normal; }
-.metric.warn strong { color: var(--warn); }
+.metric em { color: hsl(var(--muted-foreground)); font-size: 11.5px; font-style: normal; }
+.metric.warn strong { color: #b45309; }
 
-.bar { height: 10px; border-radius: 999px; background: var(--surface-3); overflow: hidden; }
-.bar-fill { height: 100%; background: linear-gradient(90deg, #1e4bdb, #6c8cf2); border-radius: 999px; }
+.bar { height: 10px; border-radius: var(--radius); background: hsl(var(--accent)); overflow: hidden; }
+.bar-fill { height: 100%; background: linear-gradient(90deg, #1e4bdb, #6c8cf2); border-radius: var(--radius); }
 .bar-legend { display: flex; justify-content: space-between; margin-top: 8px; font-size: 11.5px; }
 
 .dist { display: grid; gap: 10px; }
 .dist-row { display: grid; grid-template-columns: 90px 1fr 40px; align-items: center; gap: 10px; }
-.dist-name { font-size: 12.5px; color: var(--ink-2); text-transform: capitalize; }
-.dist-bar { height: 8px; background: var(--surface-3); border-radius: 999px; overflow: hidden; }
-.dist-bar div { height: 100%; background: var(--brand); border-radius: 999px; }
-.dist-count { text-align: right; font-size: 12px; color: var(--ink-2); }
+.dist-name { font-size: 12.5px; color: hsl(var(--muted-foreground)); text-transform: capitalize; }
+.dist-bar { height: 8px; background: hsl(var(--accent)); border-radius: var(--radius); overflow: hidden; }
+.dist-bar div { height: 100%; background: hsl(var(--primary)); border-radius: var(--radius); }
+.dist-count { text-align: right; font-size: 12px; color: hsl(var(--muted-foreground)); }
 
-.tbl { width: 100%; border-collapse: collapse; }
-.tbl th {
-  text-align: left; font-size: 11.5px; font-weight: 600; color: var(--ink-3);
-  padding: 8px 10px; border-bottom: 1px solid var(--line-2); white-space: nowrap;
-}
-.tbl td { padding: 10px; border-bottom: 1px solid var(--line-2); font-size: 13px; vertical-align: middle; }
-.tbl tr:hover td { background: var(--surface-2); }
-.tbl .mono { font-family: var(--mono); font-size: 12px; }
-.tbl .big { font-size: 13.5px; letter-spacing: 1px; }
-.tbl .right { text-align: right; }
-.tbl .nowrap { white-space: nowrap; }
-.muted { color: var(--ink-3); }
+/* 表格横向滚动容器（ADM-UI-10c）：列多时页面不能整体横向溢出。 */
+.muted { color: hsl(var(--muted-foreground)); }
 
-.pill { display: inline-flex; align-items: center; gap: 5px; padding: 2px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 600; }
+.pill { display: inline-flex; align-items: center; gap: 5px; padding: 2px 9px; border-radius: var(--radius); font-size: 11.5px; font-weight: 600; }
 .pill::before { content: ''; width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
-.pill.ok { background: var(--ok-bg); color: var(--ok); }
-.pill.warn { background: var(--warn-bg); color: var(--warn); }
-.pill.danger { background: var(--danger-bg); color: var(--danger); }
-.pill.muted { background: var(--surface-3); color: var(--ink-2); }
-.pill.brand { background: var(--brand-soft); color: var(--brand-ink); }
+.pill.ok { background: #dcfce7; color: #15803d; }
+.pill.warn { background: #fef3c7; color: #b45309; }
+.pill.danger { background: #fee2e2; color: hsl(var(--destructive)); }
+.pill.muted { background: hsl(var(--accent)); color: hsl(var(--muted-foreground)); }
+.pill.brand { background: hsl(var(--secondary)); color: hsl(var(--primary)); }
 
-.btn { border: 1px solid transparent; border-radius: 999px; padding: 8px 16px; font-size: 13px; font-weight: 600; background: var(--surface-3); }
-.btn.sm { padding: 5px 12px; font-size: 12px; }
-.btn.ghost { background: transparent; border-color: var(--line); color: var(--ink-2); }
-.btn.ghost:hover { border-color: var(--brand); color: var(--brand); }
-.btn.primary { background: var(--brand); color: #fff; }
-.btn.primary:hover { background: #1f41a1; }
-.btn.danger { background: var(--danger); color: #fff; }
-.btn.danger:disabled { opacity: .45; cursor: not-allowed; }
-.btn.block { width: 100%; margin-top: 16px; height: 44px; }
-.btn:disabled { opacity: .5; cursor: not-allowed; }
+/* 按钮：几何与状态对齐 shadcn Button（ADM-UI-11b）。
+   新代码应直接用 components/ui/button；这层保留给尚未迁移的既有标记，
+   保证"同一页里新旧按钮长得一样"，而不是两套视觉。 */
 
-.link { border: 0; background: none; color: var(--brand); font-size: 12.5px; padding: 0; }
 
+/* 输入控件：对齐 shadcn Input/Select 的 36px 高、8px 圆角与聚焦环（ADM-UI-11b）。 */
 input.search, select, textarea {
-  height: 34px; padding: 0 12px; border-radius: 10px;
-  border: 1px solid var(--line); background: #fff; color: var(--ink);
+  height: 36px; padding: 0 12px; border-radius: var(--radius);
+  border: 1px solid hsl(var(--border)); background: hsl(var(--background)); color: hsl(var(--foreground));
+  font-size: 13px;
+  transition: border-color .15s ease, box-shadow .15s ease;
 }
 textarea { height: auto; padding: 10px 12px; }
 input.search { width: 220px; }
 select { padding-right: 8px; }
+input.search:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: none; border-color: hsl(var(--primary));
+  box-shadow: 0 0 0 3px color-mix(in srgb, hsl(var(--primary)) 18%, transparent);
+}
 
-.switch { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ink-2); }
+.switch { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: hsl(var(--muted-foreground)); }
 
-.banner { border-radius: 12px; padding: 10px 14px; font-size: 12.5px; display: flex; gap: 10px; align-items: center; justify-content: space-between; }
-.banner.error { background: var(--danger-bg); color: #430103; }
-.banner.ok { background: var(--ok-bg); color: var(--ok); }
-.err-meta { display: block; font-family: var(--mono); font-size: 11px; opacity: .8; }
-
-.placeholder { padding: 36px 0; text-align: center; color: var(--ink-3); font-size: 12.5px; }
+/* 错误/加载/空三态已迁到 components/business/page-state.tsx（Alert + Tailwind），
+   这里只保留成功提示条（InfoBanner / 配置保存提示）。 */
+.banner { border-radius: var(--radius); padding: 10px 14px; font-size: 12.5px; display: flex; gap: 10px; align-items: center; justify-content: space-between; }
+.banner.ok { background: #dcfce7; color: #15803d; }
 
 .pager { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; font-size: 12px; }
 .pager-btns { display: flex; gap: 8px; }
-.pager.muted { color: var(--ink-3); }
+.pager.muted { color: hsl(var(--muted-foreground)); }
 
-.modal-mask { position: fixed; inset: 0; background: rgba(20, 24, 33, .45); display: grid; place-items: center; padding: 20px; z-index: 20; }
-.modal { background: var(--surface); border-radius: 18px; padding: 22px; width: min(440px, 100%); display: grid; gap: 8px; }
-.modal h3 { margin: 0 0 4px; font-size: 17px; }
-.modal label { font-size: 12px; color: var(--ink-2); font-weight: 600; margin-top: 6px; }
-.modal input, .modal textarea { width: 100%; }
-.modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 14px; }
-
-.diff { max-width: 260px; font-family: var(--mono); font-size: 11.5px; }
-.diff .before { color: var(--danger); }
-.diff .after { color: var(--ok); }
-.diff .arrow { margin: 0 6px; color: var(--ink-3); }
+/* 文本链接也是交互目标：最小 24px 高度，键盘聚焦时必须有可见焦点环（ADM-UI-10）。 */
+.diff .before { color: hsl(var(--destructive)); }
+.diff .after { color: #15803d; }
+.diff .arrow { margin: 0 6px; color: hsl(var(--muted-foreground)); }
 
 /* 可点击行（设备 / 用户 → 详情） */
-.tbl tr.clickable { cursor: pointer; }
-.tbl tr.clickable:hover td { background: var(--brand-soft); }
-.tbl tr.clickable .btn { cursor: pointer; }
 
 /* 详情弹窗（P1-2） */
-.modal .kv {
+.kv {
   display: grid; grid-template-columns: 76px 1fr; gap: 6px 12px;
   align-items: baseline; margin: 6px 0 4px;
 }
-.modal .kv > span { color: var(--ink-3); font-size: 12px; }
-.modal .kv > strong { font-size: 13px; font-weight: 600; }
+.kv > span { color: hsl(var(--muted-foreground)); font-size: 12px; }
+.kv > strong { font-size: 13px; font-weight: 600; }
 .detail-h {
   margin: 14px 0 6px; font-size: 12.5px; font-weight: 700;
-  color: var(--ink-2); border-top: 1px solid var(--line-2); padding-top: 12px;
+  color: hsl(var(--muted-foreground)); border-top: 1px solid hsl(var(--border)); padding-top: 12px;
 }
 
 /* 配置中心输入（P1-1） */
 .cfg-input {
-  width: 140px; height: 30px; padding: 0 10px; border-radius: 8px;
-  border: 1px solid var(--line); background: #fff; color: var(--ink);
+  width: 140px; height: 30px; padding: 0 10px; border-radius: var(--radius);
+  border: 1px solid hsl(var(--border)); background: hsl(var(--background)); color: hsl(var(--foreground));
   font-family: var(--mono); font-size: 12px;
 }
-.cfg-input.bad { border-color: var(--danger); background: var(--danger-bg); }
+.cfg-input.bad { border-color: hsl(var(--destructive)); background: #fee2e2; }
 
 @media (max-width: 1180px) {
   .metrics { grid-template-columns: repeat(2, 1fr); }
@@ -256,11 +219,26 @@ select { padding-right: 8px; }
 }
 
 @media (max-width: 860px) {
-  .shell { grid-template-columns: 1fr; }
+  /* 单列后 .shell 仍是 grid：不加 align-content:start，两个 auto 行会被
+     min-height:100vh 拉伸，导航下方出现一大块空白（ADM-UI-10 截图发现）。 */
+  /* minmax(0,1fr)：单列时也允许内容收缩，否则横向导航/宽表格会撑破视口。 */
+  .shell { grid-template-columns: minmax(0, 1fr); align-content: start; }
   .side { position: static; height: auto; flex-direction: row; align-items: center; overflow-x: auto; }
   .side nav { grid-auto-flow: column; }
   .side-foot { display: none; }
   .login { grid-template-columns: 1fr; }
   .login-brand { display: none; }
   input.search { width: 140px; }
+}
+
+/* 网格/卡片的最小宽度（ADM-UI-11c）：shadcn 的 Card/Table 都是块级容器，
+   默认 min-width:auto 会被宽表格/筛选行撑开，进而把整页顶出视口。 */
+.shell { min-width: 0; }
+.main > * { min-width: 0; }
+[data-card] { min-width: 0; }
+
+/* 焦点可见性：所有交互元素共用一条规则（shadcn 的 --ring 语义）。 */
+:where(a, button, input, select, textarea):focus-visible {
+  outline: 2px solid hsl(var(--primary));
+  outline-offset: 2px;
 }

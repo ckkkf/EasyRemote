@@ -29,6 +29,8 @@ var routeSpecs = []httpx.RouteSpec{
 	{ID: "GW-20", Method: "POST", Path: "/v1/devices/password", Auth: "bearer"},
 	{ID: "GW-25", Method: "POST", Path: "/v1/sessions/close", Auth: "device"},
 	{ID: "GW-24", Method: "POST", Path: "/v1/sessions/ready", Auth: "device"},
+	{ID: "GW-26", Method: "POST", Path: "/v1/sessions/quality", Auth: "device"},
+	{ID: "GW-27", Method: "POST", Path: "/v1/sessions/health", Auth: "device"},
 	{ID: "GW-21", Method: "GET", Path: "/v1/files", Auth: "bearer"},
 	{ID: "GW-22", Method: "DELETE", Path: "/v1/files/", Auth: "bearer"},
 	{ID: "GW-23", Method: "POST", Path: "/v1/files/", Auth: "bearer"},

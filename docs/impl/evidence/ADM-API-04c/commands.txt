@@ -1,0 +1,213 @@
+# ADM-API-04c 命令输出
+# 采集时间: 2026-11-23T13:31:28+0800
+# commit: 267a635
+
+$ node scripts/gen-contract.mjs --check && node scripts/check-routes.mjs --strict
+✓ 三端契约一致（48 个类型 / 48 条接口）
+✓ 路由 method/path/auth 与契约一致（48 条端点）
+
+$ (cd server && go test ./internal/store/ ./internal/adminapi/ ./internal/adminhttp/ -run Contract|DeviceRisk|Envelope -v)
+=== RUN   TestMemoryContract
+=== RUN   TestMemoryContract/AccountLifecycle
+=== RUN   TestMemoryContract/AccountUniquePhone
+=== RUN   TestMemoryContract/AccountPhoneEncBackfill
+=== RUN   TestMemoryContract/AccountLastLogin
+=== RUN   TestMemoryContract/DeviceLifecycle
+=== RUN   TestMemoryContract/DeviceCodeUnique
+=== RUN   TestMemoryContract/DeviceMeta
+=== RUN   TestMemoryContract/DeviceRisk
+=== RUN   TestMemoryContract/DeviceDeleteAndOnlineFilter
+=== RUN   TestMemoryContract/DeviceCountsByAccount
+=== RUN   TestMemoryContract/VerifyCodeAtomic
+=== RUN   TestMemoryContract/TrustExpiry
+=== RUN   TestMemoryContract/SessionLifecycle
+=== RUN   TestMemoryContract/AuditOrder
+=== RUN   TestMemoryContract/AuditFiltersAndActions
+=== RUN   TestMemoryContract/FileLifecycle
+=== RUN   TestMemoryContract/AssistSingleUse
+=== RUN   TestMemoryContract/ConfigRoundTrip
+=== RUN   TestMemoryContract/QualitySamples
+=== RUN   TestMemoryContract/AggregateDeviceQuality
+=== RUN   TestMemoryContract/QualityStatsSince
+=== RUN   TestMemoryContract/Pagination
+=== RUN   TestMemoryContract/NotFoundIsDistinct
+--- PASS: TestMemoryContract (0.00s)
+    --- PASS: TestMemoryContract/AccountLifecycle (0.00s)
+    --- PASS: TestMemoryContract/AccountUniquePhone (0.00s)
+    --- PASS: TestMemoryContract/AccountPhoneEncBackfill (0.00s)
+    --- PASS: TestMemoryContract/AccountLastLogin (0.00s)
+    --- PASS: TestMemoryContract/DeviceLifecycle (0.00s)
+    --- PASS: TestMemoryContract/DeviceCodeUnique (0.00s)
+    --- PASS: TestMemoryContract/DeviceMeta (0.00s)
+    --- PASS: TestMemoryContract/DeviceRisk (0.00s)
+    --- PASS: TestMemoryContract/DeviceDeleteAndOnlineFilter (0.00s)
+    --- PASS: TestMemoryContract/DeviceCountsByAccount (0.00s)
+    --- PASS: TestMemoryContract/VerifyCodeAtomic (0.00s)
+    --- PASS: TestMemoryContract/TrustExpiry (0.00s)
+    --- PASS: TestMemoryContract/SessionLifecycle (0.00s)
+    --- PASS: TestMemoryContract/AuditOrder (0.00s)
+    --- PASS: TestMemoryContract/AuditFiltersAndActions (0.00s)
+    --- PASS: TestMemoryContract/FileLifecycle (0.00s)
+    --- PASS: TestMemoryContract/AssistSingleUse (0.00s)
+    --- PASS: TestMemoryContract/ConfigRoundTrip (0.00s)
+    --- PASS: TestMemoryContract/QualitySamples (0.00s)
+    --- PASS: TestMemoryContract/AggregateDeviceQuality (0.00s)
+    --- PASS: TestMemoryContract/QualityStatsSince (0.00s)
+    --- PASS: TestMemoryContract/Pagination (0.00s)
+    --- PASS: TestMemoryContract/NotFoundIsDistinct (0.00s)
+PASS
+ok  	github.com/easyremote/server/internal/store	0.211s
+=== RUN   TestDeviceRiskFlagging
+--- PASS: TestDeviceRiskFlagging (0.00s)
+PASS
+ok  	github.com/easyremote/server/internal/adminapi	0.364s
+=== RUN   TestAdminEnvelopeContract
+2026/11/23 13:31:29 trace=Nop7JZJoj7z0h-8h code=100001 name=AUTH_INVALID_CREDENTIAL detail=invalid credentials
+2026/11/23 13:31:29 trace=rnBEaruTTt1HewUz code=100001 name=AUTH_INVALID_CREDENTIAL detail=invalid credentials
+2026/11/23 13:31:29 trace=TTluVYuHDbCL2HMP code=700007 name=ADMIN_SESSION_EXPIRED detail=unauthorized
+2026/11/23 13:31:29 trace=ImGNbf9XGUxTzEhw code=700007 name=ADMIN_SESSION_EXPIRED detail=unauthorized
+2026/11/23 13:31:29 trace=GGlNol-2WOGHCjmL code=700009 name=ADMIN_REASON_REQUIRED detail=reason required
+2026/11/23 13:31:29 trace=piKZ60t-cApYW1Ee code=700007 name=ADMIN_SESSION_EXPIRED detail=unauthorized
+2026/11/23 13:31:29 trace=lIPLsc8pjHyUvovV code=700007 name=ADMIN_SESSION_EXPIRED detail=unauthorized
+2026/11/23 13:31:29 trace=XLWIwIvAo0mqF4DY code=700007 name=ADMIN_SESSION_EXPIRED detail=unauthorized
+2026/11/23 13:31:29 trace=OTh_iJIKdKd4Cin8 code=700009 name=ADMIN_REASON_REQUIRED detail=reason required
+2026/11/23 13:31:29 trace=kbJpmVpoWqj0j9zF code=700007 name=ADMIN_SESSION_EXPIRED detail=unauthorized
+2026/11/23 13:31:29 trace=YCP8Jr9hjjrVPXkH code=700007 name=ADMIN_SESSION_EXPIRED detail=unauthorized
+2026/11/23 13:31:29 trace=GjL7MfiZc2nrtUBG code=700010 name=ADMIN_CONFIG_INVALID detail=empty values
+2026/11/23 13:31:29 trace=zfCEmsQn5hPukQ0O code=700007 name=ADMIN_SESSION_EXPIRED detail=unauthorized
+2026/11/23 13:31:29 trace=OikCygarP1FQqNxp code=700007 name=ADMIN_SESSION_EXPIRED detail=unauthorized
+2026/11/23 13:31:29 trace=c2mzw8tz5jssylWO code=700009 name=ADMIN_REASON_REQUIRED detail=reason required
+2026/11/23 13:31:29 trace=hjiQ0WD6a4iYX9An code=700007 name=ADMIN_SESSION_EXPIRED detail=unauthorized
+2026/11/23 13:31:29 trace=PmkdlqMKFtEC8XcQ code=700009 name=ADMIN_REASON_REQUIRED detail=reason required
+2026/11/23 13:31:29 trace=YNsqeuY2GLHO7_jT code=700007 name=ADMIN_SESSION_EXPIRED detail=unauthorized
+2026/11/23 13:31:29 trace=ZXuIvNMjO73W49yn code=700007 name=ADMIN_SESSION_EXPIRED detail=unauthorized
+2026/11/23 13:31:29 trace=nmpFtUkeISXmz4xJ code=700007 name=ADMIN_SESSION_EXPIRED detail=unauthorized
+2026/11/23 13:31:29 trace=4jZLOZCP2jGhVukl code=700010 name=ADMIN_CONFIG_INVALID detail=empty key
+2026/11/23 13:31:29 trace=hrG412M4DRKsubZT code=700007 name=ADMIN_SESSION_EXPIRED detail=unauthorized
+2026/11/23 13:31:29 trace=3LyjjaIhxLMVT5uU code=700007 name=ADMIN_SESSION_EXPIRED detail=unauthorized
+2026/11/23 13:31:29 trace=F3lXRA9kYV3jooMO code=700007 name=ADMIN_SESSION_EXPIRED detail=unauthorized
+2026/11/23 13:31:29 trace=NmFKItN5VXHt3wkq code=700009 name=ADMIN_REASON_REQUIRED detail=reason required
+2026/11/23 13:31:29 trace=wAZ1rLdHQliyjswr code=700007 name=ADMIN_SESSION_EXPIRED detail=unauthorized
+2026/11/23 13:31:29 trace=rIZRNM5BKKneSMyc code=700009 name=ADMIN_REASON_REQUIRED detail=reason required
+2026/11/23 13:31:29 trace=QedDBjdiK7IRfgzO code=700007 name=ADMIN_SESSION_EXPIRED detail=unauthorized
+2026/11/23 13:31:29 trace=Tj_WAkFY_44U9n94 code=700011 name=SRV_ROUTE_NOT_FOUND detail=GET /admin/v1/does-not-exist
+    contract_test.go:108: 全部 48 条接口响应形状已对齐
+--- PASS: TestAdminEnvelopeContract (0.00s)
+=== RUN   TestListUsers_HTTPEnvelope
+--- PASS: TestListUsers_HTTPEnvelope (0.00s)
+PASS
+ok  	github.com/easyremote/server/internal/adminhttp	0.514s
+[exit=0]
+
+$ (cd web-admin && npx tsc --noEmit)
+[exit=0]
+
+$ (cd web-admin && npm test -- --run)
+
+> easyremote-admin@0.2.13 test
+> vitest run --run
+
+
+ RUN  v2.1.9 /Users/ckkk/dev/code/Go/EasyRemote/web-admin
+
+ ✓ tests/a11y.test.ts (3 tests) 1ms
+ ✓ tests/stack-conformance.test.ts (2 tests) 2ms
+ ✓ tests/admin-scope.test.ts (4 tests) 2ms
+ ✓ tests/routes.test.ts (5 tests) 2ms
+ ✓ tests/dashboard-metrics.test.ts (6 tests) 4ms
+ ✓ tests/dialog-usage.test.ts (2 tests) 1ms
+ ✓ tests/config-audit.test.ts (5 tests) 5ms
+ ✓ tests/error-envelope.test.ts (3 tests) 1ms
+ ✓ tests/gate.test.ts (3 tests) 4ms
+ ✓ tests/kill-result.test.ts (4 tests) 2ms
+ ✓ tests/page-state.test.tsx (4 tests) 8ms
+ ✓ tests/kill-reasons.test.ts (3 tests) 1ms
+ ✓ tests/data-table.test.tsx (3 tests) 8ms
+ ✓ tests/session-states.test.ts (3 tests) 3ms
+ ✓ tests/ui-primitives.test.tsx (1 test) 11ms
+ ✓ tests/csp.test.ts (1 test) 1ms
+ ✓ tests/login.test.tsx (3 tests) 2ms
+
+ Test Files  17 passed (17)
+      Tests  55 passed (55)
+   Start at  13:31:29
+   Duration  608ms (transform 419ms, setup 0ms, collect 998ms, tests 58ms, environment 2ms, prepare 691ms)
+
+[exit=0]
+
+$ (cd web-admin && npm run build)
+
+> easyremote-admin@0.2.13 build
+> tsc -b && vite build
+
+vite v8.3.8 building client environment for production...
+transforming...
+✓ 148 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                   0.76 kB │ gzip:  0.51 kB
+dist/assets/index-CRSPGd-F.css   20.41 kB │ gzip:  5.34 kB
+dist/assets/index-CWv_mys5.js   318.48 kB │ gzip: 99.99 kB
+
+✓ built in 262ms
+[exit=0]
+
+$ (cd . && python3 scripts/admin-ui-e2e-devices.py)
+PASS device columns -> ['设备码', '设备名', '归属账号', '平台', '系统版本', '客户端版本', 'NAT', '风险', '在线', '最后在线', '操作']
+PASS device names from bind -> ['夹具测试机', '夹具工作站']
+PASS os versions from bind -> ['Windows 11 23H2', 'macOS 15.1']
+PASS online filter returns online devices
+PASS copy stays on list -> http://127.0.0.1:5399/devices
+PASS flag-risk requires reason
+PASS risk badge shown
+PASS flag risk writes audit
+PASS risk cleared
+PASS clear risk writes audit
+PASS force-offline requires reason
+PASS force offline writes audit
+PASS force offline marks device offline
+PASS unbind removes device -> 2 -> 1
+PASS unbind writes audit
+PASS row opens device detail -> http://127.0.0.1:5399/devices/dev-c68c8670350a5c84 (ctrl dev-c68c8670350a5c84)
+PASS device detail kv includes metadata -> 11
+PASS device detail shows os/client/nat -> 设备码 | 147 040 438 | 设备 ID | dev-c68c8670350a5c84 | 归属账号 | acc-c8c599fa8d132681 | 设备名 | 夹具工作站 | 平台 | macos | 系统版本 | macOS
+PASS device sessions filtered by device -> 1
+PASS device quality aggregated by day -> 2
+PASS quality shows latency and relay -> 日期	平均延迟 (ms)	平均丢包 (‰)	中继占比	采样数
+2026-11-22	30	2	0%	1
+2026-11-23	40	5	100%	1
+PASS range buttons enabled
+PASS no dead action on detail
+PASS deep link survives reload
+PASS back returns to list -> http://127.0.0.1:5399/devices
+PASS unknown device shows not found
+E2E OK (26 checks)
+[exit=0]
+
+$ (cd . && python3 scripts/admin-ui-baseline.py --out docs/impl/evidence/ADM-API-04c/screens --compare-to docs/impl/evidence/ADM-API-02e/screens/manifest.json)
+shot a1-login {"form": 1, "inputs": 3, "submitLabel": "登录"}
+shot a2-dashboard {"metricCards": 15, "metricLabels": ["在线设备", "设备总数", "进行中会话", "待授权会话", "在线用户", "24h 新增设备", "建连成功率", "P2P 命中率", "中继占比", "延迟 P50", "延迟 P95", "帧率达成率", "会话异常中断率", "客户端崩溃率", "重连成功率"], "tables": 2, "nav": ["▦\n仪表盘", "☰\n用户", "▤\n设备", "⇄\n会话", "◷\n审计日志", "⚙\n配置中心"]}
+shot a3-users {"columns": ["账号 ID", "昵称", "手机号", "设备数", "状态", "注册时间", "最近登录", "操作"], "rows": 6, "filters": 2, "pager": "共 6 条"}
+shot a6-device-detail {"modalTitle": "842 261 619", "kvPairs": 11, "sessionRows": 4}
+shot a7-sessions {"columns": ["会话 ID", "主控", "被控", "状态", "时长", "开始时间", "操作"], "rows": 4, "states": ["等待授权", "已授权", "进行中", "已结束"]}
+shot a12-config {"columns": ["配置项", "当前值", "默认 / 范围", "说明"], "configRows": 4, "capabilityRows": 7}
+BASELINE COMPARE OK (6 屏 DOM 判据一致)
+screens: a1-login, a2-dashboard, a3-users, a6-device-detail, a7-sessions, a12-config
+font: Inter, "PingFang SC", "Microsoft YaHei", sans-serif
+BASELINE OK
+[exit=0]
+
+$ bash scripts/gate.sh
+✓ built in 350ms
+  PASS
+
+== 汇总 ==
+  scripts   PASS
+  contract  PASS
+  go        PASS
+  rust      PASS
+  flutter   PASS
+  web       PASS
+
+GATE: PASS
+[exit=0]

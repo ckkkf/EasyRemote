@@ -1,0 +1,2 @@
+PROBE_CONNECTED session=ses-2d5509b15c8dae8a
+PROBE_REJECTED reason=user_rejected

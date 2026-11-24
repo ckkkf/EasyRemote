@@ -2,9 +2,24 @@
 // 从 docs/spec/contract.yaml 生成三端契约（Go / TS / Dart）。生成物禁止手改。
 // 用法: node scripts/gen-contract.mjs [--check]
 import { readFileSync, writeFileSync, mkdtempSync } from 'node:fs';
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+
+/// 用 dart format 规范化 Dart 生成物：生成与校验必须走同一套格式化，
+/// 否则 gate 的 format 检查会与契约漂移检查互相打架。
+function formatDart(content) {
+  try {
+    const dir = mkdtempSync(join(tmpdir(), 'er-contract-'));
+    const f = join(dir, 'x.dart');
+    writeFileSync(f, content);
+    execFileSync(process.env.DART_BIN || 'dart', ['format', f], { stdio: 'ignore' });
+    return readFileSync(f, 'utf8');
+  } catch {
+    return content;
+  }
+}
+import { execSync } from 'node:child_process';
 
 const SRC = 'docs/spec/contract.yaml';
 const GO_OUT = 'server/internal/contract/types_gen.go';
@@ -225,7 +240,12 @@ function emitDart(types, endpoints) {
   L.push('// 源: docs/spec/contract.yaml');
   L.push('');
   L.push('class Envelope<T> {');
-  L.push('  const Envelope({required this.code, required this.name, required this.data, required this.traceId});');
+  L.push('  const Envelope({');
+  L.push('    required this.code,');
+  L.push('    required this.name,');
+  L.push('    required this.data,');
+  L.push('    required this.traceId,');
+  L.push('  });');
   L.push('');
   L.push('  final int code;');
   L.push('  final String name;');
@@ -302,20 +322,33 @@ if (Object.keys(types).length === 0) {
 const outputs = [
   { path: GO_OUT, content: gofmt(emitGo(types, endpoints)) },
   { path: TS_OUT, content: emitTs(types, endpoints) },
-  { path: DART_OUT, content: emitDart(types, endpoints) },
+  // Dart 产物统一过 formatter：写入与 --check 看到同一份内容，
+  // 否则 gate 的 dart format 检查会和契约漂移检查互相打架。
+  { path: DART_OUT, content: formatDart(emitDart(types, endpoints)) },
 ];
 
 const check = process.argv.includes('--check');
 let drift = false;
 for (const o of outputs) {
   if (!check) {
+    if (o.path.endsWith('.dart')) o.content = formatDart(o.content);
     writeFileSync(o.path, o.content);
+    // Dart 产物必须与 formatter 输出一致：否则 gate 的两步检查互相矛盾。
+    if (o.path.endsWith('.dart')) {
+      try {
+        execFileSync('dart', ['format', o.path], { stdio: 'ignore' });
+      } catch {
+        // 没有 dart 命令时跳过：不影响生成，只在有 dart 的环境保持格式一致
+      }
+    }
     console.log('✓ ' + o.path);
     continue;
   }
   let cur = '';
   try {
     cur = readFileSync(o.path, 'utf8');
+    // Dart 产物两侧都过一遍 formatter，比较的才是语义而非排版
+    if (o.path.endsWith('.dart')) cur = formatDart(cur);
   } catch {
     cur = '';
   }

@@ -1,0 +1,7 @@
+{
+  "comparedTo": "/Users/ckkk/dev/code/Go/EasyRemote/docs/impl/evidence/ADM-API-03a/screens/manifest.json",
+  "diffs": [
+    "a3-users.columns: ['账号 ID', '手机号', '设备数', '状态', '注册时间', '操作'] -> ['账号 ID', '昵称', '手机号', '设备数', '状态', '注册时间', '最近登录', '操作']"
+  ],
+  "screens": 6
+}

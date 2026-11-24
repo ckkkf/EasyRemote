@@ -1,0 +1,26 @@
+# ADM-UI-00c 命令输出
+# 采集时间: 2026-11-23T16:17:41+0800
+# commit: 267a635
+
+$ node scripts/check-admin-ui-matrix.mjs
+PASS TestAdminUiMatrixRowsComplete: 20 行，A1-A14 与 s12-s17 全覆盖
+PASS TestAdminUiMatrixEvidenceExists: 证据路径与 6 张 1360x860 截图均存在
+
+$ 状态统计（A 行）
+implemented: 10
+partial:     4
+blocked:     0
+
+$ bash scripts/gate.sh
+✓ built in 342ms
+  PASS
+
+== 汇总 ==
+  scripts   PASS
+  contract  PASS
+  go        PASS
+  rust      PASS
+  flutter   PASS
+  web       PASS
+
+GATE: PASS

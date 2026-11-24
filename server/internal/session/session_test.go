@@ -52,12 +52,16 @@ func TestConsentAcceptedOpensAuthWindow(t *testing.T) {
 	}
 }
 
+// ER-905：拒绝是完成态决策（契约 GW-07 的 ConsentResult），不再返回业务错误。
 func TestConsentRejected(t *testing.T) {
 	s, _ := setup(t)
 	sess, _ := s.Request(ctx(), "c1", "t1")
-	_, err := s.Consent(ctx(), sess.ID, false, "user_rejected")
-	if !errcode.Is(err, errcode.ConnConsentRejected) {
-		t.Fatalf("want rejected, got %v", err)
+	got, err := s.Consent(ctx(), sess.ID, false, "user_rejected")
+	if err != nil {
+		t.Fatalf("want nil error (complete state), got %v", err)
+	}
+	if got.State != StateClosed || got.Reason != "user_rejected" {
+		t.Fatalf("want closed/user_rejected, got %s/%q", got.State, got.Reason)
 	}
 }
 
@@ -67,8 +71,12 @@ func TestConsentTimeout(t *testing.T) {
 	s.SetClock(func() time.Time { return now })
 	sess, _ := s.Request(ctx(), "c1", "t1")
 	s.SetClock(func() time.Time { return now.Add(31 * time.Second) })
-	if _, err := s.Consent(ctx(), sess.ID, true, ""); !errcode.Is(err, errcode.ConnConsentTimeout) {
-		t.Fatalf("want timeout, got %v", err)
+	got, err := s.Consent(ctx(), sess.ID, true, "")
+	if err != nil {
+		t.Fatalf("want nil error (complete state), got %v", err)
+	}
+	if got.State != StateClosed || got.Reason != "consent_timeout" {
+		t.Fatalf("want closed/consent_timeout, got %s/%q", got.State, got.Reason)
 	}
 }
 

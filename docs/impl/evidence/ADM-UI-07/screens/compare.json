@@ -1,0 +1,7 @@
+{
+  "comparedTo": "/Users/ckkk/dev/code/Go/EasyRemote/docs/impl/evidence/ADM-UI-06/screens/manifest.json",
+  "diffs": [
+    "a7-sessions.states: ['requested', 'authorized', 'active', 'closed'] -> ['等待授权', '已授权', '进行中', '已结束']"
+  ],
+  "screens": 6
+}

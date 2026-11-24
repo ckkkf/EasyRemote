@@ -1,0 +1,29 @@
+PASS device columns -> ['设备码', '设备名', '归属账号', '平台', '系统版本', '客户端版本', 'NAT', '风险', '在线', '最后在线', '操作']
+PASS device names from bind -> ['夹具工作站', '夹具测试机']
+PASS os versions from bind -> ['macOS 15.1', 'Windows 11 23H2']
+PASS online filter returns online devices
+PASS copy stays on list -> http://127.0.0.1:5399/devices
+PASS flag-risk requires reason
+PASS risk badge shown
+PASS flag risk writes audit
+PASS risk cleared
+PASS clear risk writes audit
+PASS force-offline requires reason
+PASS force offline writes audit
+PASS force offline marks device offline
+PASS unbind removes device -> 2 -> 1
+PASS unbind writes audit
+PASS row opens device detail -> http://127.0.0.1:5399/devices/dev-ef995ff07807a145 (ctrl dev-5f166cc37f672781)
+PASS device detail kv includes metadata -> 11
+PASS device detail shows os/client/nat -> 设备码 | 906 856 042 | 设备 ID | dev-ef995ff07807a145 | 归属账号 | acc-4394a0666b896bb6 | 设备名 | 夹具测试机 | 平台 | windows | 系统版本 | Win
+PASS device sessions filtered by device -> 1
+PASS device quality aggregated by day -> 2
+PASS quality shows latency and relay -> 日期	平均延迟 (ms)	平均丢包 (‰)	中继占比	采样数
+2026-11-23	30	2	0%	1
+2026-11-24	40	5	100%	1
+PASS range buttons enabled
+PASS no dead action on detail
+PASS deep link survives reload
+PASS back returns to list -> http://127.0.0.1:5399/devices
+PASS unknown device shows not found
+E2E OK (26 checks)

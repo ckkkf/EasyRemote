@@ -1,0 +1,85 @@
+{
+  "generatedAt": "2026-11-24T08:38:48+0800",
+  "viewport": {
+    "width": 1360,
+    "height": 860
+  },
+  "baseUrl": "http://127.0.0.1:5394",
+  "admin": {
+    "username": "root",
+    "role": "super"
+  },
+  "checks": [
+    {
+      "name": "deep link /users renders page",
+      "ok": true,
+      "detail": "用户"
+    },
+    {
+      "name": "deep link /users keeps URL",
+      "ok": true,
+      "detail": "http://127.0.0.1:5394/users"
+    },
+    {
+      "name": "deep link /users has data rows",
+      "ok": true,
+      "detail": 1
+    },
+    {
+      "name": "reload keeps route",
+      "ok": true,
+      "detail": "http://127.0.0.1:5394/users"
+    },
+    {
+      "name": "reload keeps page title",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "deep link /config renders config table",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "deep link /config title",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "unknown path renders notfound",
+      "ok": true,
+      "detail": "页面不存在"
+    },
+    {
+      "name": "nav click updates URL",
+      "ok": true,
+      "detail": "http://127.0.0.1:5394/audit"
+    },
+    {
+      "name": "nav click updates title",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "nav active state follows route",
+      "ok": true,
+      "detail": "审计日志"
+    },
+    {
+      "name": "/login redirects when authenticated",
+      "ok": true,
+      "detail": "http://127.0.0.1:5394/dashboard"
+    },
+    {
+      "name": "anon deep link lands on login",
+      "ok": true,
+      "detail": "http://127.0.0.1:5394/login"
+    },
+    {
+      "name": "anon sees no admin table",
+      "ok": true,
+      "detail": ""
+    }
+  ],
+  "pageErrors": []
+}
