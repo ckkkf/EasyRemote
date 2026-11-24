@@ -1,0 +1,8 @@
+{
+  "comparedTo": "/Users/ckkk/dev/code/Go/EasyRemote/docs/impl/evidence/ADM-UI-05/screens/manifest.json",
+  "diffs": [
+    "a6-device-detail.kvPairs: 6 -> 7",
+    "a6-device-detail.modalTitle: '设备详情 ### ### ###' -> '### ### ###'"
+  ],
+  "screens": 6
+}

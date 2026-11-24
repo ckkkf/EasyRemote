@@ -1,0 +1,5 @@
+PROBE_CONNECTED session=ses-a6d46c1dffdf5d95
+PROBE_ATTACHED ctrl-18eab8eb0b07fc30
+PROBE_FRAMES=1
+PROBE_FRAMES=1
+PROBE_PEER_CLOSED reason=local_disconnect

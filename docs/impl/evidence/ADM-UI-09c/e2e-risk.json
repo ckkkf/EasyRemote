@@ -1,0 +1,75 @@
+{
+  "checks": [
+    {
+      "name": "nav shows risk page",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "blocked connect produced alert",
+      "ok": true,
+      "detail": true
+    },
+    {
+      "name": "blacklist starts empty",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "invalid ip rejected",
+      "ok": true,
+      "detail": "配置值不合法 | 700010 ADMIN_CONFIG_INVALID · trace bpcEHHslgDshbSmr | 复制 trace"
+    },
+    {
+      "name": "blacklist row added",
+      "ok": true,
+      "detail": "account\tacc-050aa55fbb5fcd63\t同 IP 高频连接\t2026/11/25 08:40:21\troot\t移除"
+    },
+    {
+      "name": "blacklist shows expiry",
+      "ok": true,
+      "detail": "account\tacc-050aa55fbb5fcd63\t同 IP 高频连接\t2026/11/25 08:40:21\troot\t移除"
+    },
+    {
+      "name": "add writes audit",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "alert listed from real block",
+      "ok": true,
+      "detail": 1
+    },
+    {
+      "name": "alert subject is account",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "remove requires reason",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "blacklist removed",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "remove writes audit",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "no risk nav without permission",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "forbidden on deep link",
+      "ok": true,
+      "detail": "ER | EasyRemote | 管理后台 | 仪表盘 | 用户 | 设备 | 会话 | 审计日志 | C | cs1 | 客服 | 退出登录 | 无权限 |  | 所有写操作按角色权限执行并写入审"
+    }
+  ],
+  "pageErrors": []
+}

@@ -108,8 +108,8 @@ try:
 
         # 1) 配置中心：改一项并保存
         page.locator("nav button", has_text="配置中心").click()
-        page.wait_for_selector("table.tbl tbody tr", timeout=10000)
-        first = page.locator("table.tbl tbody tr").first
+        page.wait_for_selector("table[data-testid=data-table] tbody tr", timeout=10000)
+        first = page.locator("table[data-testid=data-table] tbody tr").first
         inp = first.locator("input.cfg-input")
         check("config row rendered", inp.count() == 1)
         inp.fill("601")
@@ -127,11 +127,11 @@ try:
 
         # 2) 设备行点击 → 详情；复制按钮不触发详情
         page.locator("nav button", has_text="设备").click()
-        page.wait_for_selector("table.tbl tbody tr.clickable", timeout=10000)
-        page.locator("table.tbl tbody tr.clickable").first.locator("button", has_text="复制设备码").click()
+        page.wait_for_selector("table[data-testid=data-table] tbody tr.clickable", timeout=10000)
+        page.locator("table[data-testid=data-table] tbody tr.clickable").first.locator("button", has_text="复制设备码").click()
         page.wait_for_timeout(400)
         check("copy button does not open detail", page.locator(".modal").count() == 0)
-        page.locator("table.tbl tbody tr.clickable").first.click()
+        page.locator("table[data-testid=data-table] tbody tr.clickable").first.click()
         page.wait_for_selector(".modal .kv", timeout=10000)
         check("device detail opens on row click", page.locator(".modal h3").first.inner_text().startswith("设备详情"))
         page.locator(".modal-actions button", has_text="关闭").click()
@@ -140,17 +140,17 @@ try:
 
         # 3) 用户行点击 → 详情；封禁按钮不触发详情
         page.locator("nav button", has_text="用户").click()
-        page.wait_for_selector("table.tbl tbody tr.clickable", timeout=10000)
-        page.locator("table.tbl tbody tr.clickable").first.locator("button", has_text="封禁").click()
+        page.wait_for_selector("table[data-testid=data-table] tbody tr.clickable", timeout=10000)
+        page.locator("table[data-testid=data-table] tbody tr.clickable").first.locator("button", has_text="封禁").click()
         page.wait_for_timeout(400)
         h3 = page.locator(".modal h3").first.inner_text()
         check("ban button opens ban modal", h3.startswith("封禁"), h3)
         page.locator(".modal-actions button", has_text="取消").click()
         page.wait_for_timeout(300)
-        page.locator("table.tbl tbody tr.clickable").first.click()
+        page.locator("table[data-testid=data-table] tbody tr.clickable").first.click()
         page.wait_for_selector(".modal .kv", timeout=10000)
         check("user detail opens on row click", page.locator(".modal h3").first.inner_text().startswith("用户详情"))
-        check("user detail shows account devices", page.locator(".modal table.tbl tbody tr").count() >= 1)
+        check("user detail shows account devices", page.locator(".modal table[data-testid=data-table] tbody tr").count() >= 1)
 
         check("no page errors", len(errs) == 0, errs)
         br.close()

@@ -1,0 +1,26 @@
+PASS three metric groups rendered
+PASS scale shows authoritative values -> 4 vs fixture 4
+PASS users_online shows authoritative value -> 3
+PASS devices new 24h from device created_at -> 4
+PASS quality p50 from samples -> 34 ms
+PASS quality p95 from samples -> 41 ms
+PASS quality relay percent from samples -> 66%
+PASS connect success rate from real attempts -> 0%
+PASS connect attempts count shown
+PASS p2p hit rate from reported link -> 33%
+PASS fps target rate from reported target -> 33%
+PASS abnormal close rate from real reasons -> 100%
+PASS stability subtitle shows closed count
+PASS crash rate from reported events -> 100%
+PASS reconnect success rate from reported events -> 50%
+PASS trend buckets rendered -> 窗口 24h · 按小时 · 1 个时间桶
+PASS trend polyline has points -> 160.0,2.0
+PASS trend shows peak
+PASS updated-at rendered
+PASS range switch hits server with range param
+PASS polls every 5s -> 3 -> 4
+PASS pause stops polling -> 4 -> 4
+PASS stale badge appears when paused
+PASS resume polls again -> 4 -> 5
+PASS stale badge clears after refresh
+E2E OK (25 checks)

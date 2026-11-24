@@ -1,0 +1,136 @@
+{
+  "generatedAt": "2026-11-24T08:39:42+0800",
+  "viewport": {
+    "width": 1360,
+    "height": 860
+  },
+  "checks": [
+    {
+      "name": "three metric groups rendered",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "scale shows authoritative values",
+      "ok": true,
+      "detail": "4 vs fixture 4"
+    },
+    {
+      "name": "users_online shows authoritative value",
+      "ok": true,
+      "detail": "3"
+    },
+    {
+      "name": "devices new 24h from device created_at",
+      "ok": true,
+      "detail": "4"
+    },
+    {
+      "name": "quality p50 from samples",
+      "ok": true,
+      "detail": "34 ms"
+    },
+    {
+      "name": "quality p95 from samples",
+      "ok": true,
+      "detail": "41 ms"
+    },
+    {
+      "name": "quality relay percent from samples",
+      "ok": true,
+      "detail": "66%"
+    },
+    {
+      "name": "connect success rate from real attempts",
+      "ok": true,
+      "detail": "0%"
+    },
+    {
+      "name": "connect attempts count shown",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "p2p hit rate from reported link",
+      "ok": true,
+      "detail": "33%"
+    },
+    {
+      "name": "fps target rate from reported target",
+      "ok": true,
+      "detail": "33%"
+    },
+    {
+      "name": "abnormal close rate from real reasons",
+      "ok": true,
+      "detail": "100%"
+    },
+    {
+      "name": "stability subtitle shows closed count",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "crash rate from reported events",
+      "ok": true,
+      "detail": "100%"
+    },
+    {
+      "name": "reconnect success rate from reported events",
+      "ok": true,
+      "detail": "50%"
+    },
+    {
+      "name": "trend buckets rendered",
+      "ok": true,
+      "detail": "窗口 24h · 按小时 · 1 个时间桶"
+    },
+    {
+      "name": "trend polyline has points",
+      "ok": true,
+      "detail": "160.0,2.0"
+    },
+    {
+      "name": "trend shows peak",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "updated-at rendered",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "range switch hits server with range param",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "polls every 5s",
+      "ok": true,
+      "detail": "3 -> 4"
+    },
+    {
+      "name": "pause stops polling",
+      "ok": true,
+      "detail": "4 -> 4"
+    },
+    {
+      "name": "stale badge appears when paused",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "resume polls again",
+      "ok": true,
+      "detail": "4 -> 5"
+    },
+    {
+      "name": "stale badge clears after refresh",
+      "ok": true,
+      "detail": ""
+    }
+  ],
+  "pageErrors": [],
+  "overviewRequests": 5
+}

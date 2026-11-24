@@ -1,0 +1,30 @@
+# ADM-UI-11c 命令输出
+# 采集时间: 2026-11-23T21:23:30+0800
+
+$ cd web-admin && npx tsc --noEmit && npm test -- --run
+      Tests  57 passed (57)
+   Start at  21:23:31
+   Duration  860ms (transform 573ms, setup 0ms, collect 1.46s, tests 74ms, environment 2ms, prepare 783ms)
+
+
+$ bash scripts/admin-ui-e2e-all.sh
+== 汇总 ==
+  PASS: 14
+  FAIL: 0
+  耗时: 150s
+  日志: /Users/ckkk/dev/code/Go/EasyRemote/docs/impl/evidence/ADM-UI-10c/logs
+  E2E SUITE: PASS
+
+$ python3 scripts/admin-ui-responsive-a11y.py
+AUDIT OK（28 张截图，见 evidence/ADM-UI-10/shots）
+
+$ bash scripts/gate.sh
+== 汇总 ==
+  scripts   PASS
+  contract  PASS
+  go        PASS
+  rust      PASS
+  flutter   PASS
+  web       PASS
+
+GATE: PASS

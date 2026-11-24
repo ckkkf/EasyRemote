@@ -1,0 +1,31 @@
+# dist CSS 关键片段（ADM-UI-01a）
+# 文件: web-admin/dist/assets/index-CHVlNU0n.css
+
+## 1) 生成令牌品牌色（来自 design/generated/tokens.css，经 globals.css @import 内联）
+--er-brand:#1e4bdb
+--er-brand:#94b5fd
+--er-primary:#1e4bdb
+--er-primary:#adc6fc
+
+## 2) shadcn 语义变量映射（globals.css，全部指向 --er-* 生成令牌）
+--background:var(--er-surface)
+--background:var(--er-surface)
+--ring:var(--er-brand)
+--ring:var(--er-brand)
+
+## 3) Tailwind 工具类产物
+.inline-flex{display:inline-flex}
+.h-11{height:2.75rem}
+.w-full{width:100%}
+.mt-4{margin-top:1rem}
+.bg-primary{background-color:var(--er-brand)}
+.border-transparent{border-color:#0000}
+.rounded-md{border-radius:8px}
+
+## 4) preflight 关闭证据
+  border-width:0 出现次数 = 0
+  ::before 出现次数      = 0
+  => preflight 重置未进入产物，现有 styles.css 仍是唯一基础排版来源
+
+## 5) 品牌色出现次数（大小写不敏感 1e4bdb）
+7

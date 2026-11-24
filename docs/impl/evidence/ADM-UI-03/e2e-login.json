@@ -1,0 +1,56 @@
+{
+  "generatedAt": "2026-11-24T08:38:53+0800",
+  "viewport": {
+    "width": 1360,
+    "height": 860
+  },
+  "baseUrl": "http://127.0.0.1:5395",
+  "checks": [
+    {
+      "name": "login page has no dev credentials",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "login page labels are bound",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "wrong password shows envelope",
+      "ok": true,
+      "detail": "手机号或验证码不正确 | 100001 AUTH_INVALID_CREDENTIAL | 复制 trace_id"
+    },
+    {
+      "name": "wrong password keeps trace_id",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "wrong password stays on login",
+      "ok": true,
+      "detail": "http://127.0.0.1:5395/login"
+    },
+    {
+      "name": "valid credentials reach dashboard",
+      "ok": true,
+      "detail": "http://127.0.0.1:5395/dashboard"
+    },
+    {
+      "name": "dashboard rendered after login",
+      "ok": true,
+      "detail": 15
+    },
+    {
+      "name": "metric groups rendered after login",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "no dev credentials after login",
+      "ok": true,
+      "detail": ""
+    }
+  ],
+  "pageErrors": []
+}

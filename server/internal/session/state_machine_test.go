@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/easyremote/server/internal/errcode"
 	"github.com/easyremote/server/internal/store"
 )
 
@@ -150,8 +149,12 @@ func TestConsentTimeoutClosesViaCommand(t *testing.T) {
 	s.SetClock(func() time.Time { return now })
 	sess, _ := s.Request(ctx(), "c-timeout", "t-timeout")
 	s.SetClock(func() time.Time { return now.Add(ConsentTimeout + time.Second) })
-	if _, err := s.Consent(ctx(), sess.ID, true, ""); !errcode.Is(err, errcode.ConnConsentTimeout) {
-		t.Fatalf("want timeout, got %v", err)
+	res, err := s.Consent(ctx(), sess.ID, true, "")
+	if err != nil {
+		t.Fatalf("want nil error (complete state), got %v", err)
+	}
+	if res.State != StateClosed {
+		t.Fatalf("want closed result, got %s", res.State)
 	}
 	got, _ := s.Get(ctx(), sess.ID)
 	if got.State != StateClosed || got.Reason != "consent_timeout" {

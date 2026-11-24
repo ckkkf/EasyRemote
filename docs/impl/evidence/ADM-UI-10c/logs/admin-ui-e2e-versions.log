@@ -1,0 +1,15 @@
+PASS nav shows versions page
+PASS versions start empty
+PASS draft published -> windows	0.2.14	草稿	0%	否	—	2026/11/24 08:40:26	下线
+PASS draft rollout is 0 -> windows	0.2.14	草稿	0%	否	—	2026/11/24 08:40:26	下线
+PASS full with 50% blocked locally
+PASS rollout error explained
+PASS rolling published with 20%
+PASS publish writes audit
+PASS retire requires reason
+PASS retire marks version retired
+PASS retire writes audit
+PASS deep link survives reload
+PASS no versions nav without permission
+PASS forbidden on deep link -> ER | EasyRemote | 管理后台 | 仪表盘 | 用户 | 设备 | 会话 | 审计日志 | C | cs1 | 客服 | 退出登录 | 无权限 |  | 所有写操作按角色权限执行并写入审
+E2E OK (14 checks)

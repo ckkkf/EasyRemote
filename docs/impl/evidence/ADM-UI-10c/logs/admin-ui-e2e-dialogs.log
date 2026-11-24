@@ -1,0 +1,17 @@
+PASS ban dialog role=dialog
+PASS ban dialog labelled by title
+PASS outside content is aria-hidden
+PASS ban dialog title -> 封禁 acc-d2813ba2975aec57
+PASS confirm disabled without reason
+PASS confirm disabled with 3 chars
+PASS confirm enabled with 4+ chars
+PASS focus stays inside dialog
+PASS escape closes without side effect
+PASS ban writes audit
+PASS ban takes effect
+PASS cancel writes no kill audit
+PASS kill writes audit
+PASS device row navigates to detail page -> http://127.0.0.1:5396/devices/dev-556c92120c9109d4
+PASS user row navigates to detail page -> http://127.0.0.1:5396/users/acc-d2813ba2975aec57
+PASS user detail has tables
+E2E OK (16 checks)

@@ -1,0 +1,64 @@
+# ADM-02a 命令输出（phone_mask 修复）
+# 采集时间: 2026-11-23T11:03:56+0800
+# commit: 267a635
+
+$ (cd server && go test ./internal/auth/ ./internal/adminapi/ ./internal/adminhttp/ -run ListUsers|SMSLogin|MasksPhone|Envelope -v)
+=== RUN   TestSMSLoginStoresPhoneEnc
+--- PASS: TestSMSLoginStoresPhoneEnc (0.00s)
+PASS
+ok  	github.com/easyremote/server/internal/auth	0.203s
+=== RUN   TestUserListMasksPhone
+--- PASS: TestUserListMasksPhone (0.00s)
+=== RUN   TestListUsers_Mask
+--- PASS: TestListUsers_Mask (0.00s)
+=== RUN   TestListUsers_Empty
+--- PASS: TestListUsers_Empty (0.00s)
+=== RUN   TestListUsers_Forbidden
+--- PASS: TestListUsers_Forbidden (0.00s)
+PASS
+ok  	github.com/easyremote/server/internal/adminapi	0.335s
+=== RUN   TestAdminEnvelopeContract
+2026/11/23 11:03:57 trace=sKYSDue-X8ITWfIG code=100001 name=AUTH_INVALID_CREDENTIAL detail=invalid credentials
+2026/11/23 11:03:57 trace=VnGsMzJZzqghZWOp code=100001 name=AUTH_INVALID_CREDENTIAL detail=invalid credentials
+2026/11/23 11:03:57 trace=kYM32a7v6ZKPd8UH code=700007 name=ADMIN_SESSION_EXPIRED detail=unauthorized
+2026/11/23 11:03:57 trace=Fi67nkJ2cx0kQAUw code=700007 name=ADMIN_SESSION_EXPIRED detail=unauthorized
+2026/11/23 11:03:57 trace=GA0WC7K1mq7czUAW code=700009 name=ADMIN_REASON_REQUIRED detail=reason required
+2026/11/23 11:03:57 trace=qKti6rgmqtjiBU4L code=700007 name=ADMIN_SESSION_EXPIRED detail=unauthorized
+2026/11/23 11:03:57 trace=qYYiZw17ACLfneqz code=700007 name=ADMIN_SESSION_EXPIRED detail=unauthorized
+2026/11/23 11:03:57 trace=0gl81dJREO1JlY5W code=700007 name=ADMIN_SESSION_EXPIRED detail=unauthorized
+2026/11/23 11:03:57 trace=bBvbq5SraC1YMKCl code=700009 name=ADMIN_REASON_REQUIRED detail=reason required
+2026/11/23 11:03:57 trace=NKrPkAAh7KdSNtpR code=700007 name=ADMIN_SESSION_EXPIRED detail=unauthorized
+2026/11/23 11:03:57 trace=kWUnmY_bOXknN3yg code=700007 name=ADMIN_SESSION_EXPIRED detail=unauthorized
+2026/11/23 11:03:57 trace=wa4W1yqWF2cJ4x2w code=700010 name=ADMIN_CONFIG_INVALID detail=empty values
+2026/11/23 11:03:57 trace=au50ehTdtsZO2etC code=700007 name=ADMIN_SESSION_EXPIRED detail=unauthorized
+2026/11/23 11:03:57 trace=AwHZbR1GgUrGdL0z code=700007 name=ADMIN_SESSION_EXPIRED detail=unauthorized
+2026/11/23 11:03:57 trace=wah33fUOhYuNwf1J code=700011 name=SRV_ROUTE_NOT_FOUND detail=GET /admin/v1/does-not-exist
+    contract_test.go:108: 全部 38 条接口响应形状已对齐
+--- PASS: TestAdminEnvelopeContract (0.00s)
+=== RUN   TestListUsers_HTTPEnvelope
+--- PASS: TestListUsers_HTTPEnvelope (0.00s)
+PASS
+ok  	github.com/easyremote/server/internal/adminhttp	0.525s
+[exit=0]
+
+$ (cd server && gofmt -l internal/auth internal/adminapi internal/adminhttp)
+[exit=0]
+
+$ (cd . && python3 /tmp/probe_mask.py)
+items: [('acc-bbf31bb36bd7f104', "'139****3000'")]
+[exit=0]
+
+$ bash scripts/gate.sh
+✓ built in 395ms
+  PASS
+
+== 汇总 ==
+  scripts   PASS
+  contract  PASS
+  go        PASS
+  rust      PASS
+  flutter   PASS
+  web       PASS
+
+GATE: PASS
+[exit=0]

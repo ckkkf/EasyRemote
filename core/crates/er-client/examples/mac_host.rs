@@ -57,21 +57,28 @@ fn real_main() {
         disp.scale()
     );
 
-    // 采集能力自检：屏录权限缺失时这里就报出来，而不是让主控端黑屏
-    match ScreenCapture::open_primary() {
-        Ok(mut cap) => match cap.grab() {
-            Ok(f) => println!(
-                "MAC: capture_ok {}x{} backend={}",
-                f.width,
-                f.height,
-                cap.backend_name()
-            ),
-            Err(e) => println!("MAC: capture_error={e}"),
-        },
-        Err(e) => println!("MAC: capture_unavailable={e}"),
+    // 采集能力自检：屏录权限缺失时这里就报出来，而不是让主控端黑屏。
+    // ER_SKIP_MEDIA_PROBE=1 供 E2E 的「拒绝」路径使用：该路径不需要采集/编码，
+    // 而连续第三次打开采集设备可能阻塞（xcap 释放滞后），会把 device_code 卡到超时。
+    let skip_media_probe = std::env::var("ER_SKIP_MEDIA_PROBE").ok().as_deref() == Some("1");
+    if skip_media_probe {
+        println!("MAC: media_probe_skipped");
+    } else {
+        match ScreenCapture::open_primary() {
+            Ok(mut cap) => match cap.grab() {
+                Ok(f) => println!(
+                    "MAC: capture_ok {}x{} backend={}",
+                    f.width,
+                    f.height,
+                    cap.backend_name()
+                ),
+                Err(e) => println!("MAC: capture_error={e}"),
+            },
+            Err(e) => println!("MAC: capture_unavailable={e}"),
+        }
+        let acc = MacInjector::cursor_pixel();
+        println!("MAC: cursor_baseline_pixel={acc:?}");
     }
-    let acc = MacInjector::cursor_pixel();
-    println!("MAC: cursor_baseline_pixel={acc:?}");
 
     let target = TargetAgent::start(&base, &phone, &sms, relay_addr).expect("target start");
     let code = target.device_code();
@@ -110,6 +117,14 @@ fn real_main() {
             .wait_for_session(&signal, Duration::from_secs(3600))
             .expect("signalling");
         println!("MAC: session={session_id}");
+        // E2E 路径 C：显式拒绝一次（模拟用户点「拒绝」），只允许由测试环境变量触发。
+        if std::env::var("ER_REJECT_ONCE").ok().as_deref() == Some("1") {
+            match target.reject(&session_id) {
+                Ok(()) => println!("MAC: rejected_once session={session_id}"),
+                Err(e) => println!("MAC: reject_failed={e}"),
+            }
+            continue;
+        }
         if let Err(e) = target.consent(&session_id) {
             println!("MAC: consent_failed={e}");
             continue;
@@ -158,6 +173,9 @@ fn real_main() {
         let mut injected: u64 = 0;
         let mut last_input = Instant::now();
         let mut last_beat = Instant::now();
+        let mut last_state_check = Instant::now();
+        // 当前会话的开始时刻（ER_CLOSE_AFTER_SECS 按它计时，不按进程启动）
+        let session_started = Instant::now();
         let mut last_stat = Instant::now();
         let mut last_rotate = Instant::now();
 
@@ -165,6 +183,33 @@ fn real_main() {
             // 主控断开判据：只在「没显式给时长」时启用（无人值守的默认模式）。
             // 显式给了 duration 就按 duration 走——演示时用户可能只是盯着画面不动鼠标，
             // 按静默超时退出会把正在看的会话掐断（实测 10 分钟就断了）。
+            // 关闭传播兜底：每秒查一次权威状态，主控 close 后 ≤2s 停止采集/编码/输入。
+            // 与 host_stream 的客户端实现保持一致；心跳只作为信令层兜底。
+            if last_state_check.elapsed() >= Duration::from_secs(1) {
+                last_state_check = Instant::now();
+                if let Ok(state) = target.session_state(&session_id) {
+                    if er_client::host_stream::peer_closed(&state) {
+                        println!("MAC: peer_closed state={state}");
+                        break;
+                    }
+                }
+                // E2E 路径 C：被控端主动断开（模拟用户点「断开远程控制」）。
+                // 仅测试用环境变量触发，生产行为不受影响。
+                if let Ok(secs) = std::env::var("ER_CLOSE_AFTER_SECS") {
+                    if let Ok(n) = secs.parse::<u64>() {
+                        // 按「当前会话开始」计时，而不是进程启动：
+                        // 否则第二个会话会立刻触发本地关闭。
+                        if session_started.elapsed().as_secs() >= n {
+                            println!("MAC: local_close_after={n}s");
+                            match target.close_session(&session_id) {
+                                Ok(()) => println!("MAC: local_close_ok"),
+                                Err(e) => println!("MAC: local_close_failed={e}"),
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
             // 心跳超时优先：主控走了就别继续空推（CLI 端与客户端行为保持一致）
             if last_beat.elapsed() > Duration::from_secs(10) {
                 println!("MAC: peer_left (no heartbeat)");

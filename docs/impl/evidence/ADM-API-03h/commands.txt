@@ -1,0 +1,138 @@
+# ADM-API-03h 命令输出
+# 采集时间: 2026-11-23T19:03:59+0800
+# commit: 267a635
+
+$ node scripts/gen-contract.mjs --check && node scripts/check-routes.mjs --strict
+✓ 三端契约一致（73 个类型 / 70 条接口）
+✓ 路由 method/path/auth 与契约一致（70 条端点）
+
+$ (cd server && go test ./internal/gateway/ -run TestSessionErrorsRecorded -v)
+=== RUN   TestSessionErrorsRecorded
+2026/11/23 19:00:16 trace=8jGrjwHtFlLAdGcn code=300001 name=SESSION_NOT_FOUND detail=not authorized: requested
+--- PASS: TestSessionErrorsRecorded (0.00s)
+PASS
+ok  	github.com/easyremote/server/internal/gateway	(cached)
+[exit=0]
+
+$ (cd server && go test ./internal/gateway/ ./internal/adminapi/ ./internal/store/)
+ok  	github.com/easyremote/server/internal/gateway	0.274s
+ok  	github.com/easyremote/server/internal/adminapi	1.993s
+ok  	github.com/easyremote/server/internal/store	0.818s
+[exit=0]
+
+$ (cd web-admin && npx tsc --noEmit)
+[exit=0]
+
+$ (cd web-admin && npm test -- --run)
+
+> easyremote-admin@0.2.13 test
+> vitest run --run
+
+
+ RUN  v2.1.9 /Users/ckkk/dev/code/Go/EasyRemote/web-admin
+
+ ✓ tests/a11y.test.ts (3 tests) 4ms
+ ✓ tests/dialog-usage.test.ts (2 tests) 4ms
+ ✓ tests/stack-conformance.test.ts (2 tests) 5ms
+ ✓ tests/routes.test.ts (5 tests) 3ms
+ ✓ tests/admin-scope.test.ts (4 tests) 3ms
+ ✓ tests/dashboard-metrics.test.ts (8 tests) 3ms
+ ✓ tests/config-audit.test.ts (5 tests) 4ms
+ ✓ tests/kill-result.test.ts (4 tests) 2ms
+ ✓ tests/error-envelope.test.ts (3 tests) 3ms
+ ✓ tests/gate.test.ts (3 tests) 3ms
+ ✓ tests/kill-reasons.test.ts (3 tests) 3ms
+ ✓ tests/page-state.test.tsx (4 tests) 7ms
+ ✓ tests/session-states.test.ts (3 tests) 5ms
+ ✓ tests/data-table.test.tsx (3 tests) 5ms
+ ✓ tests/ui-primitives.test.tsx (1 test) 9ms
+ ✓ tests/csp.test.ts (1 test) 2ms
+ ✓ tests/login.test.tsx (3 tests) 1ms
+
+ Test Files  17 passed (17)
+      Tests  57 passed (57)
+   Start at  19:04:03
+   Duration  673ms (transform 547ms, setup 0ms, collect 1.14s, tests 66ms, environment 2ms, prepare 743ms)
+
+[exit=0]
+
+$ (cd web-admin && npm run build)
+
+> easyremote-admin@0.2.13 build
+> tsc -b && vite build
+
+vite v8.3.8 building client environment for production...
+transforming...
+✓ 148 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                   0.76 kB │ gzip:   0.51 kB
+dist/assets/index-C1JILLF1.css   20.49 kB │ gzip:   5.36 kB
+dist/assets/index-ewu7JXaW.js   347.15 kB │ gzip: 106.46 kB
+
+✓ built in 288ms
+[exit=0]
+
+$ (cd . && python3 scripts/admin-ui-e2e-sessions.py)
+PASS session columns -> ['会话 ID', '主控', '被控', '状态', '时长', '平均延迟', '结束原因', '链路', '开始时间', '操作']
+PASS session latency and link from samples
+PASS future time range returns no sessions
+PASS device filter narrows rows -> dev-c50d4a167ddf8bde
+PASS link filter matches link column
+PASS abnormal filter returns only abnormal closed sessions
+PASS state filter has machine states -> ['全部状态', '等待授权（requested）', '已授权（authorized）', '进行中（active）', '已结束（closed）']
+PASS state filter has no 'ended' -> ['全部状态', '等待授权（requested）', '已授权（authorized）', '进行中（active）', '已结束（closed）']
+PASS closed filter returns rows -> ['已结束']
+PASS closed rows labelled -> ['已结束']
+PASS kill disabled on closed row
+PASS kill dialog requires category
+PASS kill dialog enabled after category
+PASS kill dialog shows audited reason
+PASS cancel writes no kill audit
+PASS kill writes audit
+PASS kill closes session -> {'id': 'ses-d1a08027112883d9', 'controller_id': 'dev-c50d4a167ddf8bde', 'target_id': 'dev-5882a49b4939d6a0', 'state': 'closed', 'reason': 'admin: 安全应急', 'started_at': '2026-11-23T11:04:06.159934Z', 'ended_at': '2026-11-23T11:04:08.210462Z', 'latency_available': True, 'avg_latency_ms': 34, 'link': 'relay'}
+PASS row opens session detail -> http://127.0.0.1:5400/sessions/ses-a273133f3f02509a
+PASS detail shows session fields
+PASS unsampled session shows no data
+PASS quality samples rendered -> 3
+PASS quality summary computed
+PASS quality link column shows relay
+PASS session error timeline recorded -> 1
+PASS error timeline shows code and source
+PASS session parties listed -> 2
+PASS link switch recorded -> 时间	从	到 | 2026/11/23 19:04:05	p2p	relay
+PASS timeline rendered
+PASS deep link survives reload
+PASS back returns to list -> http://127.0.0.1:5400/sessions
+PASS dual request requires reason
+PASS pending request listed -> ses-d414c21b3751a6ef
+PASS dual request writes audit
+PASS requester cannot confirm own request -> 没有权限执行该操作 | 700005 ADMIN_FORBIDDEN · trace LrZX0P242elw7L_s | 复制 trace
+PASS second admin confirmed and closed session
+PASS session closed after confirmation -> ses-d414c21b3751a6ef
+PASS confirm writes audit
+PASS unknown session shows not found
+E2E OK (38 checks)
+[exit=0]
+
+$ python3 scripts/admin-ui-baseline.py --out docs/impl/evidence/ADM-API-03h/screens --compare-to docs/impl/evidence/ADM-API-05d/screens/manifest.json
+BASELINE COMPARE OK (6 屏 DOM 判据一致)
+screens: a1-login, a2-dashboard, a3-users, a6-device-detail, a7-sessions, a12-config
+font: Inter, "PingFang SC", "Microsoft YaHei", sans-serif
+BASELINE OK
+[exit=0]
+
+$ bash scripts/gate.sh
+✓ built in 382ms
+  PASS
+
+== 汇总 ==
+  scripts   PASS
+  contract  PASS
+  go        PASS
+  rust      PASS
+  flutter   PASS
+  web       PASS
+
+GATE: PASS
+[exit=0]

@@ -1,0 +1,76 @@
+{
+  "checks": [
+    {
+      "name": "nav shows admin page",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "admin columns",
+      "ok": true,
+      "detail": [
+        "用户名",
+        "角色",
+        "状态",
+        "MFA",
+        "操作"
+      ]
+    },
+    {
+      "name": "seeded admins listed",
+      "ok": true,
+      "detail": 3
+    },
+    {
+      "name": "root is super with mfa",
+      "ok": true,
+      "detail": "super / root\t | super | \t启用\t已开启\t禁用"
+    },
+    {
+      "name": "ops-dev is ops and disabled without mfa",
+      "ok": true,
+      "detail": "ops / ops-dev\t | ops | \t禁用\t未开启\t启用"
+    },
+    {
+      "name": "role change requires reason",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "role change applied",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "role change writes audit",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "last super self-disable blocked",
+      "ok": true,
+      "detail": "没有权限执行该操作 | 700005 ADMIN_FORBIDDEN · trace 9xD4bJS2oO7t9IaU | 复制 trace"
+    },
+    {
+      "name": "root still active",
+      "ok": true,
+      "detail": "root\t | super | \t启用\t已开启\t禁用"
+    },
+    {
+      "name": "deep link survives reload",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "non-super sees no admin nav",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "non-super gets forbidden",
+      "ok": true,
+      "detail": "ER | EasyRemote | 管理后台 | 仪表盘 | 用户 | 设备 | 会话 | 审计日志 | 配置中心 | O | ops-dev | 运维 | 退出登录 | 无权限 |  | 所有写操作按角色权限执行并写入审计 |  | 刷新"
+    }
+  ],
+  "pageErrors": []
+}

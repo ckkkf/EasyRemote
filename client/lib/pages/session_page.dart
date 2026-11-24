@@ -9,7 +9,9 @@ import '../models.dart';
 import '../net_probe.dart';
 
 import '../net_probe_cache.dart';
+import '../session_close_coordinator.dart';
 import '../session_video.dart';
+import '../video_adapter.dart';
 import '../theme.dart';
 import 'diagnostics_page.dart';
 
@@ -33,6 +35,11 @@ class SessionPage extends StatefulWidget {
     this.targetCode = '',
     this.ownDevice,
     this.assist = false,
+    this.probeNat = true,
+    this.initialStatus,
+    this.pollSessionStatus = true,
+    this.enableVideo = true,
+    this.video,
   });
 
   final GatewayClient client;
@@ -47,6 +54,21 @@ class SessionPage extends StatefulWidget {
 
   /// true 表示本次是协助码接入（连接方式一栏要如实写）。
   final bool assist;
+
+  /// NAT 探测会起定时器；widget 测试关掉它，避免 pending timer 干扰断言。
+  final bool probeNat;
+
+  /// 测试注入的初始领域状态（不传则从 requesting 开始并轮询）。
+  final SessionStatus? initialStatus;
+
+  /// 是否启动状态轮询；widget 测试关掉，避免 periodic timer 干扰。
+  final bool pollSessionStatus;
+
+  /// 是否接管视频（走 FFI）；widget 测试关掉，避免加载真实动态库。
+  final bool enableVideo;
+
+  /// 视频会话适配器；默认委托 SessionVideo 单例，测试可注入 fake。
+  final VideoAdapter? video;
 
   @override
   State<SessionPage> createState() => _SessionPageState();
@@ -78,24 +100,62 @@ class _SessionPageState extends State<SessionPage> {
   @override
   void initState() {
     super.initState();
+    if (widget.initialStatus != null) _status = widget.initialStatus!;
+    // 恢复会话时状态可能已经是 authorized/active：这种情况要立刻接管画面，
+    // 否则只能等下一次轮询（测试里轮询被关掉，就永远不 attach）。
+    if (_status.isLive && widget.enableVideo) {
+      unawaited(_startVideoOnce());
+    }
     _loadTarget();
-    _probeNat();
-    _pollOnce();
-    _poll = Timer.periodic(const Duration(seconds: 1), (_) => _pollOnce());
+    if (widget.probeNat) _probeNat();
+    if (widget.pollSessionStatus) {
+      _pollOnce();
+      _poll = Timer.periodic(const Duration(seconds: 1), (_) => _pollOnce());
+    }
     _tick = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) setState(() {});
     });
-    unawaited(_startVideo());
+    // ER-905：requested 阶段**不** attach。
+    // 之前这里无条件 _startVideo()，会话还没被授权就去申请 relay 票据，
+    // 服务端只能拿「未授权」兜底成 SESSION_AUTH_WINDOW_EXCEEDED，用户看到 403。
+    // attach 由 _pollOnce 在首次观察到 authorized/active 时触发，且只触发一次。
   }
 
   Timer? _videoTimer;
 
-  /// ER-504b：当前不做自动重连；用户可手动重新 attach 同一会话。
-  Future<void> _reconnectVideo() async {
-    _videoTimer?.cancel();
-    SessionVideo.instance.close();
+  VideoAdapter get _video => widget.video ?? const DefaultVideoAdapter();
+
+  /// attach 只允许成功触发一次（ER-905）：并发轮询不得重复申请票据。
+  bool _videoStarted = false;
+
+  Future<void> _startVideoOnce() async {
+    if (_videoStarted) return;
+    _videoStarted = true;
+    if (!widget.enableVideo) return;
     await _startVideo();
-    if (mounted) setState(() {});
+  }
+
+  /// ER-504b：当前不做自动重连；用户可手动重新 attach 同一会话。
+  /// 重连（ER-905 4.1(4)）：必须真正允许**再次 attach**。
+  ///
+  /// 之前只清 timer 和 FFI 句柄，但 `_videoStarted` 仍为 true，
+  /// `_startVideoOnce()` 会直接 return —— 按钮等于死键。
+  /// 这里显式复位标志并清失败态，再走一次 attach；并发由 `_reconnecting` 挡住。
+  bool _reconnecting = false;
+
+  Future<void> _reconnectVideo() async {
+    if (_reconnecting) return;
+    _reconnecting = true;
+    setState(() {});
+    try {
+      _videoTimer?.cancel();
+      _video.close();
+      _videoStarted = false;
+      await _startVideoOnce();
+    } finally {
+      _reconnecting = false;
+      if (mounted) setState(() {});
+    }
   }
 
   /// 接管会话并开始拉帧：FFI 里已经建好双缓冲，这里只是定时把最新帧解码成 ui.Image。
@@ -118,7 +178,7 @@ class _SessionPageState extends State<SessionPage> {
       debugPrint("[video] 服务端未下发 relay 端点，跳过画面接管");
       return;
     }
-    await SessionVideo.instance.attach(
+    await _video.attach(
       gateway: widget.client.gatewayURL,
       relay: relay,
       token: token,
@@ -126,16 +186,19 @@ class _SessionPageState extends State<SessionPage> {
       deviceToken: deviceToken,
       sessionId: widget.sessionId,
     );
+    // attach 失败时没有帧、也就没有轮询回调来触发重建：这里必须主动刷新一次，
+    // 否则失败的 message / trace_id 永远不会出现在画面上。
+    if (mounted) setState(() {});
     _videoTimer = Timer.periodic(const Duration(milliseconds: 60), (_) async {
-      await SessionVideo.instance.poll();
-      if (mounted && SessionVideo.instance.image != null) setState(() {});
+      await _video.poll();
+      if (mounted && _video.image != null) setState(() {});
     });
   }
 
   @override
   void dispose() {
     _videoTimer?.cancel();
-    SessionVideo.instance.close();
+    _video.close();
     _poll?.cancel();
     _tick?.cancel();
     super.dispose();
@@ -174,8 +237,16 @@ class _SessionPageState extends State<SessionPage> {
       if (!wasLive && s.isLive) {
         _liveSince = DateTime.now();
         _measureLink();
+        // 授权到位 → 启动一次 attach（并发轮询不会重复：_videoStarted 幂等）
+        unawaited(_startVideoOnce());
       }
-      if (s.state == SessionState.ended || s.state == SessionState.failed) {
+      if (s.state == SessionState.ended) {
+        // 权威终态：停止轮询、停数据面、展示关闭原因（拒绝/超时/对端断开）
+        _poll?.cancel();
+        _videoTimer?.cancel();
+        _video.close();
+      }
+      if (s.state == SessionState.failed) {
         _poll?.cancel();
       }
     } on ApiException catch (e) {
@@ -287,12 +358,78 @@ class _SessionPageState extends State<SessionPage> {
     widget.onLeave();
   }
 
+  late final SessionCloseCoordinator _closer = SessionCloseCoordinator(
+    closeRemote: (reason) =>
+        widget.client.closeSession(widget.sessionId, reason: reason),
+    releaseLocal: _releaseDataPlane,
+    leave: (message) {
+      if (mounted) _leaveWith(message);
+    },
+  );
+
+  /// 释放本地数据面：停 attach 轮询、清 FFI 会话、停状态轮询。
+  void _releaseDataPlane() {
+    _videoTimer?.cancel();
+    _video.close();
+    _poll?.cancel();
+  }
+
+  /// 主控主动断开（ER-905）。
+  ///
+  /// 一律交给 SessionCloseCoordinator：
+  /// - requested / authorized / active 都必须先调 GW-25，确认 closed 才释放并离开
+  ///   （requested 也算「非终态」：服务端已有会话、被控端已收到授权申请，只退 UI 会留下垃圾）
+  /// - 已 ended 才允许直接离开
+  /// - 关闭失败时**保留原领域状态**，只展示错误与 trace_id，允许重试
+  Future<void> _disconnectAndLeave({
+    String reason = 'controller_closed',
+  }) async {
+    if (_closer.closing) {
+      // 不静默吞掉：让用户看到「正在断开」，避免以为点了没反应
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('正在断开，请稍候…')));
+      return;
+    }
+    setState(() {});
+    final outcome = await _closer.disconnect(_status.state, reason: reason);
+    if (!mounted) return;
+    if (outcome == CloseOutcome.failed) {
+      setState(() {});
+      final err = _closer.error;
+      final traceId = err?.traceId ?? '';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('断开失败：${err?.display ?? '未知错误'}（可重试）'),
+          duration: const Duration(seconds: 8),
+          action: traceId.isEmpty
+              ? null
+              : SnackBarAction(
+                  label: '复制 trace_id',
+                  onPressed: () =>
+                      Clipboard.setData(ClipboardData(text: traceId)),
+                ),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final live = _status.isLive;
-    return Scaffold(
-      backgroundColor: live ? const Color(0xFF23262B) : null,
-      body: SafeArea(child: live ? _liveBody(context) : _waitingBody(context)),
+    // ER-905：系统返回（Esc / 手势 / 返回键）也必须走 close-before-leave，
+    // 否则用户按一次返回就能绕过 GW-25，把会话留在服务端。
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        unawaited(_disconnectAndLeave(reason: 'controller_cancel'));
+      },
+      child: Scaffold(
+        backgroundColor: live ? const Color(0xFF23262B) : null,
+        body: SafeArea(
+          child: live ? _liveBody(context) : _waitingBody(context),
+        ),
+      ),
     );
   }
 
@@ -316,7 +453,10 @@ class _SessionPageState extends State<SessionPage> {
             children: [
               TextButton.icon(
                 key: const Key('back-to-devices'),
-                onPressed: widget.onLeave,
+                // ER-905：返回入口不得直接 onLeave——requested 会话还在服务端，
+                // 直接走会留下会话与被控端授权申请。
+                onPressed: () =>
+                    _disconnectAndLeave(reason: 'controller_cancel'),
                 icon: const Icon(Icons.chevron_left_rounded, size: 18),
                 label: const Text('返回设备列表'),
               ),
@@ -476,7 +616,8 @@ class _SessionPageState extends State<SessionPage> {
             children: [
               OutlinedButton(
                 key: const Key('cancel-connect'),
-                onPressed: () => _leaveWith('已取消本次连接请求'),
+                onPressed: () =>
+                    _disconnectAndLeave(reason: 'controller_cancel'),
                 child: const Text('取消连接'),
               ),
               TextButton(
@@ -621,10 +762,10 @@ class _SessionPageState extends State<SessionPage> {
 
   /// 远端画面：有帧就画，没帧才显示占位说明。
   Widget _remoteView(BuildContext context) {
-    final img = SessionVideo.instance.image;
+    final img = _video.image;
     if (img == null) {
       // 把 FFI 侧的错误直接显示出来：黑屏时这是唯一能自证的线索
-      return _remotePlaceholder(context, SessionVideo.instance.error);
+      return _remotePlaceholder(context, _video.error);
     }
     return Container(
       key: const Key("remote-canvas"),
@@ -705,12 +846,28 @@ class _SessionPageState extends State<SessionPage> {
             error.isEmpty
                 ? '等待被控端画面…（若长时间无画面，请确认对方已开启「允许被控」）'
                 : '画面接管失败：' + error,
+            key: const Key('attach-error-message'),
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 12,
               color: error.isEmpty ? Colors.white38 : Colors.orangeAccent,
             ),
           ),
+          // 可复制的 trace_id：用户/客服定位用；不展示内部 URL 或原始 JSON。
+          if (_video.failure?.traceId.isNotEmpty ?? false) ...[
+            const SizedBox(height: 6),
+            TextButton.icon(
+              key: const Key('attach-error-copy-trace'),
+              onPressed: () {
+                Clipboard.setData(ClipboardData(text: _video.failure!.traceId));
+              },
+              icon: const Icon(Icons.copy_rounded, size: 14),
+              label: Text(
+                '复制 trace_id：' + _video.failure!.traceId,
+                style: const TextStyle(fontSize: 11),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -729,8 +886,9 @@ class _SessionPageState extends State<SessionPage> {
       child: Row(
         children: [
           IconButton(
+            key: const Key('back-to-devices-live'),
             tooltip: '返回设备列表',
-            onPressed: widget.onLeave,
+            onPressed: () => _disconnectAndLeave(),
             icon: const Icon(Icons.chevron_left_rounded, color: Colors.white70),
           ),
           const SizedBox(width: 2),
@@ -845,10 +1003,11 @@ class _SessionPageState extends State<SessionPage> {
           _ToolItem(
             key: const Key('disconnect'),
             icon: Icons.call_end_rounded,
-            label: '断开连接',
+            label: _closer.closing ? '断开中…' : '断开连接',
             compact: compact,
             danger: true,
-            onTap: () => _leaveWith('已断开连接'),
+            busy: _closer.closing,
+            onTap: _disconnectAndLeave,
           ),
         ],
       ),
@@ -979,6 +1138,7 @@ class _ToolItem extends StatelessWidget {
     required this.onTap,
     this.compact = false,
     this.danger = false,
+    this.busy = false,
   });
 
   final IconData icon;
@@ -987,11 +1147,14 @@ class _ToolItem extends StatelessWidget {
   final bool compact;
   final bool danger;
 
+  /// 关闭请求进行中：禁用点击并给出进行中提示，避免重复发起 GW-25。
+  final bool busy;
+
   @override
   Widget build(BuildContext context) {
     final color = danger ? const Color(0xFFFF8A80) : Colors.white70;
     return TextButton(
-      onPressed: onTap,
+      onPressed: busy ? null : onTap,
       style: TextButton.styleFrom(
         foregroundColor: color,
         minimumSize: const Size(0, 40),

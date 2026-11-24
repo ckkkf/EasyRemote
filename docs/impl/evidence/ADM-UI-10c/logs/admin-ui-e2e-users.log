@@ -1,0 +1,27 @@
+PASS users table columns -> ['账号 ID', '昵称', '手机号', '设备数', '状态', '注册时间', '最近登录', '操作']
+PASS device count column from server -> ['2', '1']
+PASS nickname empty until set -> ['—', '—']
+PASS last login recorded -> ['刚刚', '刚刚']
+PASS phone masked -> ['139****5000', '139****5001']
+PASS future range returns no users
+PASS clearing range restores rows
+PASS csv header exported -> 账号 ID,昵称,手机号,设备数,状态,注册时间,最近登录
+PASS csv masks phone -> acc-18be5c6995a6eb6c,,139****5000,2,active,2026-11-24T00:39:45Z,2026-11-24T00:39:45Z | acc-91f6e3e87f17032b,,139****5001,1,active,2026-11-24T00:39:45Z,2026-11-24T00:39:45Z
+PASS export writes audit
+PASS kick requires reason
+PASS kick writes audit
+PASS ban applied
+PASS unban writes audit
+PASS row opens detail route -> http://127.0.0.1:5398/users/acc-18be5c6995a6eb6c
+PASS detail shows account section
+PASS detail shows masked phone
+PASS detail lists devices -> 2
+PASS account sessions listed -> 1
+PASS session reason shown
+PASS note saved
+PASS note writes audit
+PASS note persisted in form
+PASS deep link survives reload
+PASS back returns to list -> http://127.0.0.1:5398/users
+PASS unknown user shows not found
+E2E OK (26 checks)

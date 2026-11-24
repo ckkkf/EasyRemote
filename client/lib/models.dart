@@ -156,10 +156,46 @@ enum SessionState {
   failed,
 }
 
+/// 会话关闭原因（服务端 reason 的枚举化视图）。
+///
+/// 不新增服务端错误码：只是把已存在的 reason 字符串映射成用户能读懂的一句话。
+/// 主控据此区分「对方拒绝」「对方未响应」「对方/本端断开」，而不是笼统显示已结束。
+enum SessionCloseReason {
+  userRejected,
+  consentTimeout,
+  peerClosed,
+  closedBySelf,
+  unknown;
+
+  static SessionCloseReason fromServer(String reason) => switch (reason) {
+    'user_rejected' => SessionCloseReason.userRejected,
+    'consent_timeout' => SessionCloseReason.consentTimeout,
+    'peer_closed' || 'terminated_by_peer' => SessionCloseReason.peerClosed,
+    // 被控端本地点「断开远程控制」写的是 local_disconnect（真实 B 链路实测值）。
+    // 对主控而言这就是「对方结束了控制」，不能落 unknown 显示笼统的「连接已结束」。
+    'local_disconnect' => SessionCloseReason.peerClosed,
+    'closed_by_self' ||
+    'controller_closed' ||
+    'host_closed' => SessionCloseReason.closedBySelf,
+    _ => SessionCloseReason.unknown,
+  };
+
+  String get userMessage => switch (this) {
+    SessionCloseReason.userRejected => '对方拒绝了本次连接',
+    SessionCloseReason.consentTimeout => '对方未响应，连接已取消',
+    SessionCloseReason.peerClosed => '对方已结束远程控制',
+    SessionCloseReason.closedBySelf => '连接已断开',
+    SessionCloseReason.unknown => '连接已结束',
+  };
+}
+
 class SessionStatus {
-  const SessionStatus(this.state, {this.message = ''});
+  const SessionStatus(this.state, {this.message = '', this.reason = ''});
   final SessionState state;
   final String message;
+
+  /// 服务端原始 reason（用于日志与测试断言，不直接展示）。
+  final String reason;
 
   bool get isActive => state == SessionState.active;
 

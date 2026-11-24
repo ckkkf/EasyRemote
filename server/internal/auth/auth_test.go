@@ -120,3 +120,77 @@ func countAccounts(m *store.Memory) int {
 	}
 	return len(list)
 }
+
+func TestSMSLoginStoresPhoneEnc(t *testing.T) {
+	// 后台 phone_mask 依赖 PhoneEnc；短信注册建号必须写入归一化手机号。
+	s, mem := newSvc(t)
+	_, acc, err := s.Login(ctx(), "13800008882", "123456")
+	if err != nil {
+		t.Fatalf("login: %v", err)
+	}
+	stored, err := mem.GetAccount(ctx(), acc.ID)
+	if err != nil {
+		t.Fatalf("get account: %v", err)
+	}
+	if stored.PhoneEnc != "13800008882" {
+		t.Fatalf("want PhoneEnc stored, got %q", stored.PhoneEnc)
+	}
+
+	// 同一手机号再次登录复用账号，不能把 PhoneEnc 清空。
+	_, again, err := s.Login(ctx(), "13800008882", "123456")
+	if err != nil {
+		t.Fatalf("relogin: %v", err)
+	}
+	if again.PhoneEnc != "13800008882" {
+		t.Fatalf("relogin lost PhoneEnc: %q", again.PhoneEnc)
+	}
+}
+
+// ADM-02b：历史账号只有 PhoneHash，登录时必须幂等回填 PhoneEnc。
+func TestLoginBackfillsMissingPhoneEnc(t *testing.T) {
+	s, mem := newSvc(t)
+	// 模拟历史账号：只有哈希，没有密文。
+	hash := s.phoneHash("13800008882")
+	if err := mem.CreateAccount(ctx(), &store.Account{PhoneHash: hash, Status: "active"}); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	_, acc, err := s.Login(ctx(), "13800008882", "123456")
+	if err != nil {
+		t.Fatalf("login: %v", err)
+	}
+	if acc.PhoneEnc != "13800008882" {
+		t.Fatalf("login 返回值未回填: %q", acc.PhoneEnc)
+	}
+	stored, err := mem.GetAccount(ctx(), acc.ID)
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	if stored.PhoneEnc != "13800008882" {
+		t.Fatalf("存储未回填: %q", stored.PhoneEnc)
+	}
+
+	// 幂等：再次登录不报错、值不变。
+	if _, again, err := s.Login(ctx(), "13800008882", "123456"); err != nil || again.PhoneEnc != "13800008882" {
+		t.Fatalf("relogin: %v %q", err, again.PhoneEnc)
+	}
+}
+
+// ADM-API-03b：登录成功必须写入最近登录时间。
+func TestLoginRecordsLastLoginAt(t *testing.T) {
+	s, mem := newSvc(t)
+	_, acc, err := s.Login(ctx(), "13800008882", "123456")
+	if err != nil {
+		t.Fatalf("login: %v", err)
+	}
+	if acc.LastLoginAt.IsZero() {
+		t.Fatal("login 返回值缺 LastLoginAt")
+	}
+	stored, err := mem.GetAccount(ctx(), acc.ID)
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	if stored.LastLoginAt.IsZero() {
+		t.Fatal("存储未写入 LastLoginAt")
+	}
+}

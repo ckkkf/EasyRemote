@@ -1,0 +1,68 @@
+{
+  "generatedAt": "2026-11-24T08:40:39+0800",
+  "viewport": {
+    "width": 1360,
+    "height": 860
+  },
+  "checks": [
+    {
+      "name": "page 1 has page size rows",
+      "ok": true,
+      "detail": 10
+    },
+    {
+      "name": "pager reports 12 total / 2 pages",
+      "ok": true,
+      "detail": "共 12 条 · 第 1 / 2 页\n上一页\n下一页"
+    },
+    {
+      "name": "page 2 has remaining rows",
+      "ok": true,
+      "detail": 2
+    },
+    {
+      "name": "page 2 rows differ from page 1",
+      "ok": true,
+      "detail": [
+        "acc-82ae39535419acfe",
+        "acc-faf9ead68c8f562d"
+      ]
+    },
+    {
+      "name": "back to page 1 restores rows",
+      "ok": true,
+      "detail": 10
+    },
+    {
+      "name": "token valid before logout",
+      "ok": true,
+      "detail": "200 OK"
+    },
+    {
+      "name": "logout lands on login",
+      "ok": true,
+      "detail": "http://127.0.0.1:5403/login"
+    },
+    {
+      "name": "logout clears stored token",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "logout clears identity",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "server session revoked after logout",
+      "ok": true,
+      "detail": "401 ADMIN_SESSION_EXPIRED"
+    },
+    {
+      "name": "anonymous deep link to login",
+      "ok": true,
+      "detail": "http://127.0.0.1:5403/login"
+    }
+  ],
+  "pageErrors": []
+}

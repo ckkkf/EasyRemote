@@ -1,0 +1,256 @@
+ M VERSION
+ M client/lib/api.dart
+ M client/lib/contract.dart
+ M client/lib/pages/device_list_page.dart
+ M client/lib/version_gen.dart
+ M client/pubspec.yaml
+ M client/test/api_error_test.dart
+ M core/Cargo.lock
+ M core/Cargo.toml
+ M docs/spec/contract.yaml
+ M scripts/verify-admin-ui.py
+ M server/internal/adminapi/adminapi.go
+ M server/internal/adminapi/adminapi_test.go
+ M server/internal/adminapi/config.go
+ M server/internal/adminhttp/handler.go
+ M server/internal/adminhttp/route_specs.go
+ M server/internal/appconfig/appconfig.go
+ M server/internal/auth/auth.go
+ M server/internal/auth/auth_test.go
+ M server/internal/contract/types_gen.go
+ M server/internal/gateway/bind_platform_test.go
+ M server/internal/gateway/handler.go
+ M server/internal/gateway/helper_test.go
+ M server/internal/gateway/route_specs.go
+ M server/internal/session/session.go
+ M server/internal/stack/seed_test.go
+ M server/internal/stack/stack_pg.go
+ M server/internal/store/memory.go
+ M server/internal/store/pg.go
+ M server/internal/store/store.go
+ M server/internal/store/storetest/storetest.go
+ M web-admin/package-lock.json
+ M web-admin/package.json
+ M web-admin/src/App.tsx
+ M web-admin/src/api.ts
+ M web-admin/src/contract.ts
+ M web-admin/src/main.tsx
+ M web-admin/src/styles.css
+ M web-admin/tsconfig.tsbuildinfo
+?? docs/impl/evidence/ADM-02a/
+?? docs/impl/evidence/ADM-02b/
+?? docs/impl/evidence/ADM-API-02a/
+?? docs/impl/evidence/ADM-API-02c/
+?? docs/impl/evidence/ADM-API-02d/
+?? docs/impl/evidence/ADM-API-02e/
+?? docs/impl/evidence/ADM-API-02f1/
+?? docs/impl/evidence/ADM-API-02f2/
+?? docs/impl/evidence/ADM-API-02f3/
+?? docs/impl/evidence/ADM-API-02f4/
+?? docs/impl/evidence/ADM-API-02f5/
+?? docs/impl/evidence/ADM-API-02f7/
+?? docs/impl/evidence/ADM-API-03a/
+?? docs/impl/evidence/ADM-API-03b/
+?? docs/impl/evidence/ADM-API-03c/
+?? docs/impl/evidence/ADM-API-03d/
+?? docs/impl/evidence/ADM-API-03e/
+?? docs/impl/evidence/ADM-API-03f1/
+?? docs/impl/evidence/ADM-API-03f2/
+?? docs/impl/evidence/ADM-API-03g/
+?? docs/impl/evidence/ADM-API-03h/
+?? docs/impl/evidence/ADM-API-04a/
+?? docs/impl/evidence/ADM-API-04b/
+?? docs/impl/evidence/ADM-API-04c/
+?? docs/impl/evidence/ADM-API-05a/
+?? docs/impl/evidence/ADM-API-05b/
+?? docs/impl/evidence/ADM-API-05c1/
+?? docs/impl/evidence/ADM-API-05c2/
+?? docs/impl/evidence/ADM-API-05d/
+?? docs/impl/evidence/ADM-API-06a/
+?? docs/impl/evidence/ADM-API-06b/
+?? docs/impl/evidence/ADM-API-06c/
+?? docs/impl/evidence/ADM-API-07b1/
+?? docs/impl/evidence/ADM-UI-00/
+?? docs/impl/evidence/ADM-UI-00b/
+?? docs/impl/evidence/ADM-UI-00c/
+?? docs/impl/evidence/ADM-UI-00d/
+?? docs/impl/evidence/ADM-UI-01a/
+?? docs/impl/evidence/ADM-UI-02a/
+?? docs/impl/evidence/ADM-UI-02b/
+?? docs/impl/evidence/ADM-UI-02c/
+?? docs/impl/evidence/ADM-UI-03/
+?? docs/impl/evidence/ADM-UI-04/
+?? docs/impl/evidence/ADM-UI-05/
+?? docs/impl/evidence/ADM-UI-06/
+?? docs/impl/evidence/ADM-UI-07/
+?? docs/impl/evidence/ADM-UI-07b2/
+?? docs/impl/evidence/ADM-UI-08/
+?? docs/impl/evidence/ADM-UI-09/
+?? docs/impl/evidence/ADM-UI-09b/
+?? docs/impl/evidence/ADM-UI-09c/
+?? docs/impl/evidence/ADM-UI-09d/
+?? docs/impl/evidence/ADM-UI-10/
+?? docs/impl/evidence/ADM-UI-10b/
+?? docs/impl/evidence/ADM-UI-10c/
+?? docs/impl/evidence/ADM-UI-11a/
+?? docs/impl/evidence/ADM-UI-11b/
+?? docs/impl/evidence/ADM-UI-11c/
+?? docs/impl/evidence/ADM-UI-12/
+?? docs/impl/evidence/ER-905/
+?? docs/impl/tasks/ADM-02a-user-phone-mask.md
+?? docs/impl/tasks/ADM-02b-phone-enc-backfill.md
+?? docs/impl/tasks/ADM-API-02-dashboard-metrics-contract.md
+?? docs/impl/tasks/ADM-API-02a-overview-users-online.md
+?? docs/impl/tasks/ADM-API-02c-session-quality.md
+?? docs/impl/tasks/ADM-API-02d-device-quality.md
+?? docs/impl/tasks/ADM-API-02e-overview-quality.md
+?? docs/impl/tasks/ADM-API-02f-stability-trends.md
+?? docs/impl/tasks/ADM-API-02f1-close-kinds.md
+?? docs/impl/tasks/ADM-API-02f2-connect-attempts.md
+?? docs/impl/tasks/ADM-API-02f3-trends.md
+?? docs/impl/tasks/ADM-API-02f4-link-report.md
+?? docs/impl/tasks/ADM-API-02f5-health-report.md
+?? docs/impl/tasks/ADM-API-02f7-session-summary.md
+?? docs/impl/tasks/ADM-API-03-user-contract.md
+?? docs/impl/tasks/ADM-API-03a-user-device-count.md
+?? docs/impl/tasks/ADM-API-03b-account-profile.md
+?? docs/impl/tasks/ADM-API-03c-user-detail.md
+?? docs/impl/tasks/ADM-API-03d-user-actions.md
+?? docs/impl/tasks/ADM-API-03e-users-export.md
+?? docs/impl/tasks/ADM-API-03f-session-filters.md
+?? docs/impl/tasks/ADM-API-03f1-session-filters.md
+?? docs/impl/tasks/ADM-API-03f2-link-abnormal-filter.md
+?? docs/impl/tasks/ADM-API-03f2-link-abnormal.md
+?? docs/impl/tasks/ADM-API-03g-session-detail.md
+?? docs/impl/tasks/ADM-API-03h-session-error-events.md
+?? docs/impl/tasks/ADM-API-03h-session-errors.md
+?? docs/impl/tasks/ADM-API-04-device-contract.md
+?? docs/impl/tasks/ADM-API-04a-device-meta.md
+?? docs/impl/tasks/ADM-API-04b-device-actions.md
+?? docs/impl/tasks/ADM-API-04c-device-risk.md
+?? docs/impl/tasks/ADM-API-05-config-audit-contract.md
+?? docs/impl/tasks/ADM-API-05a-audit-filters.md
+?? docs/impl/tasks/ADM-API-05b-config-history.md
+?? docs/impl/tasks/ADM-API-05c-config-scope-export.md
+?? docs/impl/tasks/ADM-API-05c1-config-scope.md
+?? docs/impl/tasks/ADM-API-05c2-audit-export.md
+?? docs/impl/tasks/ADM-API-05d-config-version-scope.md
+?? docs/impl/tasks/ADM-API-06-risk-version-admin-contract.md
+?? docs/impl/tasks/ADM-API-06a-admins.md
+?? docs/impl/tasks/ADM-API-06b-versions.md
+?? docs/impl/tasks/ADM-API-06c-risk.md
+?? docs/impl/tasks/ADM-API-07b1-kill-request.md
+?? docs/impl/tasks/ADM-UI-00.md
+?? docs/impl/tasks/ADM-UI-00b-matrix-reconcile.md
+?? docs/impl/tasks/ADM-UI-00c-matrix-reconcile.md
+?? docs/impl/tasks/ADM-UI-00d-final-close.md
+?? docs/impl/tasks/ADM-UI-01a.md
+?? docs/impl/tasks/ADM-UI-02a.md
+?? docs/impl/tasks/ADM-UI-02b.md
+?? docs/impl/tasks/ADM-UI-02c.md
+?? docs/impl/tasks/ADM-UI-03.md
+?? docs/impl/tasks/ADM-UI-04.md
+?? docs/impl/tasks/ADM-UI-05a.md
+?? docs/impl/tasks/ADM-UI-06a.md
+?? docs/impl/tasks/ADM-UI-07a.md
+?? docs/impl/tasks/ADM-UI-07b-kill-double-confirm.md
+?? docs/impl/tasks/ADM-UI-07b2-kill-double-confirm-ui.md
+?? docs/impl/tasks/ADM-UI-08a.md
+?? docs/impl/tasks/ADM-UI-09a.md
+?? docs/impl/tasks/ADM-UI-09b-admins.md
+?? docs/impl/tasks/ADM-UI-09c-risk.md
+?? docs/impl/tasks/ADM-UI-09d-versions.md
+?? docs/impl/tasks/ADM-UI-10a.md
+?? docs/impl/tasks/ADM-UI-10b.md
+?? docs/impl/tasks/ADM-UI-10c-e2e-suite.md
+?? docs/impl/tasks/ADM-UI-11-shadcn-adoption.md
+?? docs/impl/tasks/ADM-UI-11c-shadcn-controls.md
+?? docs/impl/tasks/ER-905-remote-session-lifecycle-regression.md
+?? scripts/admin-ui-baseline.py
+?? scripts/admin-ui-e2e-admins.py
+?? scripts/admin-ui-e2e-all.sh
+?? scripts/admin-ui-e2e-config-audit.py
+?? scripts/admin-ui-e2e-dashboard.py
+?? scripts/admin-ui-e2e-devices.py
+?? scripts/admin-ui-e2e-dialogs.py
+?? scripts/admin-ui-e2e-lifecycle.py
+?? scripts/admin-ui-e2e-login.py
+?? scripts/admin-ui-e2e-risk.py
+?? scripts/admin-ui-e2e-routes.py
+?? scripts/admin-ui-e2e-sessions.py
+?? scripts/admin-ui-e2e-users.py
+?? scripts/admin-ui-e2e-versions.py
+?? scripts/admin-ui-responsive-a11y.py
+?? scripts/admin_e2e.py
+?? scripts/check-admin-ui-matrix.mjs
+?? scripts/check-web-admin-stack.mjs
+?? server/internal/adminapi/admins_test.go
+?? server/internal/adminapi/config_history_test.go
+?? server/internal/adminapi/config_scoped_test.go
+?? server/internal/adminapi/connect_stats_test.go
+?? server/internal/adminapi/device_quality_test.go
+?? server/internal/adminapi/device_risk_test.go
+?? server/internal/adminapi/export_test.go
+?? server/internal/adminapi/health_stats_test.go
+?? server/internal/adminapi/kill_request_test.go
+?? server/internal/adminapi/link_stats_test.go
+?? server/internal/adminapi/overview_quality_test.go
+?? server/internal/adminapi/quality_test.go
+?? server/internal/adminapi/risk_test.go
+?? server/internal/adminapi/session_closekind_test.go
+?? server/internal/adminapi/session_detail_test.go
+?? server/internal/adminapi/session_filters_test.go
+?? server/internal/adminapi/session_summary_test.go
+?? server/internal/adminapi/stability_test.go
+?? server/internal/adminapi/trends_test.go
+?? server/internal/adminapi/user_actions_test.go
+?? server/internal/adminapi/user_detail_test.go
+?? server/internal/adminapi/users_export_test.go
+?? server/internal/adminapi/versions_test.go
+?? server/internal/adminhttp/users_envelope_test.go
+?? server/internal/appconfig/scoped_test.go
+?? server/internal/gateway/connect_attempt_test.go
+?? server/internal/gateway/risk_gate.go
+?? server/internal/gateway/risk_gate_test.go
+?? server/internal/gateway/session_errors.go
+?? server/internal/gateway/session_errors_test.go
+?? server/internal/session/closekind.go
+?? server/internal/session/closekind_test.go
+?? server/internal/stack/migration_test.go
+?? server/internal/stack/migrations/003_account_profile.sql
+?? server/internal/stack/migrations/004_device_meta.sql
+?? server/internal/stack/migrations/005_session_quality.sql
+?? server/internal/stack/migrations/006_device_risk.sql
+?? server/internal/stack/migrations/007_client_versions.sql
+?? server/internal/stack/migrations/008_risk_blacklist.sql
+?? server/internal/stack/migrations/009_config_overrides.sql
+?? server/internal/stack/migrations/010_kill_requests.sql
+?? server/internal/stack/migrations/011_connect_attempts.sql
+?? server/internal/stack/migrations/012_account_notes.sql
+?? server/internal/stack/migrations/013_quality_link.sql
+?? server/internal/stack/migrations/014_health_events.sql
+?? server/internal/stack/migrations/015_device_created_at.sql
+?? server/internal/stack/migrations/016_session_close_kind.sql
+?? server/internal/stack/migrations/017_config_version_scope.sql
+?? server/internal/stack/migrations/018_session_errors.sql
+?? web-admin/postcss.config.js
+?? web-admin/src/app/
+?? web-admin/src/components/
+?? web-admin/src/features/
+?? web-admin/src/lib/
+?? web-admin/src/styles/
+?? web-admin/tailwind.config.ts
+?? web-admin/tests/a11y.test.ts
+?? web-admin/tests/admin-scope.test.ts
+?? web-admin/tests/config-audit.test.ts
+?? web-admin/tests/dashboard-metrics.test.ts
+?? web-admin/tests/data-table.test.tsx
+?? web-admin/tests/dialog-usage.test.ts
+?? web-admin/tests/kill-reasons.test.ts
+?? web-admin/tests/kill-result.test.ts
+?? web-admin/tests/login.test.tsx
+?? web-admin/tests/page-state.test.tsx
+?? web-admin/tests/routes.test.ts
+?? web-admin/tests/session-states.test.ts
+?? web-admin/tests/stack-conformance.test.ts
+?? web-admin/tests/ui-primitives.test.tsx

@@ -1,0 +1,7 @@
+{
+  "comparedTo": "/Users/ckkk/dev/code/Go/EasyRemote/docs/impl/evidence/ADM-API-03d/screens/manifest.json",
+  "diffs": [
+    "a3-users.filters: 2 -> 4"
+  ],
+  "screens": 6
+}

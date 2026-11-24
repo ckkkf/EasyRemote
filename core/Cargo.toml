@@ -16,6 +16,10 @@ members = [
 resolver = "2"
 
 [workspace.package]
-version = "0.2.14"
+<<<<<<< HEAD
+version = "0.2.16"
+=======
+version = "0.2.15"
+>>>>>>> ef3c884 (fix(ER-905): 会话生命周期闭环 + attach 错误结构化与 UI 脱敏)
 edition = "2021"
 license = "MIT"

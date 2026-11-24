@@ -1,0 +1,42 @@
+# ADM-API-07b1 命令输出
+# 采集时间: 2026-11-23T15:15:25+0800
+# commit: 267a635
+
+$ node scripts/gen-contract.mjs --check && node scripts/check-routes.mjs --strict
+✓ 三端契约一致（62 个类型 / 61 条接口）
+✓ 路由 method/path/auth 与契约一致（61 条端点）
+
+$ (cd server && go test ./internal/adminapi/ -run KillRequest -v)
+=== RUN   TestKillRequestTwoPersonFlow
+--- PASS: TestKillRequestTwoPersonFlow (0.00s)
+=== RUN   TestKillRequestExpires
+--- PASS: TestKillRequestExpires (0.00s)
+PASS
+ok  	github.com/easyremote/server/internal/adminapi	(cached)
+
+$ (cd server && go test ./internal/store/ ./internal/adminapi/ ./internal/adminhttp/)
+ok  	github.com/easyremote/server/internal/store	(cached)
+ok  	github.com/easyremote/server/internal/adminapi	(cached)
+ok  	github.com/easyremote/server/internal/adminhttp	(cached)
+
+$ (cd web-admin && npx tsc --noEmit && npm test -- --run && npm run build)
+      Tests  56 passed (56)
+   Start at  15:15:26
+   Duration  593ms (transform 420ms, setup 0ms, collect 983ms, tests 58ms, environment 2ms, prepare 666ms)
+
+
+✓ built in 264ms
+
+$ bash scripts/gate.sh
+✓ built in 351ms
+  PASS
+
+== 汇总 ==
+  scripts   PASS
+  contract  PASS
+  go        PASS
+  rust      PASS
+  flutter   PASS
+  web       PASS
+
+GATE: PASS

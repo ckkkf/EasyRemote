@@ -196,11 +196,17 @@ func transition(sess *store.Session, cmd Command, now time.Time) (*store.Session
 	switch cmd.Kind {
 	case CommandConsent:
 		if sess.State == StateRequested {
+			// ER-905：拒绝/超时都是**成功完成的本机决策**，权威状态落 closed，
+			// 不返回业务错误。契约 GW-07 的 response 是 ConsentResult，
+			// errors 只允许 CONN_DEVICE_NOT_FOUND / ADMIN_FORBIDDEN；
+			// 之前这里返回 200006/200007 让 handler 写成 4xx，
+			// 客户端因此拿不到 closed，主控一直卡在等待。
 			if now.Sub(sess.StartedAt) > ConsentTimeout {
 				next.State = StateClosed
 				next.Reason = "consent_timeout"
+				next.CloseKind = string(ClassifyClose(next.Reason))
 				next.EndedAt = now
-				return &next, true, errcode.New(errcode.ConnConsentTimeout, sess.ID)
+				return &next, true, nil
 			}
 			if cmd.Accepted {
 				next.State = StateAuthorized
@@ -209,8 +215,12 @@ func transition(sess *store.Session, cmd Command, now time.Time) (*store.Session
 			}
 			next.State = StateClosed
 			next.Reason = cmd.Reason
+			if next.Reason == "" {
+				next.Reason = "user_rejected"
+			}
+			next.CloseKind = string(ClassifyClose(next.Reason))
 			next.EndedAt = now
-			return &next, true, errcode.New(errcode.ConnConsentRejected, sess.ID)
+			return &next, true, nil
 		}
 		if cmd.Accepted {
 			// 重复接受/已授权：幂等成功。
@@ -227,6 +237,7 @@ func transition(sess *store.Session, cmd Command, now time.Time) (*store.Session
 		}
 		next.State = StateClosed
 		next.Reason = cmd.Reason
+		next.CloseKind = string(ClassifyClose(next.Reason))
 		next.EndedAt = now
 		return &next, true, errcode.New(errcode.ConnConsentRejected, sess.ID)
 
@@ -244,7 +255,10 @@ func transition(sess *store.Session, cmd Command, now time.Time) (*store.Session
 		if sess.State == StateAuthorized &&
 			(sess.AuthExpireAt.IsZero() || now.After(sess.AuthExpireAt)) {
 			next.State = StateClosed
+			// 先写 reason 再分类：否则 ClassifyClose 会按旧值/空串算成 unknown，
+			// 授权窗口到期就会被后台统计成「异常原因未知」。
 			next.Reason = "auth_window_exceeded"
+			next.CloseKind = string(ClassifyClose(next.Reason))
 			next.EndedAt = now
 			return &next, true, errcode.New(errcode.SessionAuthWindowExceeded, sess.ID)
 		}
@@ -285,7 +299,10 @@ func transition(sess *store.Session, cmd Command, now time.Time) (*store.Session
 		}
 		if sess.AuthExpireAt.IsZero() || now.After(sess.AuthExpireAt) {
 			next.State = StateClosed
+			// 先写 reason 再分类：否则 ClassifyClose 会按旧值/空串算成 unknown，
+			// 授权窗口到期就会被后台统计成「异常原因未知」。
 			next.Reason = "auth_window_exceeded"
+			next.CloseKind = string(ClassifyClose(next.Reason))
 			next.EndedAt = now
 			return &next, true, errcode.New(errcode.SessionAuthWindowExceeded, sess.ID)
 		}
@@ -304,6 +321,7 @@ func transition(sess *store.Session, cmd Command, now time.Time) (*store.Session
 		}
 		next.State = StateClosed
 		next.Reason = cmd.Reason
+		next.CloseKind = string(ClassifyClose(next.Reason))
 		next.EndedAt = now
 		return &next, true, nil
 	}

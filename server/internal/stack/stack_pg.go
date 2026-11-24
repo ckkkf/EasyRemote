@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"os"
+	"sort"
 	"strings"
 	"time"
 
@@ -25,13 +26,32 @@ import (
 //go:embed migrations/*.sql
 var migrations embed.FS
 
-// LoadMigration 读取内嵌的建表脚本。
+// LoadMigration 读取全部内嵌迁移脚本，按文件名排序拼接后一次执行。
+//
+// 迁移脚本必须幂等（CREATE TABLE IF NOT EXISTS / ADD COLUMN IF NOT EXISTS），
+// 因为启动时会对同一份 DDL 重复执行；新增迁移只要放一个 0NN_*.sql 即可。
 func LoadMigration() (string, error) {
-	b, err := migrations.ReadFile("migrations/001_init.sql")
+	entries, err := migrations.ReadDir("migrations")
 	if err != nil {
 		return "", err
 	}
-	return string(b), nil
+	names := make([]string, 0, len(entries))
+	for _, e := range entries {
+		if !e.IsDir() && strings.HasSuffix(e.Name(), ".sql") {
+			names = append(names, e.Name())
+		}
+	}
+	sort.Strings(names)
+	var b strings.Builder
+	for _, name := range names {
+		content, err := migrations.ReadFile("migrations/" + name)
+		if err != nil {
+			return "", err
+		}
+		b.Write(content)
+		b.WriteString("\n")
+	}
+	return b.String(), nil
 }
 
 // NewWithStoreAndSessions 用给定存储与会话后端组装 handler。
@@ -109,11 +129,31 @@ func SeedDevAdmin(ctx context.Context, st store.Store) error {
 	if config.IsProduction() {
 		return errors.New("stack: refusing to seed development admin in production")
 	}
-	return st.PutAdmin(ctx, &store.AdminUser{
+	if err := st.PutAdmin(ctx, &store.AdminUser{
 		Username:     "root",
 		PasswordHash: adminapi.HashPassword("dev-pass"),
 		TOTPSecret:   DevTOTPSecret,
 		Role:         adminapi.RoleSuper,
+		Status:       "active",
+	}); err != nil {
+		return err
+	}
+	// 第二个开发管理员：状态 disabled 且无 TOTP，只用于后台 A14 的"改角色/启用"演示与 E2E，
+	// 默认不可登录（生产环境整段被 IsProduction 拦住）。
+	if err := st.PutAdmin(ctx, &store.AdminUser{
+		Username:     "ops-dev",
+		PasswordHash: adminapi.HashPassword("dev-pass"),
+		Role:         adminapi.RoleOps,
+		Status:       "disabled",
+	}); err != nil {
+		return err
+	}
+	// 第三个开发管理员：可登录（共享开发 TOTP），用于"双人确认中断"这类需要两个真实操作人的 E2E。
+	return st.PutAdmin(ctx, &store.AdminUser{
+		Username:     "ops2-dev",
+		PasswordHash: adminapi.HashPassword("dev-pass"),
+		TOTPSecret:   DevTOTPSecret,
+		Role:         adminapi.RoleOps,
 		Status:       "active",
 	})
 }

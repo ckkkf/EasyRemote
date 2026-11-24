@@ -1,0 +1,8 @@
+{
+  "comparedTo": "/Users/ckkk/dev/code/Go/EasyRemote/docs/impl/evidence/ADM-UI-00/screens/manifest.json",
+  "diffs": [
+    "a2-dashboard.metricCards: 4 -> 15",
+    "a2-dashboard.metricLabels: ['设备总数', '在线设备', '进行中会话', '待授权'] -> ['在线设备', '设备总数', '进行中会话', '待授权会话', '在线用户', '24h 新增设备', '建连成功率', 'P2P 命中率', '中继占比', '延迟 P50', '延迟 P95', '帧率达成率', '会话异常中断率', '客户端崩溃率', '重连成功率']"
+  ],
+  "screens": 6
+}

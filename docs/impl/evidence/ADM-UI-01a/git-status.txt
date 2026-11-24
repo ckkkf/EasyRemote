@@ -1,0 +1,20 @@
+ M core/Cargo.lock
+ M web-admin/package-lock.json
+ M web-admin/package.json
+ M web-admin/src/App.tsx
+ M web-admin/src/main.tsx
+ M web-admin/tsconfig.tsbuildinfo
+?? docs/impl/evidence/ADM-UI-00/
+?? docs/impl/evidence/ADM-UI-01a/
+?? docs/impl/tasks/ADM-UI-00.md
+?? docs/impl/tasks/ADM-UI-01a.md
+?? scripts/admin-ui-baseline.py
+?? scripts/check-admin-ui-matrix.mjs
+?? scripts/check-web-admin-stack.mjs
+?? web-admin/postcss.config.js
+?? web-admin/src/components/
+?? web-admin/src/lib/
+?? web-admin/src/styles/
+?? web-admin/tailwind.config.ts
+?? web-admin/tests/stack-conformance.test.ts
+?? web-admin/tests/ui-primitives.test.tsx

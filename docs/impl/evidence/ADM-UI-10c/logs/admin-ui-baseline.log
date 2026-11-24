@@ -1,0 +1,10 @@
+shot a1-login {"form": 1, "inputs": 3, "submitLabel": "登录"}
+shot a2-dashboard {"metricCards": 15, "metricLabels": ["在线设备", "设备总数", "进行中会话", "待授权会话", "在线用户", "24h 新增设备", "建连成功率", "P2P 命中率", "中继占比", "延迟 P50", "延迟 P95", "帧率达成率", "会话异常中断率", "客户端崩溃率", "重连成功率"], "tables": 0, "nav": ["仪表盘", "用户", "设备", "会话", "审计日志", "配置中心", "管理员与角色", "风控中心", "版本管理"]}
+shot a3-users {"columns": ["账号 ID", "昵称", "手机号", "设备数", "状态", "注册时间", "最近登录", "操作"], "rows": 6, "filters": 3, "pager": "共 6 条"}
+shot a6-device-detail {"modalTitle": "409 821 189", "kvPairs": 11, "sessionRows": 4}
+shot a7-sessions {"columns": ["会话 ID", "主控", "被控", "状态", "时长", "平均延迟", "结束原因", "链路", "开始时间", "操作"], "rows": 4, "states": ["等待授权", "已授权", "进行中", "已结束"]}
+shot a12-config {"columns": ["配置项", "当前值", "默认 / 范围", "说明"], "configRows": 4, "capabilityRows": 7}
+BASELINE COMPARE OK (6 屏 DOM 判据一致)
+screens: a1-login, a2-dashboard, a3-users, a6-device-detail, a7-sessions, a12-config
+font: Inter, "PingFang SC", "Microsoft YaHei", sans-serif
+BASELINE OK

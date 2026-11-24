@@ -1,0 +1,7 @@
+{
+  "comparedTo": "/Users/ckkk/dev/code/Go/EasyRemote/docs/impl/evidence/ADM-API-03b/screens/manifest.json",
+  "diffs": [
+    "a6-device-detail.kvPairs: 7 -> 11"
+  ],
+  "screens": 6
+}

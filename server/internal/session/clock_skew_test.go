@@ -40,8 +40,12 @@ func TestClockForwardExpiresConsent(t *testing.T) {
 		t.Fatal(err)
 	}
 	s.SetClock(func() time.Time { return now.Add(ConsentTimeout + time.Second) })
-	if _, err := s.Consent(ctx(), sess.ID, true, ""); !errcode.Is(err, errcode.ConnConsentTimeout) {
-		t.Fatalf("want CONN_CONSENT_TIMEOUT, got %v", err)
+	got, err := s.Consent(ctx(), sess.ID, true, "")
+	if err != nil {
+		t.Fatalf("want nil error (complete state), got %v", err)
+	}
+	if got.State != StateClosed || got.Reason != "consent_timeout" {
+		t.Fatalf("want closed/consent_timeout, got %s/%q", got.State, got.Reason)
 	}
 }
 

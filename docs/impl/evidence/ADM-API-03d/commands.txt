@@ -1,0 +1,58 @@
+# ADM-API-03d 命令输出
+# 采集时间: 2026-11-23T16:04:58+0800
+# commit: 267a635
+
+$ node scripts/gen-contract.mjs --check && node scripts/check-routes.mjs --strict
+✓ 三端契约一致（67 个类型 / 67 条接口）
+✓ 路由 method/path/auth 与契约一致（67 条端点）
+
+$ (cd server && go test ./internal/adminapi/ -run UnbanAndKickUser -v)
+=== RUN   TestUnbanAndKickUser
+--- PASS: TestUnbanAndKickUser (0.00s)
+PASS
+ok  	github.com/easyremote/server/internal/adminapi	(cached)
+
+$ (cd web-admin && npx tsc --noEmit && npm test -- --run && npm run build)
+      Tests  57 passed (57)
+   Start at  16:04:59
+   Duration  616ms (transform 437ms, setup 0ms, collect 1.00s, tests 56ms, environment 2ms, prepare 609ms)
+
+
+✓ built in 268ms
+
+$ python3 scripts/admin-ui-e2e-users.py
+PASS unban writes audit
+PASS row opens detail route -> http://127.0.0.1:5398/users/acc-b877a1e15d11f823
+PASS detail shows account section
+PASS detail shows masked phone
+PASS detail lists devices -> 2
+PASS account sessions listed -> 1
+PASS session reason shown
+PASS note saved
+PASS note writes audit
+PASS note persisted in form
+PASS deep link survives reload
+PASS back returns to list -> http://127.0.0.1:5398/users
+PASS unknown user shows not found
+E2E OK (22 checks)
+
+$ python3 scripts/admin-ui-baseline.py ... --compare-to ADM-API-03c/manifest.json
+shot a12-config {"columns": ["配置项", "当前值", "默认 / 范围", "说明"], "configRows": 4, "capabilityRows": 7}
+BASELINE COMPARE OK (6 屏 DOM 判据一致)
+screens: a1-login, a2-dashboard, a3-users, a6-device-detail, a7-sessions, a12-config
+font: Inter, "PingFang SC", "Microsoft YaHei", sans-serif
+BASELINE OK
+
+$ bash scripts/gate.sh
+✓ built in 359ms
+  PASS
+
+== 汇总 ==
+  scripts   PASS
+  contract  PASS
+  go        PASS
+  rust      PASS
+  flutter   PASS
+  web       PASS
+
+GATE: PASS

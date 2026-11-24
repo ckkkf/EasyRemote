@@ -1,0 +1,26 @@
+=== RUN   TestClockBackwardDoesNotExpireConsent
+--- PASS: TestClockBackwardDoesNotExpireConsent (0.00s)
+=== RUN   TestClockForwardExpiresConsent
+--- PASS: TestClockForwardExpiresConsent (0.00s)
+=== RUN   TestConsentRejectedPersistsClosedAndReturnsContractResult
+--- PASS: TestConsentRejectedPersistsClosedAndReturnsContractResult (0.00s)
+=== RUN   TestClosedStatusCarriesReason
+--- PASS: TestClosedStatusCarriesReason (0.00s)
+=== RUN   TestConsentAcceptedOpensAuthWindow
+--- PASS: TestConsentAcceptedOpensAuthWindow (0.00s)
+=== RUN   TestConsentRejected
+--- PASS: TestConsentRejected (0.00s)
+=== RUN   TestConsentTimeout
+--- PASS: TestConsentTimeout (0.00s)
+=== RUN   TestActivateWithoutConsentRejected
+--- PASS: TestActivateWithoutConsentRejected (0.00s)
+=== RUN   TestConsentOnClosedSession
+--- PASS: TestConsentOnClosedSession (0.00s)
+=== RUN   TestDuplicateConsentIdempotent
+--- PASS: TestDuplicateConsentIdempotent (0.00s)
+=== RUN   TestConsentTimeoutClosesViaCommand
+--- PASS: TestConsentTimeoutClosesViaCommand (0.00s)
+ok  	github.com/easyremote/server/internal/session	0.203s
+=== RUN   TestConsentRejectedReturnsCompletedClosedState
+--- PASS: TestConsentRejectedReturnsCompletedClosedState (0.00s)
+ok  	github.com/easyremote/server/internal/gateway	0.342s

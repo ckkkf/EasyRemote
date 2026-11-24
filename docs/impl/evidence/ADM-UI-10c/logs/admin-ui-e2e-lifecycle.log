@@ -1,0 +1,14 @@
+PASS page 1 has page size rows -> 10
+PASS pager reports 12 total / 2 pages -> 共 12 条 · 第 1 / 2 页
+上一页
+下一页
+PASS page 2 has remaining rows -> 2
+PASS page 2 rows differ from page 1 -> ['acc-82ae39535419acfe', 'acc-faf9ead68c8f562d']
+PASS back to page 1 restores rows -> 10
+PASS token valid before logout -> 200 OK
+PASS logout lands on login -> http://127.0.0.1:5403/login
+PASS logout clears stored token
+PASS logout clears identity
+PASS server session revoked after logout -> 401 ADMIN_SESSION_EXPIRED
+PASS anonymous deep link to login -> http://127.0.0.1:5403/login
+E2E OK (11 checks)

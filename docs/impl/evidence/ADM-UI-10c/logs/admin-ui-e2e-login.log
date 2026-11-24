@@ -1,0 +1,10 @@
+PASS login page has no dev credentials
+PASS login page labels are bound
+PASS wrong password shows envelope -> 手机号或验证码不正确 | 100001 AUTH_INVALID_CREDENTIAL | 复制 trace_id
+PASS wrong password keeps trace_id
+PASS wrong password stays on login -> http://127.0.0.1:5395/login
+PASS valid credentials reach dashboard -> http://127.0.0.1:5395/dashboard
+PASS dashboard rendered after login -> 15
+PASS metric groups rendered after login
+PASS no dev credentials after login
+E2E OK (9 checks)

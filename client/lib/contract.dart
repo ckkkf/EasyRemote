@@ -2,7 +2,12 @@
 // 源: docs/spec/contract.yaml
 
 class Envelope<T> {
-  const Envelope({required this.code, required this.name, required this.data, required this.traceId});
+  const Envelope({
+    required this.code,
+    required this.name,
+    required this.data,
+    required this.traceId,
+  });
 
   final int code;
   final String name;
@@ -13,21 +18,41 @@ class Envelope<T> {
 }
 
 class OkResult {
-  const OkResult({
-    required this.oK,
-  });
+  const OkResult({required this.oK});
 
   final bool oK;
 
-  factory OkResult.fromJson(Map<String, dynamic> json) => OkResult(
-    oK: json['ok'] as bool,
-  );
+  factory OkResult.fromJson(Map<String, dynamic> json) =>
+      OkResult(oK: json['ok'] as bool);
 }
 
 class Overview {
   const Overview({
     required this.devicesTotal,
     required this.devicesOnline,
+    required this.usersOnline,
+    required this.qualityAvailable,
+    required this.latencyP50Ms,
+    required this.latencyP95Ms,
+    required this.relayPercent,
+    required this.qualitySamples,
+    required this.stabilityAvailable,
+    required this.closedSessions,
+    required this.abnormalCloses,
+    required this.abnormalCloseRate,
+    required this.connectAvailable,
+    required this.connectAttempts,
+    required this.connectSuccessRate,
+    required this.linkAvailable,
+    required this.p2pHitRate,
+    required this.fpsAvailable,
+    required this.fpsTargetRate,
+    required this.devicesNewAvailable,
+    required this.devicesNew24h,
+    required this.crashAvailable,
+    required this.crashRate,
+    required this.reconnectAvailable,
+    required this.reconnectSuccessRate,
     required this.sessionsActive,
     required this.sessionsPending,
     required this.generatedAt,
@@ -35,6 +60,29 @@ class Overview {
 
   final int devicesTotal;
   final int devicesOnline;
+  final int usersOnline;
+  final bool qualityAvailable;
+  final int latencyP50Ms;
+  final int latencyP95Ms;
+  final int relayPercent;
+  final int qualitySamples;
+  final bool stabilityAvailable;
+  final int closedSessions;
+  final int abnormalCloses;
+  final int abnormalCloseRate;
+  final bool connectAvailable;
+  final int connectAttempts;
+  final int connectSuccessRate;
+  final bool linkAvailable;
+  final int p2pHitRate;
+  final bool fpsAvailable;
+  final int fpsTargetRate;
+  final bool devicesNewAvailable;
+  final int devicesNew24h;
+  final bool crashAvailable;
+  final int crashRate;
+  final bool reconnectAvailable;
+  final int reconnectSuccessRate;
   final int sessionsActive;
   final int sessionsPending;
   final String generatedAt;
@@ -42,6 +90,29 @@ class Overview {
   factory Overview.fromJson(Map<String, dynamic> json) => Overview(
     devicesTotal: json['devices_total'] as int,
     devicesOnline: json['devices_online'] as int,
+    usersOnline: json['users_online'] as int,
+    qualityAvailable: json['quality_available'] as bool,
+    latencyP50Ms: json['latency_p50_ms'] as int,
+    latencyP95Ms: json['latency_p95_ms'] as int,
+    relayPercent: json['relay_percent'] as int,
+    qualitySamples: json['quality_samples'] as int,
+    stabilityAvailable: json['stability_available'] as bool,
+    closedSessions: json['closed_sessions'] as int,
+    abnormalCloses: json['abnormal_closes'] as int,
+    abnormalCloseRate: json['abnormal_close_rate'] as int,
+    connectAvailable: json['connect_available'] as bool,
+    connectAttempts: json['connect_attempts'] as int,
+    connectSuccessRate: json['connect_success_rate'] as int,
+    linkAvailable: json['link_available'] as bool,
+    p2pHitRate: json['p2p_hit_rate'] as int,
+    fpsAvailable: json['fps_available'] as bool,
+    fpsTargetRate: json['fps_target_rate'] as int,
+    devicesNewAvailable: json['devices_new_available'] as bool,
+    devicesNew24h: json['devices_new_24h'] as int,
+    crashAvailable: json['crash_available'] as bool,
+    crashRate: json['crash_rate'] as int,
+    reconnectAvailable: json['reconnect_available'] as bool,
+    reconnectSuccessRate: json['reconnect_success_rate'] as int,
     sessionsActive: json['sessions_active'] as int,
     sessionsPending: json['sessions_pending'] as int,
     generatedAt: json['generated_at'] as String,
@@ -51,20 +122,29 @@ class Overview {
 class UserRow {
   const UserRow({
     required this.iD,
+    required this.nickname,
     required this.phoneMask,
     required this.status,
+    required this.deviceCount,
+    this.lastLoginAt,
     required this.createdAt,
   });
 
   final String iD;
+  final String nickname;
   final String phoneMask;
   final String status;
+  final int deviceCount;
+  final String? lastLoginAt;
   final String createdAt;
 
   factory UserRow.fromJson(Map<String, dynamic> json) => UserRow(
     iD: json['id'] as String,
+    nickname: json['nickname'] as String,
     phoneMask: json['phone_mask'] as String,
     status: json['status'] as String,
+    deviceCount: json['device_count'] as int,
+    lastLoginAt: json['last_login_at'] as String?,
     createdAt: json['created_at'] as String,
   );
 }
@@ -75,6 +155,12 @@ class DeviceRow {
     required this.deviceCode,
     required this.accountID,
     required this.platform,
+    required this.deviceName,
+    required this.osVersion,
+    required this.clientVersion,
+    required this.natType,
+    required this.riskFlag,
+    required this.riskReason,
     required this.online,
     required this.lastSeen,
   });
@@ -83,6 +169,12 @@ class DeviceRow {
   final String deviceCode;
   final String accountID;
   final String platform;
+  final String deviceName;
+  final String osVersion;
+  final String clientVersion;
+  final String natType;
+  final bool riskFlag;
+  final String riskReason;
   final bool online;
   final String lastSeen;
 
@@ -91,6 +183,12 @@ class DeviceRow {
     deviceCode: json['device_code'] as String,
     accountID: json['account_id'] as String,
     platform: json['platform'] as String,
+    deviceName: json['device_name'] as String,
+    osVersion: json['os_version'] as String,
+    clientVersion: json['client_version'] as String,
+    natType: json['nat_type'] as String,
+    riskFlag: json['risk_flag'] as bool,
+    riskReason: json['risk_reason'] as String,
     online: json['online'] as bool,
     lastSeen: json['last_seen'] as String,
   );
@@ -101,16 +199,28 @@ class BindRequest {
     required this.platform,
     this.deviceID,
     this.deviceToken,
+    this.deviceName,
+    this.osVersion,
+    this.clientVersion,
+    this.natType,
   });
 
   final String platform;
   final String? deviceID;
   final String? deviceToken;
+  final String? deviceName;
+  final String? osVersion;
+  final String? clientVersion;
+  final String? natType;
 
   factory BindRequest.fromJson(Map<String, dynamic> json) => BindRequest(
     platform: json['platform'] as String,
     deviceID: json['device_id'] as String?,
     deviceToken: json['device_token'] as String?,
+    deviceName: json['device_name'] as String?,
+    osVersion: json['os_version'] as String?,
+    clientVersion: json['client_version'] as String?,
+    natType: json['nat_type'] as String?,
   );
 }
 
@@ -147,6 +257,9 @@ class SessionRow {
     this.reason,
     required this.startedAt,
     this.endedAt,
+    required this.latencyAvailable,
+    required this.avgLatencyMs,
+    required this.link,
   });
 
   final String iD;
@@ -156,6 +269,9 @@ class SessionRow {
   final String? reason;
   final String startedAt;
   final String? endedAt;
+  final bool latencyAvailable;
+  final int avgLatencyMs;
+  final String link;
 
   factory SessionRow.fromJson(Map<String, dynamic> json) => SessionRow(
     iD: json['id'] as String,
@@ -165,6 +281,9 @@ class SessionRow {
     reason: json['reason'] as String?,
     startedAt: json['started_at'] as String,
     endedAt: json['ended_at'] as String?,
+    latencyAvailable: json['latency_available'] as bool,
+    avgLatencyMs: json['avg_latency_ms'] as int,
+    link: json['link'] as String,
   );
 }
 
@@ -226,9 +345,708 @@ class AdminSession {
     token: json['token'] as String,
     username: json['username'] as String,
     role: json['role'] as String,
-    permissions: (json['permissions'] as List<dynamic>? ?? const []).map((e) => e as String).toList(),
+    permissions: (json['permissions'] as List<dynamic>? ?? const [])
+        .map((e) => e as String)
+        .toList(),
     expiresAt: json['expires_at'] as String,
   );
+}
+
+class KillRequestRow {
+  const KillRequestRow({
+    required this.iD,
+    required this.sessionID,
+    required this.reason,
+    required this.requestedBy,
+    required this.requestedAt,
+    required this.expiresAt,
+    required this.status,
+    required this.confirmedBy,
+    this.confirmedAt,
+  });
+
+  final String iD;
+  final String sessionID;
+  final String reason;
+  final String requestedBy;
+  final String requestedAt;
+  final String expiresAt;
+  final String status;
+  final String confirmedBy;
+  final String? confirmedAt;
+
+  factory KillRequestRow.fromJson(Map<String, dynamic> json) => KillRequestRow(
+    iD: json['id'] as String,
+    sessionID: json['session_id'] as String,
+    reason: json['reason'] as String,
+    requestedBy: json['requested_by'] as String,
+    requestedAt: json['requested_at'] as String,
+    expiresAt: json['expires_at'] as String,
+    status: json['status'] as String,
+    confirmedBy: json['confirmed_by'] as String,
+    confirmedAt: json['confirmed_at'] as String?,
+  );
+}
+
+class KillRequestCreate {
+  const KillRequestCreate({required this.sessionID, required this.reason});
+
+  final String sessionID;
+  final String reason;
+
+  factory KillRequestCreate.fromJson(Map<String, dynamic> json) =>
+      KillRequestCreate(
+        sessionID: json['session_id'] as String,
+        reason: json['reason'] as String,
+      );
+}
+
+class KillConfirmRequest {
+  const KillConfirmRequest({required this.requestID});
+
+  final String requestID;
+
+  factory KillConfirmRequest.fromJson(Map<String, dynamic> json) =>
+      KillConfirmRequest(requestID: json['request_id'] as String);
+}
+
+class AuditExportResult {
+  const AuditExportResult({
+    required this.csv,
+    required this.rows,
+    required this.truncated,
+  });
+
+  final String csv;
+  final int rows;
+  final bool truncated;
+
+  factory AuditExportResult.fromJson(Map<String, dynamic> json) =>
+      AuditExportResult(
+        csv: json['csv'] as String,
+        rows: json['rows'] as int,
+        truncated: json['truncated'] as bool,
+      );
+}
+
+class BlacklistRow {
+  const BlacklistRow({
+    required this.iD,
+    required this.kind,
+    required this.value,
+    required this.note,
+    this.expiresAt,
+    required this.createdAt,
+    required this.createdBy,
+  });
+
+  final String iD;
+  final String kind;
+  final String value;
+  final String note;
+  final String? expiresAt;
+  final String createdAt;
+  final String createdBy;
+
+  factory BlacklistRow.fromJson(Map<String, dynamic> json) => BlacklistRow(
+    iD: json['id'] as String,
+    kind: json['kind'] as String,
+    value: json['value'] as String,
+    note: json['note'] as String,
+    expiresAt: json['expires_at'] as String?,
+    createdAt: json['created_at'] as String,
+    createdBy: json['created_by'] as String,
+  );
+}
+
+class BlacklistAddRequest {
+  const BlacklistAddRequest({
+    required this.kind,
+    required this.value,
+    required this.note,
+    this.ttlHours,
+  });
+
+  final String kind;
+  final String value;
+  final String note;
+  final int? ttlHours;
+
+  factory BlacklistAddRequest.fromJson(Map<String, dynamic> json) =>
+      BlacklistAddRequest(
+        kind: json['kind'] as String,
+        value: json['value'] as String,
+        note: json['note'] as String,
+        ttlHours: json['ttl_hours'] as int?,
+      );
+}
+
+class BlacklistRemoveRequest {
+  const BlacklistRemoveRequest({required this.iD, required this.reason});
+
+  final String iD;
+  final String reason;
+
+  factory BlacklistRemoveRequest.fromJson(Map<String, dynamic> json) =>
+      BlacklistRemoveRequest(
+        iD: json['id'] as String,
+        reason: json['reason'] as String,
+      );
+}
+
+class RiskAlertRow {
+  const RiskAlertRow({
+    required this.iD,
+    required this.kind,
+    required this.subject,
+    required this.detail,
+    required this.tS,
+  });
+
+  final String iD;
+  final String kind;
+  final String subject;
+  final String detail;
+  final String tS;
+
+  factory RiskAlertRow.fromJson(Map<String, dynamic> json) => RiskAlertRow(
+    iD: json['id'] as String,
+    kind: json['kind'] as String,
+    subject: json['subject'] as String,
+    detail: json['detail'] as String,
+    tS: json['ts'] as String,
+  );
+}
+
+class ClientVersionRow {
+  const ClientVersionRow({
+    required this.iD,
+    required this.platform,
+    required this.version,
+    required this.status,
+    required this.rolloutPercent,
+    required this.forceUpdate,
+    required this.notes,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+
+  final String iD;
+  final String platform;
+  final String version;
+  final String status;
+  final int rolloutPercent;
+  final bool forceUpdate;
+  final String notes;
+  final String createdAt;
+  final String updatedAt;
+
+  factory ClientVersionRow.fromJson(Map<String, dynamic> json) =>
+      ClientVersionRow(
+        iD: json['id'] as String,
+        platform: json['platform'] as String,
+        version: json['version'] as String,
+        status: json['status'] as String,
+        rolloutPercent: json['rollout_percent'] as int,
+        forceUpdate: json['force_update'] as bool,
+        notes: json['notes'] as String,
+        createdAt: json['created_at'] as String,
+        updatedAt: json['updated_at'] as String,
+      );
+}
+
+class VersionPublishRequest {
+  const VersionPublishRequest({
+    required this.platform,
+    required this.version,
+    required this.status,
+    required this.rolloutPercent,
+    required this.forceUpdate,
+    required this.notes,
+  });
+
+  final String platform;
+  final String version;
+  final String status;
+  final int rolloutPercent;
+  final bool forceUpdate;
+  final String notes;
+
+  factory VersionPublishRequest.fromJson(Map<String, dynamic> json) =>
+      VersionPublishRequest(
+        platform: json['platform'] as String,
+        version: json['version'] as String,
+        status: json['status'] as String,
+        rolloutPercent: json['rollout_percent'] as int,
+        forceUpdate: json['force_update'] as bool,
+        notes: json['notes'] as String,
+      );
+}
+
+class VersionRetireRequest {
+  const VersionRetireRequest({required this.versionID, required this.reason});
+
+  final String versionID;
+  final String reason;
+
+  factory VersionRetireRequest.fromJson(Map<String, dynamic> json) =>
+      VersionRetireRequest(
+        versionID: json['version_id'] as String,
+        reason: json['reason'] as String,
+      );
+}
+
+class SessionParty {
+  const SessionParty({
+    required this.deviceID,
+    required this.deviceCode,
+    required this.platform,
+    required this.osVersion,
+    required this.clientVersion,
+    required this.online,
+  });
+
+  final String deviceID;
+  final String deviceCode;
+  final String platform;
+  final String osVersion;
+  final String clientVersion;
+  final bool online;
+
+  factory SessionParty.fromJson(Map<String, dynamic> json) => SessionParty(
+    deviceID: json['device_id'] as String,
+    deviceCode: json['device_code'] as String,
+    platform: json['platform'] as String,
+    osVersion: json['os_version'] as String,
+    clientVersion: json['client_version'] as String,
+    online: json['online'] as bool,
+  );
+}
+
+class LinkSwitch {
+  const LinkSwitch({required this.tS, required this.from, required this.to});
+
+  final String tS;
+  final String from;
+  final String to;
+
+  factory LinkSwitch.fromJson(Map<String, dynamic> json) => LinkSwitch(
+    tS: json['ts'] as String,
+    from: json['from'] as String,
+    to: json['to'] as String,
+  );
+}
+
+class TimelineEntry {
+  const TimelineEntry({
+    required this.tS,
+    required this.label,
+    required this.detail,
+  });
+
+  final String tS;
+  final String label;
+  final String detail;
+
+  factory TimelineEntry.fromJson(Map<String, dynamic> json) => TimelineEntry(
+    tS: json['ts'] as String,
+    label: json['label'] as String,
+    detail: json['detail'] as String,
+  );
+}
+
+class SessionErrorRow {
+  const SessionErrorRow({
+    required this.tS,
+    required this.code,
+    required this.name,
+    required this.detail,
+    required this.source,
+  });
+
+  final String tS;
+  final int code;
+  final String name;
+  final String detail;
+  final String source;
+
+  factory SessionErrorRow.fromJson(Map<String, dynamic> json) =>
+      SessionErrorRow(
+        tS: json['ts'] as String,
+        code: json['code'] as int,
+        name: json['name'] as String,
+        detail: json['detail'] as String,
+        source: json['source'] as String,
+      );
+}
+
+class SessionDetailResult {
+  const SessionDetailResult({
+    required this.controller,
+    required this.target,
+    required this.linkSwitches,
+    required this.timeline,
+    required this.errorEvents,
+  });
+
+  final SessionParty controller;
+  final SessionParty target;
+  final List<LinkSwitch> linkSwitches;
+  final List<TimelineEntry> timeline;
+  final List<SessionErrorRow> errorEvents;
+
+  factory SessionDetailResult.fromJson(Map<String, dynamic> json) =>
+      SessionDetailResult(
+        controller: json['controller'] as SessionParty,
+        target: json['target'] as SessionParty,
+        linkSwitches: (json['link_switches'] as List<dynamic>? ?? const [])
+            .map((e) => e as LinkSwitch)
+            .toList(),
+        timeline: (json['timeline'] as List<dynamic>? ?? const [])
+            .map((e) => e as TimelineEntry)
+            .toList(),
+        errorEvents: (json['error_events'] as List<dynamic>? ?? const [])
+            .map((e) => e as SessionErrorRow)
+            .toList(),
+      );
+}
+
+class CsvExportResult {
+  const CsvExportResult({
+    required this.csv,
+    required this.rows,
+    required this.truncated,
+  });
+
+  final String csv;
+  final int rows;
+  final bool truncated;
+
+  factory CsvExportResult.fromJson(Map<String, dynamic> json) =>
+      CsvExportResult(
+        csv: json['csv'] as String,
+        rows: json['rows'] as int,
+        truncated: json['truncated'] as bool,
+      );
+}
+
+class UserActionRequest {
+  const UserActionRequest({required this.accountID, required this.reason});
+
+  final String accountID;
+  final String reason;
+
+  factory UserActionRequest.fromJson(Map<String, dynamic> json) =>
+      UserActionRequest(
+        accountID: json['account_id'] as String,
+        reason: json['reason'] as String,
+      );
+}
+
+class AccountNoteResult {
+  const AccountNoteResult({
+    required this.accountID,
+    required this.note,
+    required this.updatedBy,
+    this.updatedAt,
+  });
+
+  final String accountID;
+  final String note;
+  final String updatedBy;
+  final String? updatedAt;
+
+  factory AccountNoteResult.fromJson(Map<String, dynamic> json) =>
+      AccountNoteResult(
+        accountID: json['account_id'] as String,
+        note: json['note'] as String,
+        updatedBy: json['updated_by'] as String,
+        updatedAt: json['updated_at'] as String?,
+      );
+}
+
+class AccountNoteSet {
+  const AccountNoteSet({required this.accountID, required this.note});
+
+  final String accountID;
+  final String note;
+
+  factory AccountNoteSet.fromJson(Map<String, dynamic> json) => AccountNoteSet(
+    accountID: json['account_id'] as String,
+    note: json['note'] as String,
+  );
+}
+
+class TrendPoint {
+  const TrendPoint({
+    required this.bucketStart,
+    required this.sessionsStarted,
+    required this.connectAttempts,
+    required this.connectActive,
+  });
+
+  final String bucketStart;
+  final int sessionsStarted;
+  final int connectAttempts;
+  final int connectActive;
+
+  factory TrendPoint.fromJson(Map<String, dynamic> json) => TrendPoint(
+    bucketStart: json['bucket_start'] as String,
+    sessionsStarted: json['sessions_started'] as int,
+    connectAttempts: json['connect_attempts'] as int,
+    connectActive: json['connect_active'] as int,
+  );
+}
+
+class TrendsResult {
+  const TrendsResult({
+    required this.range,
+    required this.bucket,
+    required this.points,
+  });
+
+  final String range;
+  final String bucket;
+  final List<TrendPoint> points;
+
+  factory TrendsResult.fromJson(Map<String, dynamic> json) => TrendsResult(
+    range: json['range'] as String,
+    bucket: json['bucket'] as String,
+    points: (json['points'] as List<dynamic>? ?? const [])
+        .map((e) => e as TrendPoint)
+        .toList(),
+  );
+}
+
+class AdminRow {
+  const AdminRow({
+    required this.iD,
+    required this.username,
+    required this.role,
+    required this.status,
+    required this.mfaEnabled,
+  });
+
+  final String iD;
+  final String username;
+  final String role;
+  final String status;
+  final bool mfaEnabled;
+
+  factory AdminRow.fromJson(Map<String, dynamic> json) => AdminRow(
+    iD: json['id'] as String,
+    username: json['username'] as String,
+    role: json['role'] as String,
+    status: json['status'] as String,
+    mfaEnabled: json['mfa_enabled'] as bool,
+  );
+}
+
+class AdminUpdateRequest {
+  const AdminUpdateRequest({
+    required this.adminID,
+    this.role,
+    this.status,
+    required this.reason,
+  });
+
+  final String adminID;
+  final String? role;
+  final String? status;
+  final String reason;
+
+  factory AdminUpdateRequest.fromJson(Map<String, dynamic> json) =>
+      AdminUpdateRequest(
+        adminID: json['admin_id'] as String,
+        role: json['role'] as String?,
+        status: json['status'] as String?,
+        reason: json['reason'] as String,
+      );
+}
+
+class DeviceQualityDay {
+  const DeviceQualityDay({
+    required this.date,
+    required this.avgLatencyMs,
+    required this.avgLossPermille,
+    required this.relayPercent,
+    required this.samples,
+  });
+
+  final String date;
+  final int avgLatencyMs;
+  final int avgLossPermille;
+  final int relayPercent;
+  final int samples;
+
+  factory DeviceQualityDay.fromJson(Map<String, dynamic> json) =>
+      DeviceQualityDay(
+        date: json['date'] as String,
+        avgLatencyMs: json['avg_latency_ms'] as int,
+        avgLossPermille: json['avg_loss_permille'] as int,
+        relayPercent: json['relay_percent'] as int,
+        samples: json['samples'] as int,
+      );
+}
+
+class DeviceQualityResult {
+  const DeviceQualityResult({
+    required this.deviceID,
+    required this.available,
+    required this.days,
+  });
+
+  final String deviceID;
+  final bool available;
+  final List<DeviceQualityDay> days;
+
+  factory DeviceQualityResult.fromJson(Map<String, dynamic> json) =>
+      DeviceQualityResult(
+        deviceID: json['device_id'] as String,
+        available: json['available'] as bool,
+        days: (json['days'] as List<dynamic>? ?? const [])
+            .map((e) => e as DeviceQualityDay)
+            .toList(),
+      );
+}
+
+class QualitySample {
+  const QualitySample({
+    required this.tS,
+    required this.latencyMs,
+    required this.lossPermille,
+    required this.fps,
+    required this.tier,
+    required this.relay,
+    this.link,
+    this.targetFps,
+  });
+
+  final String tS;
+  final int latencyMs;
+  final int lossPermille;
+  final int fps;
+  final String tier;
+  final bool relay;
+  final String? link;
+  final int? targetFps;
+
+  factory QualitySample.fromJson(Map<String, dynamic> json) => QualitySample(
+    tS: json['ts'] as String,
+    latencyMs: json['latency_ms'] as int,
+    lossPermille: json['loss_permille'] as int,
+    fps: json['fps'] as int,
+    tier: json['tier'] as String,
+    relay: json['relay'] as bool,
+    link: json['link'] as String?,
+    targetFps: json['target_fps'] as int?,
+  );
+}
+
+class QualityReportRequest {
+  const QualityReportRequest({required this.sessionID, required this.samples});
+
+  final String sessionID;
+  final List<QualitySample> samples;
+
+  factory QualityReportRequest.fromJson(Map<String, dynamic> json) =>
+      QualityReportRequest(
+        sessionID: json['session_id'] as String,
+        samples: (json['samples'] as List<dynamic>? ?? const [])
+            .map((e) => e as QualitySample)
+            .toList(),
+      );
+}
+
+class SessionQualityResult {
+  const SessionQualityResult({
+    required this.sessionID,
+    required this.available,
+    required this.samples,
+  });
+
+  final String sessionID;
+  final bool available;
+  final List<QualitySample> samples;
+
+  factory SessionQualityResult.fromJson(Map<String, dynamic> json) =>
+      SessionQualityResult(
+        sessionID: json['session_id'] as String,
+        available: json['available'] as bool,
+        samples: (json['samples'] as List<dynamic>? ?? const [])
+            .map((e) => e as QualitySample)
+            .toList(),
+      );
+}
+
+class ConfigHistoryEntry {
+  const ConfigHistoryEntry({
+    required this.iD,
+    required this.action,
+    required this.actor,
+    required this.before,
+    required this.after,
+    required this.result,
+    required this.tS,
+  });
+
+  final String iD;
+  final String action;
+  final String actor;
+  final String before;
+  final String after;
+  final String result;
+  final String tS;
+
+  factory ConfigHistoryEntry.fromJson(Map<String, dynamic> json) =>
+      ConfigHistoryEntry(
+        iD: json['id'] as String,
+        action: json['action'] as String,
+        actor: json['actor'] as String,
+        before: json['before'] as String,
+        after: json['after'] as String,
+        result: json['result'] as String,
+        tS: json['ts'] as String,
+      );
+}
+
+class ConfigHistoryResult {
+  const ConfigHistoryResult({required this.items});
+
+  final List<ConfigHistoryEntry> items;
+
+  factory ConfigHistoryResult.fromJson(Map<String, dynamic> json) =>
+      ConfigHistoryResult(
+        items: (json['items'] as List<dynamic>? ?? const [])
+            .map((e) => e as ConfigHistoryEntry)
+            .toList(),
+      );
+}
+
+class AuditActionsResult {
+  const AuditActionsResult({required this.actions});
+
+  final List<String> actions;
+
+  factory AuditActionsResult.fromJson(Map<String, dynamic> json) =>
+      AuditActionsResult(
+        actions: (json['actions'] as List<dynamic>? ?? const [])
+            .map((e) => e as String)
+            .toList(),
+      );
+}
+
+class DeviceActionRequest {
+  const DeviceActionRequest({required this.deviceID, required this.reason});
+
+  final String deviceID;
+  final String reason;
+
+  factory DeviceActionRequest.fromJson(Map<String, dynamic> json) =>
+      DeviceActionRequest(
+        deviceID: json['device_id'] as String,
+        reason: json['reason'] as String,
+      );
 }
 
 class KillSessionResult {
@@ -244,12 +1062,13 @@ class KillSessionResult {
   final bool audited;
   final String? warning;
 
-  factory KillSessionResult.fromJson(Map<String, dynamic> json) => KillSessionResult(
-    closed: json['closed'] as bool,
-    propagated: json['propagated'] as bool,
-    audited: json['audited'] as bool,
-    warning: json['warning'] as String?,
-  );
+  factory KillSessionResult.fromJson(Map<String, dynamic> json) =>
+      KillSessionResult(
+        closed: json['closed'] as bool,
+        propagated: json['propagated'] as bool,
+        audited: json['audited'] as bool,
+        warning: json['warning'] as String?,
+      );
 }
 
 class ConfigField {
@@ -260,6 +1079,7 @@ class ConfigField {
     this.min,
     this.max,
     required this.help,
+    required this.group,
   });
 
   final String key;
@@ -268,6 +1088,7 @@ class ConfigField {
   final int? min;
   final int? max;
   final String help;
+  final String group;
 
   factory ConfigField.fromJson(Map<String, dynamic> json) => ConfigField(
     key: json['key'] as String,
@@ -276,6 +1097,7 @@ class ConfigField {
     min: json['min'] as int?,
     max: json['max'] as int?,
     help: json['help'] as String,
+    group: json['group'] as String,
   );
 }
 
@@ -283,37 +1105,55 @@ class ConfigView {
   const ConfigView({
     required this.config,
     required this.fields,
+    required this.platform,
+    required this.version,
   });
 
   final Map<String, String> config;
   final List<ConfigField> fields;
+  final String platform;
+  final String version;
 
   factory ConfigView.fromJson(Map<String, dynamic> json) => ConfigView(
     config: Map<String, String>.from(json['config'] as Map? ?? const {}),
-    fields: (json['fields'] as List<dynamic>? ?? const []).map((e) => e as ConfigField).toList(),
+    fields: (json['fields'] as List<dynamic>? ?? const [])
+        .map((e) => e as ConfigField)
+        .toList(),
+    platform: json['platform'] as String,
+    version: json['version'] as String,
   );
 }
 
 class ConfigPutResult {
-  const ConfigPutResult({
-    required this.config,
-    required this.audited,
-  });
+  const ConfigPutResult({required this.config, required this.audited});
 
   final Map<String, String> config;
   final bool audited;
 
-  factory ConfigPutResult.fromJson(Map<String, dynamic> json) => ConfigPutResult(
-    config: Map<String, String>.from(json['config'] as Map? ?? const {}),
-    audited: json['audited'] as bool,
-  );
+  factory ConfigPutResult.fromJson(Map<String, dynamic> json) =>
+      ConfigPutResult(
+        config: Map<String, String>.from(json['config'] as Map? ?? const {}),
+        audited: json['audited'] as bool,
+      );
+}
+
+class ConfigPutRequest {
+  const ConfigPutRequest({required this.values, this.platform, this.version});
+
+  final Map<String, String> values;
+  final String? platform;
+  final String? version;
+
+  factory ConfigPutRequest.fromJson(Map<String, dynamic> json) =>
+      ConfigPutRequest(
+        values: Map<String, String>.from(json['values'] as Map? ?? const {}),
+        platform: json['platform'] as String?,
+        version: json['version'] as String?,
+      );
 }
 
 class LoginResult {
-  const LoginResult({
-    required this.token,
-    required this.accountID,
-  });
+  const LoginResult({required this.token, required this.accountID});
 
   final String token;
   final String accountID;
@@ -349,30 +1189,29 @@ class DeviceItem {
 }
 
 class DeviceListResult {
-  const DeviceListResult({
-    required this.devices,
-  });
+  const DeviceListResult({required this.devices});
 
   final List<DeviceItem> devices;
 
-  factory DeviceListResult.fromJson(Map<String, dynamic> json) => DeviceListResult(
-    devices: (json['devices'] as List<dynamic>? ?? const []).map((e) => e as DeviceItem).toList(),
-  );
+  factory DeviceListResult.fromJson(Map<String, dynamic> json) =>
+      DeviceListResult(
+        devices: (json['devices'] as List<dynamic>? ?? const [])
+            .map((e) => e as DeviceItem)
+            .toList(),
+      );
 }
 
 class VerifyCodeResult {
-  const VerifyCodeResult({
-    required this.code,
-    required this.expiresAt,
-  });
+  const VerifyCodeResult({required this.code, required this.expiresAt});
 
   final String code;
   final String expiresAt;
 
-  factory VerifyCodeResult.fromJson(Map<String, dynamic> json) => VerifyCodeResult(
-    code: json['code'] as String,
-    expiresAt: json['expires_at'] as String,
-  );
+  factory VerifyCodeResult.fromJson(Map<String, dynamic> json) =>
+      VerifyCodeResult(
+        code: json['code'] as String,
+        expiresAt: json['expires_at'] as String,
+      );
 }
 
 class ConnectResult {
@@ -422,11 +1261,12 @@ class SessionStateResult {
   final String state;
   final String reason;
 
-  factory SessionStateResult.fromJson(Map<String, dynamic> json) => SessionStateResult(
-    sessionID: json['session_id'] as String,
-    state: json['state'] as String,
-    reason: json['reason'] as String,
-  );
+  factory SessionStateResult.fromJson(Map<String, dynamic> json) =>
+      SessionStateResult(
+        sessionID: json['session_id'] as String,
+        state: json['state'] as String,
+        reason: json['reason'] as String,
+      );
 }
 
 class SessionKeysResult {
@@ -444,43 +1284,37 @@ class SessionKeysResult {
   final String controllerPubkey;
   final String targetPubkey;
 
-  factory SessionKeysResult.fromJson(Map<String, dynamic> json) => SessionKeysResult(
-    sessionID: json['session_id'] as String,
-    controllerID: json['controller_id'] as String,
-    targetID: json['target_id'] as String,
-    controllerPubkey: json['controller_pubkey'] as String,
-    targetPubkey: json['target_pubkey'] as String,
-  );
+  factory SessionKeysResult.fromJson(Map<String, dynamic> json) =>
+      SessionKeysResult(
+        sessionID: json['session_id'] as String,
+        controllerID: json['controller_id'] as String,
+        targetID: json['target_id'] as String,
+        controllerPubkey: json['controller_pubkey'] as String,
+        targetPubkey: json['target_pubkey'] as String,
+      );
 }
 
 class RelayTicketResult {
-  const RelayTicketResult({
-    required this.ticket,
-    required this.selfDevice,
-  });
+  const RelayTicketResult({required this.ticket, required this.selfDevice});
 
   final String ticket;
   final String selfDevice;
 
-  factory RelayTicketResult.fromJson(Map<String, dynamic> json) => RelayTicketResult(
-    ticket: json['ticket'] as String,
-    selfDevice: json['self_device'] as String,
-  );
+  factory RelayTicketResult.fromJson(Map<String, dynamic> json) =>
+      RelayTicketResult(
+        ticket: json['ticket'] as String,
+        selfDevice: json['self_device'] as String,
+      );
 }
 
 class EmailCodeResult {
-  const EmailCodeResult({
-    required this.oK,
-    required this.email,
-  });
+  const EmailCodeResult({required this.oK, required this.email});
 
   final bool oK;
   final String email;
 
-  factory EmailCodeResult.fromJson(Map<String, dynamic> json) => EmailCodeResult(
-    oK: json['ok'] as bool,
-    email: json['email'] as String,
-  );
+  factory EmailCodeResult.fromJson(Map<String, dynamic> json) =>
+      EmailCodeResult(oK: json['ok'] as bool, email: json['email'] as String);
 }
 
 class EmailLoginResult {
@@ -494,11 +1328,12 @@ class EmailLoginResult {
   final String accountID;
   final String email;
 
-  factory EmailLoginResult.fromJson(Map<String, dynamic> json) => EmailLoginResult(
-    token: json['token'] as String,
-    accountID: json['account_id'] as String,
-    email: json['email'] as String,
-  );
+  factory EmailLoginResult.fromJson(Map<String, dynamic> json) =>
+      EmailLoginResult(
+        token: json['token'] as String,
+        accountID: json['account_id'] as String,
+        email: json['email'] as String,
+      );
 }
 
 class AssistCreateResult {
@@ -514,12 +1349,13 @@ class AssistCreateResult {
   final String targetDeviceID;
   final int ttlSeconds;
 
-  factory AssistCreateResult.fromJson(Map<String, dynamic> json) => AssistCreateResult(
-    code: json['code'] as String,
-    expiresAt: json['expires_at'] as String,
-    targetDeviceID: json['target_device_id'] as String,
-    ttlSeconds: json['ttl_seconds'] as int,
-  );
+  factory AssistCreateResult.fromJson(Map<String, dynamic> json) =>
+      AssistCreateResult(
+        code: json['code'] as String,
+        expiresAt: json['expires_at'] as String,
+        targetDeviceID: json['target_device_id'] as String,
+        ttlSeconds: json['ttl_seconds'] as int,
+      );
 }
 
 class AssistRedeemResult {
@@ -533,11 +1369,12 @@ class AssistRedeemResult {
   final String state;
   final String targetID;
 
-  factory AssistRedeemResult.fromJson(Map<String, dynamic> json) => AssistRedeemResult(
-    sessionID: json['session_id'] as String,
-    state: json['state'] as String,
-    targetID: json['target_id'] as String,
-  );
+  factory AssistRedeemResult.fromJson(Map<String, dynamic> json) =>
+      AssistRedeemResult(
+        sessionID: json['session_id'] as String,
+        state: json['state'] as String,
+        targetID: json['target_id'] as String,
+      );
 }
 
 class ReflectResult {
@@ -595,15 +1432,12 @@ class FileRow {
 }
 
 class FileUploadResult {
-  const FileUploadResult({
-    required this.file,
-  });
+  const FileUploadResult({required this.file});
 
   final FileRow file;
 
-  factory FileUploadResult.fromJson(Map<String, dynamic> json) => FileUploadResult(
-    file: json['file'] as FileRow,
-  );
+  factory FileUploadResult.fromJson(Map<String, dynamic> json) =>
+      FileUploadResult(file: json['file'] as FileRow);
 }
 
 class FileListResult {
@@ -618,25 +1452,25 @@ class FileListResult {
   final int offset;
 
   factory FileListResult.fromJson(Map<String, dynamic> json) => FileListResult(
-    files: (json['files'] as List<dynamic>? ?? const []).map((e) => e as FileRow).toList(),
+    files: (json['files'] as List<dynamic>? ?? const [])
+        .map((e) => e as FileRow)
+        .toList(),
     limit: json['limit'] as int,
     offset: json['offset'] as int,
   );
 }
 
 class FileDeletedResult {
-  const FileDeletedResult({
-    required this.oK,
-    required this.deleted,
-  });
+  const FileDeletedResult({required this.oK, required this.deleted});
 
   final bool oK;
   final bool deleted;
 
-  factory FileDeletedResult.fromJson(Map<String, dynamic> json) => FileDeletedResult(
-    oK: json['ok'] as bool,
-    deleted: json['deleted'] as bool,
-  );
+  factory FileDeletedResult.fromJson(Map<String, dynamic> json) =>
+      FileDeletedResult(
+        oK: json['ok'] as bool,
+        deleted: json['deleted'] as bool,
+      );
 }
 
 class FileTicketResult {
@@ -650,59 +1484,48 @@ class FileTicketResult {
   final String expiresAt;
   final String name;
 
-  factory FileTicketResult.fromJson(Map<String, dynamic> json) => FileTicketResult(
-    uRL: json['url'] as String,
-    expiresAt: json['expires_at'] as String,
-    name: json['name'] as String,
-  );
+  factory FileTicketResult.fromJson(Map<String, dynamic> json) =>
+      FileTicketResult(
+        uRL: json['url'] as String,
+        expiresAt: json['expires_at'] as String,
+        name: json['name'] as String,
+      );
 }
 
 class SessionLimits {
-  const SessionLimits({
-    required this.maxMinutes,
-  });
+  const SessionLimits({required this.maxMinutes});
 
   final int maxMinutes;
 
-  factory SessionLimits.fromJson(Map<String, dynamic> json) => SessionLimits(
-    maxMinutes: json['max_minutes'] as int,
-  );
+  factory SessionLimits.fromJson(Map<String, dynamic> json) =>
+      SessionLimits(maxMinutes: json['max_minutes'] as int);
 }
 
 class FileLimits {
-  const FileLimits({
-    required this.maxBytes,
-  });
+  const FileLimits({required this.maxBytes});
 
   final int maxBytes;
 
-  factory FileLimits.fromJson(Map<String, dynamic> json) => FileLimits(
-    maxBytes: json['max_bytes'] as int,
-  );
+  factory FileLimits.fromJson(Map<String, dynamic> json) =>
+      FileLimits(maxBytes: json['max_bytes'] as int);
 }
 
 class DiagConfig {
-  const DiagConfig({
-    required this.autoRefreshSecs,
-  });
+  const DiagConfig({required this.autoRefreshSecs});
 
   final int autoRefreshSecs;
 
-  factory DiagConfig.fromJson(Map<String, dynamic> json) => DiagConfig(
-    autoRefreshSecs: json['auto_refresh_secs'] as int,
-  );
+  factory DiagConfig.fromJson(Map<String, dynamic> json) =>
+      DiagConfig(autoRefreshSecs: json['auto_refresh_secs'] as int);
 }
 
 class ClientFlags {
-  const ClientFlags({
-    required this.forceUpdate,
-  });
+  const ClientFlags({required this.forceUpdate});
 
   final bool forceUpdate;
 
-  factory ClientFlags.fromJson(Map<String, dynamic> json) => ClientFlags(
-    forceUpdate: json['force_update'] as bool,
-  );
+  factory ClientFlags.fromJson(Map<String, dynamic> json) =>
+      ClientFlags(forceUpdate: json['force_update'] as bool);
 }
 
 class RuntimeEndpoints {
@@ -722,14 +1545,15 @@ class RuntimeEndpoints {
   final String webtransportURL;
   final bool tlsRequired;
 
-  factory RuntimeEndpoints.fromJson(Map<String, dynamic> json) => RuntimeEndpoints(
-    gatewayURL: json['gateway_url'] as String,
-    signalURL: json['signal_url'] as String,
-    relayAddr: json['relay_addr'] as String,
-    stunURL: json['stun_url'] as String,
-    webtransportURL: json['webtransport_url'] as String,
-    tlsRequired: json['tls_required'] as bool,
-  );
+  factory RuntimeEndpoints.fromJson(Map<String, dynamic> json) =>
+      RuntimeEndpoints(
+        gatewayURL: json['gateway_url'] as String,
+        signalURL: json['signal_url'] as String,
+        relayAddr: json['relay_addr'] as String,
+        stunURL: json['stun_url'] as String,
+        webtransportURL: json['webtransport_url'] as String,
+        tlsRequired: json['tls_required'] as bool,
+      );
 }
 
 class ClientRuntimeConfig {
@@ -749,30 +1573,37 @@ class ClientRuntimeConfig {
   final ClientFlags client;
   final Map<String, bool> capabilities;
 
-  factory ClientRuntimeConfig.fromJson(Map<String, dynamic> json) => ClientRuntimeConfig(
-    endpoints: json['endpoints'] as RuntimeEndpoints,
-    session: json['session'] as SessionLimits,
-    file: json['file'] as FileLimits,
-    diag: json['diag'] as DiagConfig,
-    client: json['client'] as ClientFlags,
-    capabilities: Map<String, bool>.from(json['capabilities'] as Map? ?? const {}),
-  );
+  factory ClientRuntimeConfig.fromJson(Map<String, dynamic> json) =>
+      ClientRuntimeConfig(
+        endpoints: json['endpoints'] as RuntimeEndpoints,
+        session: json['session'] as SessionLimits,
+        file: json['file'] as FileLimits,
+        diag: json['diag'] as DiagConfig,
+        client: json['client'] as ClientFlags,
+        capabilities: Map<String, bool>.from(
+          json['capabilities'] as Map? ?? const {},
+        ),
+      );
 }
 
 class ClientConfigResult {
-  const ClientConfigResult({
-    required this.config,
-  });
+  const ClientConfigResult({required this.config});
 
   final ClientRuntimeConfig config;
 
-  factory ClientConfigResult.fromJson(Map<String, dynamic> json) => ClientConfigResult(
-    config: json['config'] as ClientRuntimeConfig,
-  );
+  factory ClientConfigResult.fromJson(Map<String, dynamic> json) =>
+      ClientConfigResult(config: json['config'] as ClientRuntimeConfig);
 }
 
 class EndpointSpec {
-  const EndpointSpec({required this.id, required this.method, required this.path, required this.auth, required this.response, required this.errors});
+  const EndpointSpec({
+    required this.id,
+    required this.method,
+    required this.path,
+    required this.auth,
+    required this.response,
+    required this.errors,
+  });
 
   final String id;
   final String method;
@@ -783,42 +1614,679 @@ class EndpointSpec {
 }
 
 const List<EndpointSpec> endpoints = <EndpointSpec>[
-  EndpointSpec(id: 'ADM-01', method: 'POST', path: '/admin/v1/login', auth: 'none', response: 'AdminSession', errors: <String>['AUTH_INVALID_CREDENTIAL', 'AUTH_TOO_MANY_ATTEMPTS', 'ADMIN_MFA_REQUIRED']),
-  EndpointSpec(id: 'ADM-02', method: 'POST', path: '/admin/v1/logout', auth: 'admin', response: 'OkResult', errors: <String>['SRV_INTERNAL']),
-  EndpointSpec(id: 'ADM-03', method: 'GET', path: '/admin/v1/stats/overview', auth: 'admin', response: 'Overview', errors: <String>['ADMIN_SESSION_EXPIRED', 'ADMIN_FORBIDDEN']),
-  EndpointSpec(id: 'ADM-04', method: 'GET', path: '/admin/v1/users', auth: 'admin', response: 'list<UserRow>', errors: <String>['ADMIN_SESSION_EXPIRED', 'ADMIN_FORBIDDEN']),
-  EndpointSpec(id: 'ADM-05', method: 'POST', path: '/admin/v1/users/ban', auth: 'admin', response: 'OkResult', errors: <String>['ADMIN_SESSION_EXPIRED', 'ADMIN_FORBIDDEN', 'ADMIN_REASON_REQUIRED']),
-  EndpointSpec(id: 'ADM-06', method: 'GET', path: '/admin/v1/devices', auth: 'admin', response: 'list<DeviceRow>', errors: <String>['ADMIN_SESSION_EXPIRED', 'ADMIN_FORBIDDEN']),
-  EndpointSpec(id: 'ADM-07', method: 'GET', path: '/admin/v1/sessions', auth: 'admin', response: 'list<SessionRow>', errors: <String>['ADMIN_SESSION_EXPIRED', 'ADMIN_FORBIDDEN']),
-  EndpointSpec(id: 'ADM-08', method: 'POST', path: '/admin/v1/sessions/kill', auth: 'admin', response: 'KillSessionResult', errors: <String>['ADMIN_SESSION_EXPIRED', 'ADMIN_FORBIDDEN', 'ADMIN_REASON_REQUIRED']),
-  EndpointSpec(id: 'ADM-09', method: 'GET', path: '/admin/v1/config', auth: 'admin', response: 'ConfigView', errors: <String>['ADMIN_SESSION_EXPIRED', 'ADMIN_FORBIDDEN']),
-  EndpointSpec(id: 'ADM-10', method: 'PUT', path: '/admin/v1/config', auth: 'admin', response: 'ConfigPutResult', errors: <String>['ADMIN_SESSION_EXPIRED', 'ADMIN_FORBIDDEN', 'ADMIN_CONFIG_INVALID']),
-  EndpointSpec(id: 'ADM-11', method: 'GET', path: '/admin/v1/audit', auth: 'admin', response: 'list<AuditRow>', errors: <String>['ADMIN_SESSION_EXPIRED', 'ADMIN_FORBIDDEN']),
-  EndpointSpec(id: 'GW-01', method: 'POST', path: '/v1/auth/sms', auth: 'none', response: 'OkResult', errors: <String>['AUTH_INVALID_CREDENTIAL', 'AUTH_SMS_RATE_LIMITED']),
-  EndpointSpec(id: 'GW-02', method: 'POST', path: '/v1/auth/login', auth: 'none', response: 'LoginResult', errors: <String>['AUTH_INVALID_CREDENTIAL', 'AUTH_TOO_MANY_ATTEMPTS']),
-  EndpointSpec(id: 'GW-03', method: 'GET', path: '/v1/devices', auth: 'bearer', response: 'DeviceListResult', errors: <String>['AUTH_TOKEN_EXPIRED', 'SRV_INTERNAL']),
-  EndpointSpec(id: 'GW-04', method: 'POST', path: '/v1/devices/bind', auth: 'bearer', response: 'BindResult', errors: <String>['AUTH_TOKEN_EXPIRED', 'SRV_INTERNAL']),
-  EndpointSpec(id: 'GW-05', method: 'POST', path: '/v1/devices/verify-code', auth: 'device', response: 'VerifyCodeResult', errors: <String>['CONN_DEVICE_NOT_FOUND', 'ADMIN_FORBIDDEN']),
-  EndpointSpec(id: 'GW-06', method: 'POST', path: '/v1/connect/request', auth: 'bearer', response: 'ConnectResult', errors: <String>['CONN_DEVICE_NOT_FOUND', 'CONN_DEVICE_OFFLINE', 'CONN_CAPTCHA_INVALID', 'CONN_RATE_LIMITED']),
-  EndpointSpec(id: 'GW-07', method: 'POST', path: '/v1/connect/consent', auth: 'device', response: 'ConsentResult', errors: <String>['CONN_DEVICE_NOT_FOUND', 'ADMIN_FORBIDDEN']),
-  EndpointSpec(id: 'GW-08', method: 'GET', path: '/v1/connect/status', auth: 'bearer', response: 'SessionStateResult', errors: <String>['SESSION_NOT_FOUND', 'AUTH_TOKEN_EXPIRED']),
-  EndpointSpec(id: 'GW-09', method: 'POST', path: '/v1/devices/identity', auth: 'device', response: 'OkResult', errors: <String>['CONN_DEVICE_NOT_FOUND', 'ADMIN_FORBIDDEN']),
-  EndpointSpec(id: 'GW-10', method: 'GET', path: '/v1/connect/keys', auth: 'bearer', response: 'SessionKeysResult', errors: <String>['SESSION_NOT_FOUND', 'AUTH_TOKEN_EXPIRED']),
-  EndpointSpec(id: 'GW-11', method: 'POST', path: '/v1/relay/ticket', auth: 'device', response: 'RelayTicketResult', errors: <String>['SESSION_NOT_FOUND', 'SESSION_AUTH_WINDOW_EXCEEDED', 'ADMIN_FORBIDDEN']),
-  EndpointSpec(id: 'GW-12', method: 'POST', path: '/v1/auth/email/code', auth: 'none', response: 'EmailCodeResult', errors: <String>['AUTH_INVALID_CREDENTIAL', 'AUTH_SMS_RATE_LIMITED']),
-  EndpointSpec(id: 'GW-13', method: 'POST', path: '/v1/auth/email/login', auth: 'none', response: 'EmailLoginResult', errors: <String>['AUTH_INVALID_CREDENTIAL', 'AUTH_TOO_MANY_ATTEMPTS']),
-  EndpointSpec(id: 'GW-14', method: 'POST', path: '/v1/files', auth: 'bearer', response: 'FileUploadResult', errors: <String>['AUTH_TOKEN_EXPIRED', 'FILE_READ_FAILED', 'CONN_RATE_LIMITED']),
-  EndpointSpec(id: 'GW-15', method: 'GET', path: '/v1/files/', auth: 'bearer', response: 'binary', errors: <String>['AUTH_TOKEN_EXPIRED', 'FILE_NOT_FOUND', 'ADMIN_FORBIDDEN']),
-  EndpointSpec(id: 'GW-16', method: 'POST', path: '/v1/assist/create', auth: 'bearer', response: 'AssistCreateResult', errors: <String>['CONN_DEVICE_NOT_FOUND', 'ADMIN_FORBIDDEN', 'CONN_RATE_LIMITED']),
-  EndpointSpec(id: 'GW-17', method: 'POST', path: '/v1/assist/redeem', auth: 'bearer', response: 'AssistRedeemResult', errors: <String>['CONN_ASSIST_CODE_INVALID', 'CONN_ASSIST_CODE_USED', 'CONN_ASSIST_CODE_EXPIRED', 'CONN_SELF_CONNECT']),
-  EndpointSpec(id: 'GW-18', method: 'GET', path: '/v1/config', auth: 'none', response: 'ClientConfigResult', errors: <String>['SRV_INTERNAL']),
-  EndpointSpec(id: 'GW-19', method: 'GET', path: '/v1/net/reflect', auth: 'none', response: 'ReflectResult', errors: <String>['SRV_INTERNAL']),
-  EndpointSpec(id: 'GW-20', method: 'POST', path: '/v1/devices/password', auth: 'bearer', response: 'OkResult', errors: <String>['CONN_DEVICE_NOT_FOUND', 'CONN_CAPTCHA_INVALID', 'AUTH_TOKEN_EXPIRED']),
-  EndpointSpec(id: 'GW-21', method: 'GET', path: '/v1/files', auth: 'bearer', response: 'FileListResult', errors: <String>['AUTH_TOKEN_EXPIRED', 'SRV_INTERNAL']),
-  EndpointSpec(id: 'GW-22', method: 'DELETE', path: '/v1/files/', auth: 'bearer', response: 'FileDeletedResult', errors: <String>['AUTH_TOKEN_EXPIRED', 'FILE_NOT_FOUND', 'ADMIN_FORBIDDEN']),
-  EndpointSpec(id: 'GW-23', method: 'POST', path: '/v1/files/', auth: 'bearer', response: 'FileTicketResult', errors: <String>['AUTH_TOKEN_EXPIRED', 'FILE_NOT_FOUND', 'CONN_DEVICE_NOT_FOUND']),
-  EndpointSpec(id: 'GW-24', method: 'POST', path: '/v1/sessions/ready', auth: 'device', response: 'SessionStateResult', errors: <String>['SESSION_NOT_FOUND', 'ADMIN_FORBIDDEN', 'SESSION_AUTH_WINDOW_EXCEEDED']),
-  EndpointSpec(id: 'GW-25', method: 'POST', path: '/v1/sessions/close', auth: 'device', response: 'SessionStateResult', errors: <String>['SESSION_NOT_FOUND', 'ADMIN_FORBIDDEN']),
-  EndpointSpec(id: 'SYS-01', method: 'GET', path: '/healthz', auth: 'none', response: 'OkResult', errors: <String>['[]']),
-  EndpointSpec(id: 'SYS-02', method: 'GET', path: '/readyz', auth: 'none', response: 'OkResult', errors: <String>['SRV_DB_UNAVAILABLE', 'SRV_CACHE_UNAVAILABLE']),
+  EndpointSpec(
+    id: 'ADM-01',
+    method: 'POST',
+    path: '/admin/v1/login',
+    auth: 'none',
+    response: 'AdminSession',
+    errors: <String>[
+      'AUTH_INVALID_CREDENTIAL',
+      'AUTH_TOO_MANY_ATTEMPTS',
+      'ADMIN_MFA_REQUIRED',
+    ],
+  ),
+  EndpointSpec(
+    id: 'ADM-02',
+    method: 'POST',
+    path: '/admin/v1/logout',
+    auth: 'admin',
+    response: 'OkResult',
+    errors: <String>['SRV_INTERNAL'],
+  ),
+  EndpointSpec(
+    id: 'ADM-03',
+    method: 'GET',
+    path: '/admin/v1/stats/overview',
+    auth: 'admin',
+    response: 'Overview',
+    errors: <String>['ADMIN_SESSION_EXPIRED', 'ADMIN_FORBIDDEN'],
+  ),
+  EndpointSpec(
+    id: 'ADM-04',
+    method: 'GET',
+    path: '/admin/v1/users',
+    auth: 'admin',
+    response: 'list<UserRow>',
+    errors: <String>['ADMIN_SESSION_EXPIRED', 'ADMIN_FORBIDDEN'],
+  ),
+  EndpointSpec(
+    id: 'ADM-05',
+    method: 'POST',
+    path: '/admin/v1/users/ban',
+    auth: 'admin',
+    response: 'OkResult',
+    errors: <String>[
+      'ADMIN_SESSION_EXPIRED',
+      'ADMIN_FORBIDDEN',
+      'ADMIN_REASON_REQUIRED',
+    ],
+  ),
+  EndpointSpec(
+    id: 'ADM-06',
+    method: 'GET',
+    path: '/admin/v1/devices',
+    auth: 'admin',
+    response: 'list<DeviceRow>',
+    errors: <String>['ADMIN_SESSION_EXPIRED', 'ADMIN_FORBIDDEN'],
+  ),
+  EndpointSpec(
+    id: 'ADM-07',
+    method: 'GET',
+    path: '/admin/v1/sessions',
+    auth: 'admin',
+    response: 'list<SessionRow>',
+    errors: <String>['ADMIN_SESSION_EXPIRED', 'ADMIN_FORBIDDEN'],
+  ),
+  EndpointSpec(
+    id: 'ADM-08',
+    method: 'POST',
+    path: '/admin/v1/sessions/kill',
+    auth: 'admin',
+    response: 'KillSessionResult',
+    errors: <String>[
+      'ADMIN_SESSION_EXPIRED',
+      'ADMIN_FORBIDDEN',
+      'ADMIN_REASON_REQUIRED',
+    ],
+  ),
+  EndpointSpec(
+    id: 'ADM-09',
+    method: 'GET',
+    path: '/admin/v1/config',
+    auth: 'admin',
+    response: 'ConfigView',
+    errors: <String>['ADMIN_SESSION_EXPIRED', 'ADMIN_FORBIDDEN'],
+  ),
+  EndpointSpec(
+    id: 'ADM-10',
+    method: 'PUT',
+    path: '/admin/v1/config',
+    auth: 'admin',
+    response: 'ConfigPutResult',
+    errors: <String>[
+      'ADMIN_SESSION_EXPIRED',
+      'ADMIN_FORBIDDEN',
+      'ADMIN_CONFIG_INVALID',
+    ],
+  ),
+  EndpointSpec(
+    id: 'ADM-11',
+    method: 'GET',
+    path: '/admin/v1/audit',
+    auth: 'admin',
+    response: 'list<AuditRow>',
+    errors: <String>['ADMIN_SESSION_EXPIRED', 'ADMIN_FORBIDDEN'],
+  ),
+  EndpointSpec(
+    id: 'ADM-12',
+    method: 'POST',
+    path: '/admin/v1/devices/force-offline',
+    auth: 'admin',
+    response: 'OkResult',
+    errors: <String>[
+      'ADMIN_SESSION_EXPIRED',
+      'ADMIN_FORBIDDEN',
+      'ADMIN_REASON_REQUIRED',
+      'CONN_DEVICE_NOT_FOUND',
+    ],
+  ),
+  EndpointSpec(
+    id: 'ADM-13',
+    method: 'POST',
+    path: '/admin/v1/devices/unbind',
+    auth: 'admin',
+    response: 'OkResult',
+    errors: <String>[
+      'ADMIN_SESSION_EXPIRED',
+      'ADMIN_FORBIDDEN',
+      'ADMIN_REASON_REQUIRED',
+      'CONN_DEVICE_NOT_FOUND',
+    ],
+  ),
+  EndpointSpec(
+    id: 'ADM-14',
+    method: 'GET',
+    path: '/admin/v1/audit/actions',
+    auth: 'admin',
+    response: 'AuditActionsResult',
+    errors: <String>['ADMIN_SESSION_EXPIRED', 'ADMIN_FORBIDDEN'],
+  ),
+  EndpointSpec(
+    id: 'ADM-15',
+    method: 'GET',
+    path: '/admin/v1/config/history',
+    auth: 'admin',
+    response: 'ConfigHistoryResult',
+    errors: <String>['ADMIN_SESSION_EXPIRED', 'ADMIN_FORBIDDEN'],
+  ),
+  EndpointSpec(
+    id: 'ADM-16',
+    method: 'POST',
+    path: '/admin/v1/config/rollback',
+    auth: 'admin',
+    response: 'ConfigPutResult',
+    errors: <String>[
+      'ADMIN_SESSION_EXPIRED',
+      'ADMIN_FORBIDDEN',
+      'ADMIN_CONFIG_INVALID',
+    ],
+  ),
+  EndpointSpec(
+    id: 'ADM-17',
+    method: 'GET',
+    path: '/admin/v1/sessions/quality',
+    auth: 'admin',
+    response: 'SessionQualityResult',
+    errors: <String>['ADMIN_SESSION_EXPIRED', 'ADMIN_FORBIDDEN'],
+  ),
+  EndpointSpec(
+    id: 'ADM-18',
+    method: 'GET',
+    path: '/admin/v1/devices/quality',
+    auth: 'admin',
+    response: 'DeviceQualityResult',
+    errors: <String>['ADMIN_SESSION_EXPIRED', 'ADMIN_FORBIDDEN'],
+  ),
+  EndpointSpec(
+    id: 'ADM-19',
+    method: 'POST',
+    path: '/admin/v1/devices/flag-risk',
+    auth: 'admin',
+    response: 'OkResult',
+    errors: <String>[
+      'ADMIN_SESSION_EXPIRED',
+      'ADMIN_FORBIDDEN',
+      'ADMIN_REASON_REQUIRED',
+      'CONN_DEVICE_NOT_FOUND',
+    ],
+  ),
+  EndpointSpec(
+    id: 'ADM-20',
+    method: 'POST',
+    path: '/admin/v1/devices/clear-risk',
+    auth: 'admin',
+    response: 'OkResult',
+    errors: <String>[
+      'ADMIN_SESSION_EXPIRED',
+      'ADMIN_FORBIDDEN',
+      'ADMIN_REASON_REQUIRED',
+      'CONN_DEVICE_NOT_FOUND',
+    ],
+  ),
+  EndpointSpec(
+    id: 'ADM-21',
+    method: 'GET',
+    path: '/admin/v1/admins',
+    auth: 'admin',
+    response: 'list<AdminRow>',
+    errors: <String>['ADMIN_SESSION_EXPIRED', 'ADMIN_FORBIDDEN'],
+  ),
+  EndpointSpec(
+    id: 'ADM-22',
+    method: 'POST',
+    path: '/admin/v1/admins/update',
+    auth: 'admin',
+    response: 'OkResult',
+    errors: <String>[
+      'ADMIN_SESSION_EXPIRED',
+      'ADMIN_FORBIDDEN',
+      'ADMIN_REASON_REQUIRED',
+    ],
+  ),
+  EndpointSpec(
+    id: 'ADM-23',
+    method: 'GET',
+    path: '/admin/v1/versions',
+    auth: 'admin',
+    response: 'list<ClientVersionRow>',
+    errors: <String>['ADMIN_SESSION_EXPIRED', 'ADMIN_FORBIDDEN'],
+  ),
+  EndpointSpec(
+    id: 'ADM-24',
+    method: 'POST',
+    path: '/admin/v1/versions',
+    auth: 'admin',
+    response: 'ClientVersionRow',
+    errors: <String>[
+      'ADMIN_SESSION_EXPIRED',
+      'ADMIN_FORBIDDEN',
+      'ADMIN_CONFIG_INVALID',
+    ],
+  ),
+  EndpointSpec(
+    id: 'ADM-25',
+    method: 'POST',
+    path: '/admin/v1/versions/retire',
+    auth: 'admin',
+    response: 'OkResult',
+    errors: <String>[
+      'ADMIN_SESSION_EXPIRED',
+      'ADMIN_FORBIDDEN',
+      'ADMIN_REASON_REQUIRED',
+    ],
+  ),
+  EndpointSpec(
+    id: 'ADM-26',
+    method: 'GET',
+    path: '/admin/v1/risk/blacklist',
+    auth: 'admin',
+    response: 'list<BlacklistRow>',
+    errors: <String>['ADMIN_SESSION_EXPIRED', 'ADMIN_FORBIDDEN'],
+  ),
+  EndpointSpec(
+    id: 'ADM-27',
+    method: 'POST',
+    path: '/admin/v1/risk/blacklist',
+    auth: 'admin',
+    response: 'BlacklistRow',
+    errors: <String>[
+      'ADMIN_SESSION_EXPIRED',
+      'ADMIN_FORBIDDEN',
+      'ADMIN_CONFIG_INVALID',
+    ],
+  ),
+  EndpointSpec(
+    id: 'ADM-28',
+    method: 'POST',
+    path: '/admin/v1/risk/blacklist/remove',
+    auth: 'admin',
+    response: 'OkResult',
+    errors: <String>[
+      'ADMIN_SESSION_EXPIRED',
+      'ADMIN_FORBIDDEN',
+      'ADMIN_REASON_REQUIRED',
+    ],
+  ),
+  EndpointSpec(
+    id: 'ADM-29',
+    method: 'GET',
+    path: '/admin/v1/risk/alerts',
+    auth: 'admin',
+    response: 'list<RiskAlertRow>',
+    errors: <String>['ADMIN_SESSION_EXPIRED', 'ADMIN_FORBIDDEN'],
+  ),
+  EndpointSpec(
+    id: 'ADM-30',
+    method: 'GET',
+    path: '/admin/v1/audit/export',
+    auth: 'admin',
+    response: 'AuditExportResult',
+    errors: <String>['ADMIN_SESSION_EXPIRED', 'ADMIN_FORBIDDEN'],
+  ),
+  EndpointSpec(
+    id: 'ADM-31',
+    method: 'POST',
+    path: '/admin/v1/sessions/kill-request',
+    auth: 'admin',
+    response: 'KillRequestRow',
+    errors: <String>[
+      'ADMIN_SESSION_EXPIRED',
+      'ADMIN_FORBIDDEN',
+      'ADMIN_REASON_REQUIRED',
+      'SESSION_NOT_FOUND',
+    ],
+  ),
+  EndpointSpec(
+    id: 'ADM-32',
+    method: 'POST',
+    path: '/admin/v1/sessions/kill-confirm',
+    auth: 'admin',
+    response: 'KillSessionResult',
+    errors: <String>[
+      'ADMIN_SESSION_EXPIRED',
+      'ADMIN_FORBIDDEN',
+      'SESSION_NOT_FOUND',
+    ],
+  ),
+  EndpointSpec(
+    id: 'ADM-33',
+    method: 'GET',
+    path: '/admin/v1/sessions/kill-requests',
+    auth: 'admin',
+    response: 'list<KillRequestRow>',
+    errors: <String>['ADMIN_SESSION_EXPIRED', 'ADMIN_FORBIDDEN'],
+  ),
+  EndpointSpec(
+    id: 'ADM-34',
+    method: 'GET',
+    path: '/admin/v1/stats/trends',
+    auth: 'admin',
+    response: 'TrendsResult',
+    errors: <String>['ADMIN_SESSION_EXPIRED', 'ADMIN_FORBIDDEN'],
+  ),
+  EndpointSpec(
+    id: 'ADM-35',
+    method: 'GET',
+    path: '/admin/v1/users/sessions',
+    auth: 'admin',
+    response: 'list<SessionRow>',
+    errors: <String>['ADMIN_SESSION_EXPIRED', 'ADMIN_FORBIDDEN'],
+  ),
+  EndpointSpec(
+    id: 'ADM-36',
+    method: 'GET',
+    path: '/admin/v1/users/note',
+    auth: 'admin',
+    response: 'AccountNoteResult',
+    errors: <String>['ADMIN_SESSION_EXPIRED', 'ADMIN_FORBIDDEN'],
+  ),
+  EndpointSpec(
+    id: 'ADM-37',
+    method: 'POST',
+    path: '/admin/v1/users/note',
+    auth: 'admin',
+    response: 'OkResult',
+    errors: <String>['ADMIN_SESSION_EXPIRED', 'ADMIN_FORBIDDEN'],
+  ),
+  EndpointSpec(
+    id: 'ADM-38',
+    method: 'POST',
+    path: '/admin/v1/users/unban',
+    auth: 'admin',
+    response: 'OkResult',
+    errors: <String>[
+      'ADMIN_SESSION_EXPIRED',
+      'ADMIN_FORBIDDEN',
+      'ADMIN_REASON_REQUIRED',
+    ],
+  ),
+  EndpointSpec(
+    id: 'ADM-39',
+    method: 'POST',
+    path: '/admin/v1/users/kick',
+    auth: 'admin',
+    response: 'OkResult',
+    errors: <String>[
+      'ADMIN_SESSION_EXPIRED',
+      'ADMIN_FORBIDDEN',
+      'ADMIN_REASON_REQUIRED',
+    ],
+  ),
+  EndpointSpec(
+    id: 'ADM-40',
+    method: 'GET',
+    path: '/admin/v1/users/export',
+    auth: 'admin',
+    response: 'CsvExportResult',
+    errors: <String>['ADMIN_SESSION_EXPIRED', 'ADMIN_FORBIDDEN'],
+  ),
+  EndpointSpec(
+    id: 'ADM-41',
+    method: 'GET',
+    path: '/admin/v1/sessions/detail',
+    auth: 'admin',
+    response: 'SessionDetailResult',
+    errors: <String>[
+      'ADMIN_SESSION_EXPIRED',
+      'ADMIN_FORBIDDEN',
+      'SESSION_NOT_FOUND',
+    ],
+  ),
+  EndpointSpec(
+    id: 'GW-01',
+    method: 'POST',
+    path: '/v1/auth/sms',
+    auth: 'none',
+    response: 'OkResult',
+    errors: <String>['AUTH_INVALID_CREDENTIAL', 'AUTH_SMS_RATE_LIMITED'],
+  ),
+  EndpointSpec(
+    id: 'GW-02',
+    method: 'POST',
+    path: '/v1/auth/login',
+    auth: 'none',
+    response: 'LoginResult',
+    errors: <String>['AUTH_INVALID_CREDENTIAL', 'AUTH_TOO_MANY_ATTEMPTS'],
+  ),
+  EndpointSpec(
+    id: 'GW-03',
+    method: 'GET',
+    path: '/v1/devices',
+    auth: 'bearer',
+    response: 'DeviceListResult',
+    errors: <String>['AUTH_TOKEN_EXPIRED', 'SRV_INTERNAL'],
+  ),
+  EndpointSpec(
+    id: 'GW-04',
+    method: 'POST',
+    path: '/v1/devices/bind',
+    auth: 'bearer',
+    response: 'BindResult',
+    errors: <String>['AUTH_TOKEN_EXPIRED', 'SRV_INTERNAL'],
+  ),
+  EndpointSpec(
+    id: 'GW-05',
+    method: 'POST',
+    path: '/v1/devices/verify-code',
+    auth: 'device',
+    response: 'VerifyCodeResult',
+    errors: <String>['CONN_DEVICE_NOT_FOUND', 'ADMIN_FORBIDDEN'],
+  ),
+  EndpointSpec(
+    id: 'GW-06',
+    method: 'POST',
+    path: '/v1/connect/request',
+    auth: 'bearer',
+    response: 'ConnectResult',
+    errors: <String>[
+      'CONN_DEVICE_NOT_FOUND',
+      'CONN_DEVICE_OFFLINE',
+      'CONN_CAPTCHA_INVALID',
+      'CONN_RATE_LIMITED',
+    ],
+  ),
+  EndpointSpec(
+    id: 'GW-07',
+    method: 'POST',
+    path: '/v1/connect/consent',
+    auth: 'device',
+    response: 'ConsentResult',
+    errors: <String>['CONN_DEVICE_NOT_FOUND', 'ADMIN_FORBIDDEN'],
+  ),
+  EndpointSpec(
+    id: 'GW-08',
+    method: 'GET',
+    path: '/v1/connect/status',
+    auth: 'bearer',
+    response: 'SessionStateResult',
+    errors: <String>['SESSION_NOT_FOUND', 'AUTH_TOKEN_EXPIRED'],
+  ),
+  EndpointSpec(
+    id: 'GW-09',
+    method: 'POST',
+    path: '/v1/devices/identity',
+    auth: 'device',
+    response: 'OkResult',
+    errors: <String>['CONN_DEVICE_NOT_FOUND', 'ADMIN_FORBIDDEN'],
+  ),
+  EndpointSpec(
+    id: 'GW-10',
+    method: 'GET',
+    path: '/v1/connect/keys',
+    auth: 'bearer',
+    response: 'SessionKeysResult',
+    errors: <String>['SESSION_NOT_FOUND', 'AUTH_TOKEN_EXPIRED'],
+  ),
+  EndpointSpec(
+    id: 'GW-11',
+    method: 'POST',
+    path: '/v1/relay/ticket',
+    auth: 'device',
+    response: 'RelayTicketResult',
+    errors: <String>[
+      'SESSION_NOT_FOUND',
+      'SESSION_AUTH_WINDOW_EXCEEDED',
+      'ADMIN_FORBIDDEN',
+    ],
+  ),
+  EndpointSpec(
+    id: 'GW-12',
+    method: 'POST',
+    path: '/v1/auth/email/code',
+    auth: 'none',
+    response: 'EmailCodeResult',
+    errors: <String>['AUTH_INVALID_CREDENTIAL', 'AUTH_SMS_RATE_LIMITED'],
+  ),
+  EndpointSpec(
+    id: 'GW-13',
+    method: 'POST',
+    path: '/v1/auth/email/login',
+    auth: 'none',
+    response: 'EmailLoginResult',
+    errors: <String>['AUTH_INVALID_CREDENTIAL', 'AUTH_TOO_MANY_ATTEMPTS'],
+  ),
+  EndpointSpec(
+    id: 'GW-14',
+    method: 'POST',
+    path: '/v1/files',
+    auth: 'bearer',
+    response: 'FileUploadResult',
+    errors: <String>[
+      'AUTH_TOKEN_EXPIRED',
+      'FILE_READ_FAILED',
+      'CONN_RATE_LIMITED',
+    ],
+  ),
+  EndpointSpec(
+    id: 'GW-15',
+    method: 'GET',
+    path: '/v1/files/',
+    auth: 'bearer',
+    response: 'binary',
+    errors: <String>['AUTH_TOKEN_EXPIRED', 'FILE_NOT_FOUND', 'ADMIN_FORBIDDEN'],
+  ),
+  EndpointSpec(
+    id: 'GW-16',
+    method: 'POST',
+    path: '/v1/assist/create',
+    auth: 'bearer',
+    response: 'AssistCreateResult',
+    errors: <String>[
+      'CONN_DEVICE_NOT_FOUND',
+      'ADMIN_FORBIDDEN',
+      'CONN_RATE_LIMITED',
+    ],
+  ),
+  EndpointSpec(
+    id: 'GW-17',
+    method: 'POST',
+    path: '/v1/assist/redeem',
+    auth: 'bearer',
+    response: 'AssistRedeemResult',
+    errors: <String>[
+      'CONN_ASSIST_CODE_INVALID',
+      'CONN_ASSIST_CODE_USED',
+      'CONN_ASSIST_CODE_EXPIRED',
+      'CONN_SELF_CONNECT',
+    ],
+  ),
+  EndpointSpec(
+    id: 'GW-18',
+    method: 'GET',
+    path: '/v1/config',
+    auth: 'none',
+    response: 'ClientConfigResult',
+    errors: <String>['SRV_INTERNAL'],
+  ),
+  EndpointSpec(
+    id: 'GW-19',
+    method: 'GET',
+    path: '/v1/net/reflect',
+    auth: 'none',
+    response: 'ReflectResult',
+    errors: <String>['SRV_INTERNAL'],
+  ),
+  EndpointSpec(
+    id: 'GW-20',
+    method: 'POST',
+    path: '/v1/devices/password',
+    auth: 'bearer',
+    response: 'OkResult',
+    errors: <String>[
+      'CONN_DEVICE_NOT_FOUND',
+      'CONN_CAPTCHA_INVALID',
+      'AUTH_TOKEN_EXPIRED',
+    ],
+  ),
+  EndpointSpec(
+    id: 'GW-21',
+    method: 'GET',
+    path: '/v1/files',
+    auth: 'bearer',
+    response: 'FileListResult',
+    errors: <String>['AUTH_TOKEN_EXPIRED', 'SRV_INTERNAL'],
+  ),
+  EndpointSpec(
+    id: 'GW-22',
+    method: 'DELETE',
+    path: '/v1/files/',
+    auth: 'bearer',
+    response: 'FileDeletedResult',
+    errors: <String>['AUTH_TOKEN_EXPIRED', 'FILE_NOT_FOUND', 'ADMIN_FORBIDDEN'],
+  ),
+  EndpointSpec(
+    id: 'GW-23',
+    method: 'POST',
+    path: '/v1/files/',
+    auth: 'bearer',
+    response: 'FileTicketResult',
+    errors: <String>[
+      'AUTH_TOKEN_EXPIRED',
+      'FILE_NOT_FOUND',
+      'CONN_DEVICE_NOT_FOUND',
+    ],
+  ),
+  EndpointSpec(
+    id: 'GW-24',
+    method: 'POST',
+    path: '/v1/sessions/ready',
+    auth: 'device',
+    response: 'SessionStateResult',
+    errors: <String>[
+      'SESSION_NOT_FOUND',
+      'ADMIN_FORBIDDEN',
+      'SESSION_AUTH_WINDOW_EXCEEDED',
+    ],
+  ),
+  EndpointSpec(
+    id: 'GW-25',
+    method: 'POST',
+    path: '/v1/sessions/close',
+    auth: 'device',
+    response: 'SessionStateResult',
+    errors: <String>['SESSION_NOT_FOUND', 'ADMIN_FORBIDDEN'],
+  ),
+  EndpointSpec(
+    id: 'GW-26',
+    method: 'POST',
+    path: '/v1/sessions/quality',
+    auth: 'device',
+    response: 'OkResult',
+    errors: <String>['SESSION_NOT_FOUND', 'ADMIN_FORBIDDEN', 'SRV_INTERNAL'],
+  ),
+  EndpointSpec(
+    id: 'GW-27',
+    method: 'POST',
+    path: '/v1/sessions/health',
+    auth: 'device',
+    response: 'OkResult',
+    errors: <String>['SESSION_NOT_FOUND', 'ADMIN_FORBIDDEN', 'SRV_INTERNAL'],
+  ),
+  EndpointSpec(
+    id: 'SYS-01',
+    method: 'GET',
+    path: '/healthz',
+    auth: 'none',
+    response: 'OkResult',
+    errors: <String>['[]'],
+  ),
+  EndpointSpec(
+    id: 'SYS-02',
+    method: 'GET',
+    path: '/readyz',
+    auth: 'none',
+    response: 'OkResult',
+    errors: <String>['SRV_DB_UNAVAILABLE', 'SRV_CACHE_UNAVAILABLE'],
+  ),
 ];

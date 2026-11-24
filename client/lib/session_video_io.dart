@@ -51,6 +51,29 @@ typedef AttachRunner = Future<Map<String, dynamic>> Function(
   Map<String, String> args,
 );
 
+/// attach 失败的结构化信息（来自 er_ctrl_attach 的 error 对象）。
+///
+/// UI 只展示 message + trace_id；绝不显示 code/name 里的技术细节，
+/// 更不能显示内部 URL / 原始 JSON（ER-905 实测踩过）。
+class AttachFailure {
+  const AttachFailure({
+    this.code = '',
+    this.name = '',
+    this.message = '画面接管失败',
+    this.retryable = false,
+    this.traceId = '',
+  });
+
+  final String code;
+  final String name;
+  final String message;
+  final bool retryable;
+  final String traceId;
+
+  /// 展示文案：只含 message，trace_id 由 UI 单独提供复制入口。
+  String get display => message;
+}
+
 class SessionVideo {
   SessionVideo._();
   static final SessionVideo instance = SessionVideo._();
@@ -65,6 +88,10 @@ class SessionVideo {
   int _lastH = 0;
   Uint8List? _buffer;
   String _error = '';
+  AttachFailure? _failure;
+
+  /// 最近一次 attach 失败的结构化原因（UI 用它渲染可重试状态）。
+  AttachFailure? get failure => _failure;
   int _frameCount = 0;
   int _nativeFps = 0;
   int _decodeMs = 0;
@@ -168,6 +195,9 @@ class SessionVideo {
     required String deviceToken,
     required String sessionId,
   }) async {
+    // 每次 attach 开始都先清旧失败态：否则上一次的错误会一直挂在画面上。
+    _failure = null;
+    _error = '';
     if (_ffiSession != null) return;
     try {
       final map = await attachRunner({
@@ -179,16 +209,37 @@ class SessionVideo {
         'session_id': sessionId,
       });
       if (map['ok'] != true) {
-        _error = map['error']?.toString() ?? 'attach failed';
+        final raw = map['error'];
+        if (raw is Map) {
+          _failure = AttachFailure(
+            code: raw['code']?.toString() ?? '',
+            name: raw['name']?.toString() ?? '',
+            message: (raw['message']?.toString().isNotEmpty ?? false)
+                ? raw['message'].toString()
+                : '画面接管失败',
+            retryable: raw['retryable'] == true,
+            traceId: raw['trace_id']?.toString() ?? '',
+          );
+        } else {
+          // legacy 字符串错误（老版本 FFI）可能含内部 URL / 原始 JSON：
+          // 原文只进 debug 日志，UI 一律用稳定文案。
+          debugPrint('[video] legacy attach error: $raw');
+          _failure = const AttachFailure(message: '画面接管失败，请重试');
+        }
+        _error = _failure!.display;
         debugPrint('[video] attach failed: $_error');
         return;
       }
       _lib ??= openLibrary();
       _ffiSession = map['session_id'] as String;
+      _failure = null;
+      _error = '';
       debugPrint('[video] attached $_ffiSession');
     } catch (e) {
-      _error = e.toString();
-      debugPrint('[video] attach exception: $_error');
+      // 原始异常可能带内部 URL/端口：只进日志，UI 用稳定文案。
+      debugPrint('[video] attach exception: $e');
+      _failure = const AttachFailure(message: '连接失败，请检查网络后重试');
+      _error = _failure!.display;
     }
   }
 
@@ -284,8 +335,13 @@ class SessionVideo {
   }
 
   void close() {
+    // 失败 attach 后 _ffiSession 仍为 null：也必须清掉失败态，否则重连看不到变化。
     final id = _ffiSession;
-    if (id == null) return;
+    if (id == null) {
+      _failure = null;
+      _error = '';
+      return;
+    }
     try {
       final lib = _lib;
       final sidPtr = id.toNativeUtf8();
@@ -307,6 +363,9 @@ class SessionVideo {
     _image?.dispose();
     _image = null;
     _frameCount = 0;
+    // close 是「回到干净状态」：无论之前是成功还是失败，失败态都要清掉。
+    _failure = null;
+    _error = '';
   }
 }
 

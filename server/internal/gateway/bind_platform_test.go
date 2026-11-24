@@ -161,9 +161,11 @@ func TestBindMalformedBodyIsRejected(t *testing.T) {
 		t.Fatalf("list devices: %v", err)
 	}
 
-	// DisallowUnknownFields：多一个字段整包作废。
+	// DisallowUnknownFields：多一个**未知**字段整包作废。
+	// 注意 device_name/os_version/client_version/nat_type 自 ADM-API-04a 起是合法字段，
+	// 这里用真正的拼写错误（device_nam）验证拒绝路径。
 	status, raw := f.do(http.MethodPost, "/v1/devices/bind",
-		strings.NewReader(`{"platform":"macos","device_name":"mac"}`), hdr)
+		strings.NewReader(`{"platform":"macos","device_nam":"mac"}`), hdr)
 	if status == http.StatusOK {
 		t.Fatalf("解析失败的 bind 不许成功，否则会凭空多一台设备：%s", raw)
 	}

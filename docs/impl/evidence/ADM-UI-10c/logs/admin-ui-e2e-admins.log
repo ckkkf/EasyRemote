@@ -1,0 +1,14 @@
+PASS nav shows admin page
+PASS admin columns -> ['用户名', '角色', '状态', 'MFA', '操作']
+PASS seeded admins listed -> 3
+PASS root is super with mfa -> super / root	 | super | 	启用	已开启	禁用
+PASS ops-dev is ops and disabled without mfa -> ops / ops-dev	 | ops | 	禁用	未开启	启用
+PASS role change requires reason
+PASS role change applied
+PASS role change writes audit
+PASS last super self-disable blocked -> 没有权限执行该操作 | 700005 ADMIN_FORBIDDEN · trace 9xD4bJS2oO7t9IaU | 复制 trace
+PASS root still active -> root	 | super | 	启用	已开启	禁用
+PASS deep link survives reload
+PASS non-super sees no admin nav
+PASS non-super gets forbidden -> ER | EasyRemote | 管理后台 | 仪表盘 | 用户 | 设备 | 会话 | 审计日志 | 配置中心 | O | ops-dev | 运维 | 退出登录 | 无权限 |  | 所有写操作按角色权限执行并写入审计 |  | 刷新
+E2E OK (13 checks)

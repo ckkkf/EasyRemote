@@ -1,0 +1,27 @@
+PASS no changes initially
+PASS history card rendered
+PASS diff lists before -> after -> 连接 · session.max_minutes: 720 -> 601
+PASS save enabled with valid change
+PASS config save writes audit -> config.update {"session.max_minutes":"720"}->{"session.max_minutes":"601"}
+PASS rollback restores previous value -> 720
+PASS rollback writes audit
+PASS config group shown
+PASS scoped save audits with platform -> app_config@windows
+PASS global unchanged after platform save
+PASS platform scope keeps its own value
+PASS version scope audited with platform and version -> app_config@windows@0.2.13
+PASS other version falls back to platform scope
+PASS invalid value disables save
+PASS invalid value explained
+PASS audit columns -> ['时间', '操作人', '动作', '对象', '结果', 'IP', '变更']
+PASS action options come from server -> ['全部动作', 'admin.login', 'config.rollback', 'config.update', 'user.ban']
+PASS audit export enabled
+PASS csv header exported -> 时间,操作人,角色,动作,对象,变更前,变更后,IP,结果
+PASS csv masks ip -> 2026-11-24T00:40:10Z,root,super,config.update,app_config@windows@0.2.13,"{""session.max_minutes"":""300""}","{""session.max_minutes"":""121""}",127.0.x.x:57945,ok
+PASS export count shown
+PASS export writes audit
+PASS exact action filter -> ['user.ban']
+PASS actor filter
+PASS future time range returns no rows
+PASS clearing filters restores rows
+E2E OK (26 checks)

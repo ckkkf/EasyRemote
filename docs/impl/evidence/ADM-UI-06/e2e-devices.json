@@ -1,0 +1,159 @@
+{
+  "generatedAt": "2026-11-24T08:39:56+0800",
+  "viewport": {
+    "width": 1360,
+    "height": 860
+  },
+  "checks": [
+    {
+      "name": "device columns",
+      "ok": true,
+      "detail": [
+        "设备码",
+        "设备名",
+        "归属账号",
+        "平台",
+        "系统版本",
+        "客户端版本",
+        "NAT",
+        "风险",
+        "在线",
+        "最后在线",
+        "操作"
+      ]
+    },
+    {
+      "name": "device names from bind",
+      "ok": true,
+      "detail": [
+        "夹具工作站",
+        "夹具测试机"
+      ]
+    },
+    {
+      "name": "os versions from bind",
+      "ok": true,
+      "detail": [
+        "macOS 15.1",
+        "Windows 11 23H2"
+      ]
+    },
+    {
+      "name": "online filter returns online devices",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "copy stays on list",
+      "ok": true,
+      "detail": "http://127.0.0.1:5399/devices"
+    },
+    {
+      "name": "flag-risk requires reason",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "risk badge shown",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "flag risk writes audit",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "risk cleared",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "clear risk writes audit",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "force-offline requires reason",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "force offline writes audit",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "force offline marks device offline",
+      "ok": true,
+      "detail": false
+    },
+    {
+      "name": "unbind removes device",
+      "ok": true,
+      "detail": "2 -> 1"
+    },
+    {
+      "name": "unbind writes audit",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "row opens device detail",
+      "ok": true,
+      "detail": "http://127.0.0.1:5399/devices/dev-ef995ff07807a145 (ctrl dev-5f166cc37f672781)"
+    },
+    {
+      "name": "device detail kv includes metadata",
+      "ok": true,
+      "detail": 11
+    },
+    {
+      "name": "device detail shows os/client/nat",
+      "ok": true,
+      "detail": "设备码 | 906 856 042 | 设备 ID | dev-ef995ff07807a145 | 归属账号 | acc-4394a0666b896bb6 | 设备名 | 夹具测试机 | 平台 | windows | 系统版本 | Win"
+    },
+    {
+      "name": "device sessions filtered by device",
+      "ok": true,
+      "detail": 1
+    },
+    {
+      "name": "device quality aggregated by day",
+      "ok": true,
+      "detail": 2
+    },
+    {
+      "name": "quality shows latency and relay",
+      "ok": true,
+      "detail": "日期\t平均延迟 (ms)\t平均丢包 (‰)\t中继占比\t采样数\n2026-11-23\t30\t2\t0%\t1\n2026-11-24\t40\t5\t100%\t1"
+    },
+    {
+      "name": "range buttons enabled",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "no dead action on detail",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "deep link survives reload",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "back returns to list",
+      "ok": true,
+      "detail": "http://127.0.0.1:5399/devices"
+    },
+    {
+      "name": "unknown device shows not found",
+      "ok": true,
+      "detail": ""
+    }
+  ],
+  "pageErrors": [],
+  "controllerDeviceId": "dev-5f166cc37f672781"
+}

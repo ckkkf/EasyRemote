@@ -3,6 +3,7 @@ package gateway
 
 import (
 	"context"
+	"errors"
 	"net"
 	"net/http"
 	"strings"
@@ -213,6 +214,11 @@ func (a *App) Routes() http.Handler {
 			Platform    string `json:"platform"`
 			DeviceID    string `json:"device_id"`
 			DeviceToken string `json:"device_token"`
+			// 可选设备元信息（ADM-API-04a）：空值表示本次不上报，保留旧值。
+			DeviceName    string `json:"device_name"`
+			OSVersion     string `json:"os_version"`
+			ClientVersion string `json:"client_version"`
+			NATType       string `json:"nat_type"`
 		}
 		// 解析失败必须报错：以前这里 `_ = httpx.Decode` 吞掉错误、再用空值兜底成
 		// "windows"，于是任何不带 platform（或带了未知字段被 DisallowUnknownFields
@@ -228,6 +234,14 @@ func (a *App) Routes() http.Handler {
 		if err != nil {
 			WriteErr(w, err)
 			return
+		}
+		// 设备元信息随绑定上报；只有非空字段会被写入，避免某次漏报把已有信息清空。
+		if req.DeviceName != "" || req.OSVersion != "" || req.ClientVersion != "" || req.NATType != "" {
+			if err := a.Store.UpdateDeviceMeta(ctx, d.ID, req.DeviceName, req.OSVersion, req.ClientVersion, req.NATType); err != nil {
+				WriteErr(w, errcode.New(errcode.SrvInternal, "save device meta: "+err.Error()))
+				return
+			}
+			d.DeviceName, d.OSVersion, d.ClientVersion, d.NATType = req.DeviceName, req.OSVersion, req.ClientVersion, req.NATType
 		}
 		// device_token 只在此处返回一次，客户端须安全保存。
 		// platform 回显服务端落库的真值，客户端不得再用自己上报的字符串显示。
@@ -339,6 +353,22 @@ func (a *App) Routes() http.Handler {
 			WriteErr(w, errcode.New(errcode.ConnSelfConnect, "self connect"))
 			return
 		}
+		// 风控闸：命中黑名单的连接直接拒绝，并写一条告警（A10 / ADM-API-06c）。
+		if subject, rerr := a.riskBlocked(ctx, acc.ID, target.DeviceCode, clientIP(r)); rerr != nil {
+			WriteErr(w, errcode.New(errcode.SrvInternal, "risk check failed"))
+			return
+		} else if subject != "" {
+			if aerr := a.Store.RecordAlert(ctx, &store.RiskAlert{
+				Kind:    "blacklist_block",
+				Subject: subject,
+				Detail:  "account=" + acc.ID + " device=" + target.DeviceCode,
+			}); aerr != nil {
+				WriteErr(w, errcode.New(errcode.SrvInternal, "risk alert write failed"))
+				return
+			}
+			WriteErr(w, errcode.New(errcode.ConnRateLimited, "blocked by risk control"))
+			return
+		}
 		sameAccount := target.AccountID == acc.ID
 		trusted := a.Device.HasTrust(ctx, controllerID, target.ID)
 		// 同账号免密直连：账号本身就是最强的身份证明，同一账号下的设备
@@ -369,6 +399,16 @@ func (a *App) Routes() http.Handler {
 		sess, err := a.Session.Request(ctx, controllerID, target.ID)
 		if err != nil {
 			WriteErr(w, err)
+			return
+		}
+		// 建连埋点（ADM-API-02f2）：每次成功创建会话记一次尝试；进入 active 时再标成功。
+		if aerr := a.Store.CreateConnectAttempt(ctx, &store.ConnectAttempt{
+			SessionID:    sess.ID,
+			AccountID:    acc.ID,
+			ControllerID: controllerID,
+			TargetID:     target.ID,
+		}); aerr != nil {
+			WriteErr(w, errcode.New(errcode.SrvInternal, "connect attempt write failed"))
 			return
 		}
 		// 通知被控端有新的授权请求；生产（注入 Presence）下投递失败必须 fail-closed。
@@ -525,6 +565,113 @@ func (a *App) Routes() http.Handler {
 	})
 
 	// 数据面 ready：会话双方各自上报；两端都 ready 且已授权才进入 active。
+	// GW-27：客户端健康事件上报（ADM-API-02f5）。只有会话双方设备可以上报。
+	mux.HandleFunc("/v1/sessions/health", func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		var req struct {
+			SessionID string `json:"session_id"`
+			Kind      string `json:"kind"`
+		}
+		if err := httpx.Decode(w, r, &req); err != nil {
+			WriteErr(w, errcode.New(errcode.SrvInternal, "bad body"))
+			return
+		}
+		switch req.Kind {
+		case "crash", "reconnect_attempt", "reconnect_success":
+		default:
+			WriteErr(w, errcode.New(errcode.SrvInternal, "unknown kind: "+req.Kind))
+			return
+		}
+		sess, err := a.Session.Get(ctx, req.SessionID)
+		if err != nil {
+			WriteErr(w, err)
+			return
+		}
+		deviceID := ""
+		if a.requireDevice(ctx, r, sess.ControllerID) == nil {
+			deviceID = sess.ControllerID
+		} else if a.requireDevice(ctx, r, sess.TargetID) == nil {
+			deviceID = sess.TargetID
+		} else {
+			WriteErr(w, errcode.New(errcode.AdminForbidden, "session party credential required"))
+			return
+		}
+		if err := a.Store.RecordHealthEvent(ctx, &store.HealthEvent{
+			SessionID: req.SessionID, DeviceID: deviceID, Kind: req.Kind,
+		}); err != nil {
+			WriteErr(w, errcode.New(errcode.SrvInternal, "store health event: "+err.Error()))
+			return
+		}
+		httpx.OK(w, r, contract.OkResult{OK: true})
+	})
+
+	// GW-26：会话质量采样上报（ADM-API-02c）。只有会话双方设备可以上报。
+	mux.HandleFunc("/v1/sessions/quality", func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		var req struct {
+			SessionID string `json:"session_id"`
+			Samples   []struct {
+				TS           time.Time `json:"ts"`
+				LatencyMs    int       `json:"latency_ms"`
+				LossPermille int       `json:"loss_permille"`
+				Fps          int       `json:"fps"`
+				Tier         string    `json:"tier"`
+				Relay        bool      `json:"relay"`
+				Link         string    `json:"link"`
+				TargetFps    int       `json:"target_fps"`
+			} `json:"samples"`
+		}
+		if err := httpx.Decode(w, r, &req); err != nil {
+			WriteErr(w, errcode.New(errcode.SrvInternal, "bad body"))
+			return
+		}
+		sess, err := a.Session.Get(ctx, req.SessionID)
+		if err != nil {
+			WriteErr(w, err)
+			return
+		}
+		if a.requireDevice(ctx, r, sess.ControllerID) != nil && a.requireDevice(ctx, r, sess.TargetID) != nil {
+			WriteErr(w, errcode.New(errcode.AdminForbidden, "session party credential required"))
+			return
+		}
+		if len(req.Samples) == 0 {
+			WriteErr(w, errcode.New(errcode.SrvInternal, "empty samples"))
+			return
+		}
+		samples := make([]store.QualitySample, 0, len(req.Samples))
+		for _, s := range req.Samples {
+			ts := s.TS
+			if ts.IsZero() {
+				ts = time.Now().UTC()
+			}
+			// link 只接受 p2p/relay（其它值按未上报处理）；target_fps 限制在 0-240。
+			link := strings.ToLower(strings.TrimSpace(s.Link))
+			if link != "p2p" && link != "relay" {
+				link = ""
+			}
+			targetFps := s.TargetFps
+			if targetFps < 0 || targetFps > 240 {
+				targetFps = 0
+			}
+			samples = append(samples, store.QualitySample{
+				SessionID:    req.SessionID,
+				TS:           ts.UTC().Truncate(time.Second),
+				LatencyMs:    s.LatencyMs,
+				LossPermille: s.LossPermille,
+				Fps:          s.Fps,
+				Tier:         s.Tier,
+				Relay:        s.Relay,
+				Link:         link,
+				TargetFps:    targetFps,
+			})
+		}
+		if err := a.Store.AppendQualitySamples(ctx, samples); err != nil {
+			WriteErr(w, errcode.New(errcode.SrvInternal, "store quality: "+err.Error()))
+			return
+		}
+		httpx.OK(w, r, contract.OkResult{OK: true})
+	})
+
 	mux.HandleFunc("/v1/sessions/ready", func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		var req struct {
@@ -550,8 +697,16 @@ func (a *App) Routes() http.Handler {
 		}
 		updated, err := a.Session.Ready(ctx, req.SessionID, deviceID)
 		if err != nil {
+			a.recordSessionError(ctx, req.SessionID, "sessions.ready", err)
 			WriteErr(w, err)
 			return
+		}
+		// 进入 active 才算建连成功（ADM-API-02f2）；失败不阻断响应，但要能被统计发现。
+		if updated.State == session.StateActive {
+			if merr := a.Store.MarkConnectAttemptActive(ctx, updated.ID); merr != nil && !errors.Is(merr, store.ErrNotFound) {
+				WriteErr(w, errcode.New(errcode.SrvInternal, "connect attempt update failed"))
+				return
+			}
 		}
 		httpx.OK(w, r, contract.SessionStateResult{
 			SessionID: updated.ID,
@@ -622,7 +777,9 @@ func (a *App) Routes() http.Handler {
 			return
 		}
 		if sess.State != session.StateAuthorized && sess.State != session.StateActive {
-			WriteErr(w, errcode.New(errcode.SessionAuthWindowExceeded, "session not authorized"))
+			err := errcode.New(errcode.SessionAuthWindowExceeded, "session not authorized")
+			a.recordSessionError(ctx, sess.ID, "relay.ticket", err)
+			WriteErr(w, err)
 			return
 		}
 		// 票据按「本端设备」签发：调用方必须证明自己是谁
@@ -648,6 +805,11 @@ func (a *App) Routes() http.Handler {
 		token, _, err := a.Relay.IssueWithEpoch(sess.ID, self, peer, epoch)
 		if err != nil {
 			WriteErr(w, err)
+			return
+		}
+		// 签发中继票据说明这次连接走 relay（ADM-API-02f2）；p2p 需要客户端上报，服务端不猜。
+		if merr := a.Store.MarkConnectAttemptRelay(ctx, sess.ID); merr != nil && !errors.Is(merr, store.ErrNotFound) {
+			WriteErr(w, errcode.New(errcode.SrvInternal, "connect attempt update failed"))
 			return
 		}
 		httpx.OK(w, r, contract.RelayTicketResult{Ticket: token, SelfDevice: self})
