@@ -776,12 +776,6 @@ func (a *App) Routes() http.Handler {
 			WriteErr(w, err)
 			return
 		}
-		if sess.State != session.StateAuthorized && sess.State != session.StateActive {
-			err := errcode.New(errcode.SessionAuthWindowExceeded, "session not authorized")
-			a.recordSessionError(ctx, sess.ID, "relay.ticket", err)
-			WriteErr(w, err)
-			return
-		}
 		// 票据按「本端设备」签发：调用方必须证明自己是谁
 		self, peer := "", ""
 		if a.requireDevice(ctx, r, sess.ControllerID) == nil {
@@ -790,6 +784,12 @@ func (a *App) Routes() http.Handler {
 			self, peer = sess.TargetID, sess.ControllerID
 		} else {
 			WriteErr(w, errcode.New(errcode.AdminForbidden, "session party credential required"))
+			return
+		}
+		deadline, err := a.Session.RelayAuthorizationDeadline(sess)
+		if err != nil {
+			a.recordSessionError(ctx, sess.ID, "relay.ticket", err)
+			WriteErr(w, err)
 			return
 		}
 		var epoch int64
@@ -802,8 +802,9 @@ func (a *App) Routes() http.Handler {
 				return
 			}
 		}
-		token, _, err := a.Relay.IssueWithEpoch(sess.ID, self, peer, epoch)
+		token, _, err := a.Relay.IssueAuthorized(sess.ID, self, peer, epoch, deadline)
 		if err != nil {
+			a.recordSessionError(ctx, sess.ID, "relay.ticket", err)
 			WriteErr(w, err)
 			return
 		}

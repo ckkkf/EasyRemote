@@ -177,15 +177,22 @@ impl TargetAgent {
         signal_base: &str,
         timeout: std::time::Duration,
     ) -> Result<String, AgentError> {
-        let mut sig = crate::signalling::Signalling::connect(
+        self.connect_signalling(signal_base)?
+            .wait_for_request(timeout)
+            .map_err(|e| AgentError(e.to_string()))
+    }
+
+    pub(crate) fn connect_signalling(
+        &self,
+        signal_base: &str,
+    ) -> Result<crate::signalling::Signalling, AgentError> {
+        crate::signalling::Signalling::connect(
             signal_base,
             &self.device.device_id,
             &self.token,
             &self.device.device_token,
         )
-        .map_err(|e| AgentError(e.to_string()))?;
-        sig.wait_for_request(timeout)
-            .map_err(|e| AgentError(e.to_string()))
+        .map_err(|e| AgentError(e.to_string()))
     }
 
     pub fn device_code(&self) -> String {

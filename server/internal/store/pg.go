@@ -856,18 +856,11 @@ func (p *PG) ListSessions(ctx context.Context, state string, page Page) ([]*Sess
 	defer rows.Close()
 	var out []*Session
 	for rows.Next() {
-		var s Session
-		var endedAt, authExp *time.Time
-		if err := rows.Scan(&s.ID, &s.ControllerID, &s.TargetID, &s.State, &s.Reason, &s.StartedAt, &endedAt, &authExp); err != nil {
+		s, err := p.scanSession(rows)
+		if err != nil {
 			return nil, err
 		}
-		if endedAt != nil {
-			s.EndedAt = *endedAt
-		}
-		if authExp != nil {
-			s.AuthExpireAt = *authExp
-		}
-		out = append(out, &s)
+		out = append(out, s)
 	}
 	return out, rows.Err()
 }
@@ -1873,30 +1866,20 @@ func (p *PG) UpdateVersionStatus(ctx context.Context, id, status string) error {
 
 func (p *PG) QualityStatsSince(ctx context.Context, from time.Time) (QualityStats, error) {
 	var out QualityStats
-	var p50, p95 *float64
 	var relayPct *float64
-	var n int
+	// 最近秩与内存 Store 的统计定义一致，避免生产插值出不同结果。
 	err := p.pool.QueryRow(ctx,
 		`SELECT count(*),
-		        percentile_cont(0.5) WITHIN GROUP (ORDER BY latency_ms),
-		        percentile_cont(0.95) WITHIN GROUP (ORDER BY latency_ms),
+		        COALESCE(percentile_disc(0.5) WITHIN GROUP (ORDER BY latency_ms), 0),
+		        COALESCE(percentile_disc(0.95) WITHIN GROUP (ORDER BY latency_ms), 0),
 		        100.0 * avg(CASE WHEN relay THEN 1.0 ELSE 0.0 END)
 		 FROM session_quality_samples WHERE ts >= $1`, from).
-		Scan(&n, &p50, &p95, &relayPct)
+		Scan(&out.Samples, &out.LatencyP50Ms, &out.LatencyP95Ms, &relayPct)
 	if err != nil {
-		return out, mapErr(err)
+		return QualityStats{}, mapErr(err)
 	}
-	out.Samples = n
-	if n > 0 {
-		if p50 != nil {
-			out.LatencyP50Ms = int(*p50 + 0.5)
-		}
-		if p95 != nil {
-			out.LatencyP95Ms = int(*p95 + 0.5)
-		}
-		if relayPct != nil {
-			out.RelayPercent = int(*relayPct + 0.5)
-		}
+	if relayPct != nil {
+		out.RelayPercent = int(*relayPct + 0.5)
 	}
 	return out, nil
 }

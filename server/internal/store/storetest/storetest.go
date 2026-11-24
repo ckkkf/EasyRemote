@@ -195,6 +195,7 @@ func testSessionLifecycle(t *testing.T, s store.Store) {
 	}
 	got.State = "authorized"
 	got.AuthExpireAt = now.Add(12 * time.Hour)
+	got.ReadyTarget = true
 	if err := s.UpdateSession(bg(), got); err != nil {
 		t.Fatal(err)
 	}
@@ -202,6 +203,36 @@ func testSessionLifecycle(t *testing.T, s store.Store) {
 	if err != nil || len(list) != 1 {
 		t.Fatalf("list: %v %v", list, err)
 	}
+	row, single := list[0], readSession(t, s, got.ID)
+	if row.ID != got.ID || row.Version != got.Version || !row.ReadyTarget || row.ReadyController ||
+		!row.AuthExpireAt.Equal(single.AuthExpireAt) || !row.EndedAt.IsZero() {
+		t.Fatalf("list lost persisted authorization or readiness: %+v, read %+v", row, single)
+	}
+
+	closed := *got
+	closed.State, closed.Reason, closed.CloseKind = "closed", "auth_window_exceeded", "timeout"
+	closed.EndedAt = now
+	if err := s.UpdateSessionCAS(bg(), &closed, got.Version); err != nil {
+		t.Fatal(err)
+	}
+	list, err = s.ListSessions(bg(), "closed", store.Page{Limit: 10})
+	if err != nil || len(list) != 1 {
+		t.Fatalf("list closed: %v %v", list, err)
+	}
+	row = list[0]
+	if row.ID != got.ID || row.Reason != "auth_window_exceeded" || row.CloseKind != "timeout" ||
+		!row.EndedAt.Equal(readSession(t, s, got.ID).EndedAt) || row.EndedAt.IsZero() || row.Version != got.Version+1 {
+		t.Fatalf("list lost persisted close metadata: %+v", row)
+	}
+}
+
+func readSession(t *testing.T, s store.Store, id string) *store.Session {
+	t.Helper()
+	row, err := s.GetSession(bg(), id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return row
 }
 
 func testAuditOrder(t *testing.T, s store.Store) {
@@ -333,7 +364,7 @@ func testTouchAccountLogin(t *testing.T, s store.Store) {
 
 // ADM-API-04a：设备元信息可写入，且空值不覆盖已有值。
 func testUpdateDeviceMeta(t *testing.T, s store.Store) {
-	d := &store.Device{DeviceCode: "910000001", AccountID: "acc-meta", Platform: "macOS"}
+	d := &store.Device{DeviceCode: "910000001", AccountID: newDeviceOwner(t, s), Platform: "macOS"}
 	if err := s.CreateDevice(bg(), d); err != nil {
 		t.Fatalf("create: %v", err)
 	}
@@ -362,8 +393,9 @@ func testUpdateDeviceMeta(t *testing.T, s store.Store) {
 
 // ADM-API-04b：设备在线过滤与解绑。
 func testDeviceDeleteAndOnlineFilter(t *testing.T, s store.Store) {
-	on := &store.Device{DeviceCode: "920000001", AccountID: "acc-del", Platform: "macOS", Online: true}
-	off := &store.Device{DeviceCode: "920000002", AccountID: "acc-del", Platform: "Windows", Online: false}
+	owner := newDeviceOwner(t, s)
+	on := &store.Device{DeviceCode: "920000001", AccountID: owner, Platform: "macOS", Online: true}
+	off := &store.Device{DeviceCode: "920000002", AccountID: owner, Platform: "Windows", Online: false}
 	for _, d := range []*store.Device{on, off} {
 		if err := s.CreateDevice(bg(), d); err != nil {
 			t.Fatalf("create: %v", err)
@@ -478,8 +510,9 @@ func testQualitySamples(t *testing.T, s store.Store) {
 
 // ADM-API-02d：设备按天聚合（同一天多条取平均，跨天分组）。
 func testAggregateDeviceQuality(t *testing.T, s store.Store) {
-	d1 := &store.Device{DeviceCode: "940000001", AccountID: "acc-q", Platform: "macOS"}
-	d2 := &store.Device{DeviceCode: "940000002", AccountID: "acc-q", Platform: "Windows"}
+	owner := newDeviceOwner(t, s)
+	d1 := &store.Device{DeviceCode: "940000001", AccountID: owner, Platform: "macOS"}
+	d2 := &store.Device{DeviceCode: "940000002", AccountID: owner, Platform: "Windows"}
 	for _, d := range []*store.Device{d1, d2} {
 		if err := s.CreateDevice(bg(), d); err != nil {
 			t.Fatalf("device: %v", err)
@@ -557,7 +590,7 @@ func testQualityStatsSince(t *testing.T, s store.Store) {
 
 // ADM-API-04c：风险标记写入/解除，解除时清空原因。
 func testSetDeviceRisk(t *testing.T, s store.Store) {
-	d := &store.Device{DeviceCode: "960000001", AccountID: "acc-risk", Platform: "macOS"}
+	d := &store.Device{DeviceCode: "960000001", AccountID: newDeviceOwner(t, s), Platform: "macOS"}
 	if err := s.CreateDevice(bg(), d); err != nil {
 		t.Fatalf("create: %v", err)
 	}
@@ -581,6 +614,15 @@ func testSetDeviceRisk(t *testing.T, s store.Store) {
 	if err := s.SetDeviceRisk(bg(), "no-such", true, "x"); err == nil {
 		t.Fatal("want ErrNotFound for unknown device")
 	}
+}
+
+func newDeviceOwner(t *testing.T, s store.Store) string {
+	t.Helper()
+	account := &store.Account{PhoneHash: "hash-device-owner", PhoneEnc: "fixture"}
+	if err := s.CreateAccount(bg(), account); err != nil {
+		t.Fatalf("create device owner: %v", err)
+	}
+	return account.ID
 }
 
 // ADM-API-06a：管理员列表/计数/改角色/启停。

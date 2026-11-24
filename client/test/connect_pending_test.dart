@@ -1,8 +1,10 @@
 // 连接请求的「看得见」与「能退出」：以前只有一个 18px 转圈，卡住就是死界面。
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:easyremote_client/api.dart';
 import 'package:easyremote_client/pages/connect_page.dart';
+import 'package:easyremote_client/prefs.dart';
 import 'package:easyremote_client/theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -23,6 +25,33 @@ Widget _page(GatewayClient client) => MaterialApp(
 );
 
 void main() {
+  testWidgets(
+    'TestDirectConnectRequestsNoPasswordAndRevealsFieldOnlyWhenNeeded',
+    (tester) async {
+      final previous = appPrefs.value;
+      appPrefs.value = previous.copyWith(sameAccountDirect: true);
+      addTearDown(() => appPrefs.value = previous);
+      final bodies = <Map<String, dynamic>>[];
+      final client = GatewayClient(
+        baseUrl: 'http://test',
+        client: MockClient((req) async {
+          bodies.add(jsonDecode(req.body) as Map<String, dynamic>);
+          return http.Response(
+            '{"code":200004,"name":"CONN_CAPTCHA_EXPIRED","message":"需要验证码","retryable":false,"trace_id":"t1"}',
+            403,
+            headers: {'content-type': 'application/json'},
+          );
+        }),
+      );
+      await tester.pumpWidget(_page(client));
+      expect(find.byKey(const Key('captcha-field')), findsNothing);
+      await tester.tap(find.byKey(const Key('connect-button')));
+      await tester.pumpAndSettle();
+      expect(bodies.single, {'device_code': '123456789', 'direct': true});
+      expect(find.byKey(const Key('captcha-field')), findsOneWidget);
+    },
+  );
+
   testWidgets('请求中显示等待条与取消，取消后回到可操作状态', (tester) async {
     // 永远不回包：模拟网关把连接接住但不响应。
     final hang = Completer<http.Response>();

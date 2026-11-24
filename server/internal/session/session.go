@@ -52,6 +52,8 @@ const (
 	CommandReady    CommandKind = "ready"
 	CommandActivate CommandKind = "activate"
 	CommandClose    CommandKind = "close"
+
+	commandExpireForRequest CommandKind = "expire_for_request"
 )
 
 // Command 是一次状态迁移请求。
@@ -86,14 +88,14 @@ func (s *Service) Apply(ctx context.Context, cmd Command) (*store.Session, error
 	switch cmd.Kind {
 	case CommandRequest:
 		return s.request(ctx, cmd.ControllerID, cmd.TargetID)
-	case CommandConsent, CommandReady, CommandActivate, CommandClose:
+	case CommandConsent, CommandReady, CommandActivate, CommandClose, commandExpireForRequest:
 		return s.applyTransition(ctx, cmd)
 	default:
 		return nil, errcode.New(errcode.SrvInternal, "unknown session command: "+string(cmd.Kind))
 	}
 }
 
-// Request 发起一次建连请求。同一对设备已有未关闭会话时返回既有会话（幂等）。
+// Request 发起一次建连请求。只复用同一对设备尚未失效的会话。
 func (s *Service) Request(ctx context.Context, controllerID, targetID string) (*store.Session, error) {
 	return s.Apply(ctx, Command{Kind: CommandRequest, ControllerID: controllerID, TargetID: targetID})
 }
@@ -105,42 +107,59 @@ func (s *Service) request(ctx context.Context, controllerID, targetID string) (*
 	if controllerID == targetID {
 		return nil, errcode.New(errcode.ConnSelfConnect, controllerID)
 	}
-	existing, err := s.store.ListSessions(ctx, "", store.Page{Limit: 500})
-	if err != nil {
-		return nil, errcode.New(errcode.SrvInternal, err.Error())
-	}
-	now := s.now()
-	for _, sess := range existing {
-		if sess.ControllerID != controllerID || sess.TargetID != targetID {
-			continue
+	const maxRequestAttempts = 5
+	for attempt := 0; attempt < maxRequestAttempts; attempt++ {
+		candidate := &store.Session{
+			ControllerID: controllerID, TargetID: targetID,
+			State: StateRequested, StartedAt: s.now(),
 		}
-		switch sess.State {
-		case StateRequested:
-			// 超过授权等待窗口的 requested 不能复用，必须收口后新建。
-			if now.Sub(sess.StartedAt) > ConsentTimeout {
-				_, _ = s.Apply(ctx, Command{Kind: CommandClose, SessionID: sess.ID, Reason: "request_expired"})
-				continue
-			}
-			return sess, nil
-		case StateAuthorized:
-			if sess.AuthExpireAt.IsZero() || now.After(sess.AuthExpireAt) {
-				_, _ = s.Apply(ctx, Command{Kind: CommandClose, SessionID: sess.ID, Reason: "auth_window_exceeded"})
-				continue
-			}
-			return sess, nil
-		case StateActive:
-			return sess, nil
+		// 复用对象由设备对的原子写入返回，不依赖会话列表的页大小或排序。
+		live, created, err := s.store.CreateSessionExclusive(ctx, candidate)
+		if err != nil {
+			return nil, errcode.New(errcode.SrvInternal, err.Error())
+		}
+		if created || requestExpiryReason(live, s.now()) == "" {
+			return live, nil
+		}
+		current, err := s.Apply(ctx, Command{Kind: commandExpireForRequest, SessionID: live.ID})
+		if err != nil {
+			return nil, err
+		}
+		if current.State != StateClosed {
+			return current, nil
 		}
 	}
-	sess := &store.Session{ControllerID: controllerID, TargetID: targetID, State: StateRequested, StartedAt: now}
-	live, created, err := s.store.CreateSessionExclusive(ctx, sess)
-	if err != nil {
-		return nil, errcode.New(errcode.SrvInternal, err.Error())
+	return nil, errcode.New(errcode.SrvInternal, "session busy: too many concurrent requests")
+}
+
+func requestExpiryReason(sess *store.Session, now time.Time) string {
+	switch sess.State {
+	case StateRequested:
+		if now.Sub(sess.StartedAt) > ConsentTimeout {
+			return "request_expired"
+		}
+	case StateAuthorized:
+		if authorizationExpired(sess, now) {
+			return "auth_window_exceeded"
+		}
 	}
-	if !created {
-		return live, nil
+	return ""
+}
+
+func authorizationExpired(sess *store.Session, now time.Time) bool {
+	return sess.AuthExpireAt.IsZero() || !now.Before(sess.AuthExpireAt)
+}
+
+// RelayAuthorizationDeadline 校验已完成设备验权的会话快照是否可初领或换领票据。
+// active 只证明数据面已经就绪，不延长被控端给出的授权窗口。
+func (s *Service) RelayAuthorizationDeadline(sess *store.Session) (time.Time, error) {
+	if sess.State != StateAuthorized && sess.State != StateActive {
+		return time.Time{}, errcode.New(errcode.SessionAuthWindowExceeded, "session not authorized")
 	}
-	return live, nil
+	if authorizationExpired(sess, s.now()) {
+		return time.Time{}, errcode.New(errcode.SessionAuthWindowExceeded, "session authorization expired")
+	}
+	return sess.AuthExpireAt, nil
 }
 
 // Consent 处理被控端授权结果（兼容入口，内部走 Apply）。
@@ -252,8 +271,7 @@ func transition(sess *store.Session, cmd Command, now time.Time) (*store.Session
 			return nil, false, errcode.New(errcode.SessionNotFound, "not authorized: "+sess.State)
 		}
 		// 授权窗口过期后不能再 ready，必须收口为 closed。
-		if sess.State == StateAuthorized &&
-			(sess.AuthExpireAt.IsZero() || now.After(sess.AuthExpireAt)) {
+		if sess.State == StateAuthorized && authorizationExpired(sess, now) {
 			next.State = StateClosed
 			// 先写 reason 再分类：否则 ClassifyClose 会按旧值/空串算成 unknown，
 			// 授权窗口到期就会被后台统计成「异常原因未知」。
@@ -297,7 +315,7 @@ func transition(sess *store.Session, cmd Command, now time.Time) (*store.Session
 		if !sess.ReadyController || !sess.ReadyTarget {
 			return nil, false, errcode.New(errcode.SessionNotFound, "peers not ready")
 		}
-		if sess.AuthExpireAt.IsZero() || now.After(sess.AuthExpireAt) {
+		if authorizationExpired(sess, now) {
 			next.State = StateClosed
 			// 先写 reason 再分类：否则 ClassifyClose 会按旧值/空串算成 unknown，
 			// 授权窗口到期就会被后台统计成「异常原因未知」。
@@ -312,9 +330,16 @@ func transition(sess *store.Session, cmd Command, now time.Time) (*store.Session
 		next.State = StateActive
 		return &next, true, nil
 
-	case CommandClose:
+	case CommandClose, commandExpireForRequest:
 		if sess.State == StateClosed {
 			return sess, false, nil
+		}
+		if cmd.Kind == commandExpireForRequest {
+			// CAS 冲突后重新检查，避免根据旧快照关闭已经就绪的会话。
+			cmd.Reason = requestExpiryReason(sess, now)
+			if cmd.Reason == "" {
+				return sess, false, nil
+			}
 		}
 		if !canTransition(sess.State, StateClosed) {
 			return nil, false, errcode.New(errcode.SessionNotFound, "cannot close: "+sess.State)

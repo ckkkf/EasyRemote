@@ -88,6 +88,14 @@ class ConsentController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// The native broker no longer has this request (remote cancel/host stop).
+  /// Close the UI without generating a second decision.
+  void dismiss() {
+    if (_pending == null) return;
+    _clearPending();
+    notifyListeners();
+  }
+
   /// 本机接受。
   bool accept() =>
       decide(_pending?.sessionId ?? '', accepted: true, reason: 'accepted');
@@ -131,12 +139,16 @@ class ConsentController extends ChangeNotifier {
   }
 
   void _finish(ConsentDecision decision) {
+    _clearPending();
+    _decisions.add(decision);
+    notifyListeners();
+  }
+
+  void _clearPending() {
     _ticker?.cancel();
     _ticker = null;
     _pending = null;
     _remaining = 0;
-    _decisions.add(decision);
-    notifyListeners();
   }
 
   @override

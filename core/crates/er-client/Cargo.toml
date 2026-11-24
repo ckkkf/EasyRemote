@@ -6,7 +6,7 @@ license.workspace = true
 description = "客户端到服务端的真实调用：登录、绑设备、登记身份、建会话、取票据与公钥"
 
 [dependencies]
-tungstenite = "0.24"
+tungstenite = { version = "0.24", features = ["rustls-tls-webpki-roots"] }
 ureq = { version = "2", features = ["json"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

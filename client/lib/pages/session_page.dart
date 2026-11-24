@@ -22,10 +22,7 @@ import 'diagnostics_page.dart';
 /// - s05 会话中：全屏远端画面占位 + 悬浮工具条（质量详情 / 全屏 / 断开连接）；
 /// - s06 质量详情：右侧抽屉面板，RTT/丢包取真实 ping 与 /v1/net/reflect，码率/帧率标「桌面端」。
 ///
-/// 状态说明（与 server 的真实能力一致）：HTTP 网关只会把会话推进到 authorized
-/// （对方已授权，/v1/relay/ticket 可签发），active 由桌面端 Rust 核心在解出第一帧后回写。
-/// 因此本页把 authorized 与 active 都算「已建立」，并用状态徽标区分是
-/// 「已授权 · 通道建立中」还是「会话进行中」，不假装已经拿到画面。
+/// 已授权只允许 attach；网关确认双方 ready 后才显示已连接。
 class SessionPage extends StatefulWidget {
   const SessionPage({
     super.key,
@@ -67,7 +64,7 @@ class SessionPage extends StatefulWidget {
   /// 是否接管视频（走 FFI）；widget 测试关掉，避免加载真实动态库。
   final bool enableVideo;
 
-  /// 视频会话适配器；默认委托 SessionVideo 单例，测试可注入 fake。
+  /// 视频会话适配器；默认使用当前页面独占的视频会话，测试可注入 fake。
   final VideoAdapter? video;
 
   @override
@@ -81,6 +78,8 @@ class _SessionPageState extends State<SessionPage> {
   bool _polling = false;
   final DateTime _openedAt = DateTime.now();
   DateTime? _liveSince;
+  bool _canLeave = false;
+  bool _dataPlaneReleased = false;
 
   /// 目标设备信息：只有目标设备属于本账号时才能从 /v1/devices 查到平台与在线状态，
   /// 查到就显示真值，查不到就写「未知（需桌面端）」，不猜。
@@ -101,6 +100,7 @@ class _SessionPageState extends State<SessionPage> {
   void initState() {
     super.initState();
     if (widget.initialStatus != null) _status = widget.initialStatus!;
+    if (_status.state == SessionState.active) _liveSince = DateTime.now();
     // 恢复会话时状态可能已经是 authorized/active：这种情况要立刻接管画面，
     // 否则只能等下一次轮询（测试里轮询被关掉，就永远不 attach）。
     if (_status.isLive && widget.enableVideo) {
@@ -123,83 +123,115 @@ class _SessionPageState extends State<SessionPage> {
 
   Timer? _videoTimer;
 
-  VideoAdapter get _video => widget.video ?? const DefaultVideoAdapter();
+  late final VideoAdapter _video = widget.video ?? DefaultVideoAdapter();
+  SessionVideo? get _nativeVideo => switch (_video) {
+    DefaultVideoAdapter(:final session) => session,
+    _ => null,
+  };
 
-  /// attach 只允许成功触发一次（ER-905）：并发轮询不得重复申请票据。
+  static const _firstFrameLimit = Duration(seconds: 10);
+  Timer? _firstFrameDeadline;
   bool _videoStarted = false;
+  bool _attaching = false;
+  bool _pollingVideo = false;
+  String? _mediaError;
 
   Future<void> _startVideoOnce() async {
-    if (_videoStarted) return;
+    if (_videoStarted ||
+        _attaching ||
+        _dataPlaneReleased ||
+        !widget.enableVideo ||
+        !_status.isLive)
+      return;
     _videoStarted = true;
-    if (!widget.enableVideo) return;
-    await _startVideo();
+    _attaching = true;
+    try {
+      final token = widget.client.token ?? '';
+      final deviceId = widget.client.deviceId ?? '';
+      final deviceToken = widget.client.deviceToken ?? '';
+      if (token.isEmpty || deviceId.isEmpty || deviceToken.isEmpty) {
+        _mediaError = '缺少本机设备凭证，请重新登录后连接';
+        return;
+      }
+      try {
+        await widget.client.ensureRuntimeConfig();
+      } on ApiException catch (e) {
+        if (mounted && !_dataPlaneReleased) _mediaError = e.message;
+        return;
+      }
+      if (!mounted || _dataPlaneReleased) return;
+      final relay = widget.client.relayAddr;
+      if (relay.isEmpty) {
+        _mediaError = '服务未配置中继地址，请联系管理员';
+        return;
+      }
+      await _video.attach(
+        gateway: widget.client.gatewayURL,
+        relay: relay,
+        token: token,
+        deviceId: deviceId,
+        deviceToken: deviceToken,
+        sessionId: widget.sessionId,
+      );
+      if (!mounted || _dataPlaneReleased) {
+        // Native attach may complete after release. Close its newly returned handle.
+        if (_video.attached) _video.close();
+        return;
+      }
+      if (!_video.attached) return;
+      _firstFrameDeadline = Timer(_firstFrameLimit, () {
+        if (!mounted || _dataPlaneReleased || _video.image != null) return;
+        setState(() => _mediaError = '未收到首帧，请检查被控端的屏幕录制权限或重试');
+      });
+      _videoTimer = Timer.periodic(
+        const Duration(milliseconds: 60),
+        (_) => unawaited(_pollVideo()),
+      );
+    } catch (error) {
+      if (mounted && !_dataPlaneReleased) {
+        _mediaError = '启动画面失败，请断开后重试';
+        debugPrint('[video] startup exception: ${error.runtimeType}');
+      }
+    } finally {
+      _attaching = false;
+      if (mounted && !_dataPlaneReleased) setState(() {});
+    }
   }
 
-  /// ER-504b：当前不做自动重连；用户可手动重新 attach 同一会话。
-  /// 重连（ER-905 4.1(4)）：必须真正允许**再次 attach**。
-  ///
-  /// 之前只清 timer 和 FFI 句柄，但 `_videoStarted` 仍为 true，
-  /// `_startVideoOnce()` 会直接 return —— 按钮等于死键。
-  /// 这里显式复位标志并清失败态，再走一次 attach；并发由 `_reconnecting` 挡住。
-  bool _reconnecting = false;
+  Future<void> _pollVideo() async {
+    if (_pollingVideo || _dataPlaneReleased) return;
+    _pollingVideo = true;
+    try {
+      final previous = _video.image;
+      final previousError = _video.error;
+      await _video.poll();
+      if (!mounted || _dataPlaneReleased) return;
+      if (_video.image != null) _firstFrameDeadline?.cancel();
+      if (_video.image != previous || _video.error != previousError) {
+        setState(() {
+          if (_video.image != null) _mediaError = null;
+        });
+      }
+    } finally {
+      _pollingVideo = false;
+    }
+  }
 
   Future<void> _reconnectVideo() async {
-    if (_reconnecting) return;
-    _reconnecting = true;
-    setState(() {});
-    try {
-      _videoTimer?.cancel();
-      _video.close();
+    if (_attaching || _dataPlaneReleased || _closer.closing) return;
+    _videoTimer?.cancel();
+    _firstFrameDeadline?.cancel();
+    _video.close();
+    setState(() {
+      _mediaError = null;
       _videoStarted = false;
-      await _startVideoOnce();
-    } finally {
-      _reconnecting = false;
-      if (mounted) setState(() {});
-    }
-  }
-
-  /// 接管会话并开始拉帧：FFI 里已经建好双缓冲，这里只是定时把最新帧解码成 ui.Image。
-  Future<void> _startVideo() async {
-    final token = widget.client.token ?? "";
-    final deviceId = widget.client.deviceId ?? "";
-    final deviceToken = widget.client.deviceToken ?? "";
-    if (token.isEmpty || deviceId.isEmpty) {
-      debugPrint("[video] 缺少登录态，跳过画面接管");
-      return;
-    }
-    try {
-      await widget.client.ensureRuntimeConfig();
-    } catch (e) {
-      debugPrint("[video] 运行时端点加载失败：$e");
-      return;
-    }
-    final relay = widget.client.relayAddr;
-    if (relay.isEmpty) {
-      debugPrint("[video] 服务端未下发 relay 端点，跳过画面接管");
-      return;
-    }
-    await _video.attach(
-      gateway: widget.client.gatewayURL,
-      relay: relay,
-      token: token,
-      deviceId: deviceId,
-      deviceToken: deviceToken,
-      sessionId: widget.sessionId,
-    );
-    // attach 失败时没有帧、也就没有轮询回调来触发重建：这里必须主动刷新一次，
-    // 否则失败的 message / trace_id 永远不会出现在画面上。
-    if (mounted) setState(() {});
-    _videoTimer = Timer.periodic(const Duration(milliseconds: 60), (_) async {
-      await _video.poll();
-      if (mounted && _video.image != null) setState(() {});
     });
+    await _startVideoOnce();
   }
 
   @override
   void dispose() {
-    _videoTimer?.cancel();
-    _video.close();
-    _poll?.cancel();
+    _releaseDataPlane();
     _tick?.cancel();
     super.dispose();
   }
@@ -227,30 +259,28 @@ class _SessionPageState extends State<SessionPage> {
   }
 
   Future<void> _pollOnce() async {
-    if (_polling) return;
+    if (_polling || _dataPlaneReleased) return;
     _polling = true;
     try {
       final s = await widget.client.sessionStatus(widget.sessionId);
-      if (!mounted) return;
+      if (!mounted || _dataPlaneReleased) return;
+      if (s.state == SessionState.active) _liveSince ??= DateTime.now();
       final wasLive = _status.isLive;
       setState(() => _status = s);
       if (!wasLive && s.isLive) {
-        _liveSince = DateTime.now();
         _measureLink();
         // 授权到位 → 启动一次 attach（并发轮询不会重复：_videoStarted 幂等）
         unawaited(_startVideoOnce());
       }
       if (s.state == SessionState.ended) {
         // 权威终态：停止轮询、停数据面、展示关闭原因（拒绝/超时/对端断开）
-        _poll?.cancel();
-        _videoTimer?.cancel();
-        _video.close();
+        _releaseDataPlane();
       }
       if (s.state == SessionState.failed) {
         _poll?.cancel();
       }
     } on ApiException catch (e) {
-      if (!mounted) return;
+      if (!mounted || _dataPlaneReleased) return;
       setState(
         () => _status = SessionStatus(SessionState.failed, message: e.message),
       );
@@ -353,9 +383,15 @@ class _SessionPageState extends State<SessionPage> {
   }
 
   void _leaveWith(String message) {
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(message)));
-    widget.onLeave();
+    if (_canLeave) return;
+    setState(() => _canLeave = true);
+    // maybePop reads the registered PopScope, which is updated by the next build.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(message)));
+      widget.onLeave();
+    });
   }
 
   late final SessionCloseCoordinator _closer = SessionCloseCoordinator(
@@ -369,6 +405,9 @@ class _SessionPageState extends State<SessionPage> {
 
   /// 释放本地数据面：停 attach 轮询、清 FFI 会话、停状态轮询。
   void _releaseDataPlane() {
+    if (_dataPlaneReleased) return;
+    _dataPlaneReleased = true;
+    _firstFrameDeadline?.cancel();
     _videoTimer?.cancel();
     _video.close();
     _poll?.cancel();
@@ -384,12 +423,7 @@ class _SessionPageState extends State<SessionPage> {
   Future<void> _disconnectAndLeave({
     String reason = 'controller_closed',
   }) async {
-    if (_closer.closing) {
-      // 不静默吞掉：让用户看到「正在断开」，避免以为点了没反应
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('正在断开，请稍候…')));
-      return;
-    }
+    if (_closer.closing || _canLeave) return;
     setState(() {});
     final outcome = await _closer.disconnect(_status.state, reason: reason);
     if (!mounted) return;
@@ -419,7 +453,7 @@ class _SessionPageState extends State<SessionPage> {
     // ER-905：系统返回（Esc / 手势 / 返回键）也必须走 close-before-leave，
     // 否则用户按一次返回就能绕过 GW-25，把会话留在服务端。
     return PopScope(
-      canPop: false,
+      canPop: _canLeave,
       onPopInvokedWithResult: (didPop, result) {
         if (didPop) return;
         unawaited(_disconnectAndLeave(reason: 'controller_cancel'));
@@ -753,6 +787,7 @@ class _SessionPageState extends State<SessionPage> {
               stateLabel: _stateLabel,
               connectedFor: _elapsed,
               onClose: () => setState(() => _sheetOpen = false),
+              video: _nativeVideo,
               onDiagnostics: _openDiagnostics,
             ),
           ),
@@ -763,9 +798,8 @@ class _SessionPageState extends State<SessionPage> {
   /// 远端画面：有帧就画，没帧才显示占位说明。
   Widget _remoteView(BuildContext context) {
     final img = _video.image;
-    if (img == null) {
-      // 把 FFI 侧的错误直接显示出来：黑屏时这是唯一能自证的线索
-      return _remotePlaceholder(context, _video.error);
+    if (img == null || _status.state != SessionState.active) {
+      return _remotePlaceholder(context, _mediaError ?? _video.error);
     }
     return Container(
       key: const Key("remote-canvas"),
@@ -780,14 +814,14 @@ class _SessionPageState extends State<SessionPage> {
               onPointerMove: (e) => _sendPointer(e.localPosition, scale, img),
               onPointerDown: (e) {
                 _sendPointer(e.localPosition, scale, img);
-                SessionVideo.instance.send(1, 0, 1);
+                _video.send(1, 0, 1);
               },
-              onPointerUp: (e) => SessionVideo.instance.send(1, 0, 0),
+              onPointerUp: (e) => _video.send(1, 0, 0),
               child: SizedBox(
                 width: iw * scale,
                 height: ih * scale,
-                child: SessionVideo.instance.textureId != null
-                    ? Texture(textureId: SessionVideo.instance.textureId!)
+                child: _nativeVideo?.textureId != null
+                    ? Texture(textureId: _nativeVideo!.textureId!)
                     : RawImage(image: img, fit: BoxFit.fill),
               ),
             ),
@@ -801,7 +835,7 @@ class _SessionPageState extends State<SessionPage> {
   void _sendPointer(Offset local, double scale, ui.Image img) {
     final x = (local.dx / scale).clamp(0.0, img.width.toDouble()).round();
     final y = (local.dy / scale).clamp(0.0, img.height.toDouble()).round();
-    SessionVideo.instance.send(0, x, y);
+    _video.send(0, x, y);
   }
 
   Widget _remotePlaceholder(BuildContext context, [String error = '']) {
@@ -905,7 +939,9 @@ class _SessionPageState extends State<SessionPage> {
                 ),
               ),
               Text(
-                '已连接 ' + _elapsed,
+                _status.state == SessionState.active
+                    ? '已连接 ' + _elapsed
+                    : '加密通道建立中',
                 style: const TextStyle(fontSize: 11, color: Colors.white54),
               ),
             ],
@@ -1313,6 +1349,7 @@ class _QualityBadge extends StatelessWidget {
 class _QualityDrawer extends StatefulWidget {
   const _QualityDrawer({
     required this.client,
+    required this.video,
     required this.sessionId,
     required this.targetLabel,
     required this.stateLabel,
@@ -1322,6 +1359,7 @@ class _QualityDrawer extends StatefulWidget {
   });
 
   final GatewayClient client;
+  final SessionVideo? video;
   final String sessionId;
   final String targetLabel;
   final String stateLabel;
@@ -1334,6 +1372,7 @@ class _QualityDrawer extends StatefulWidget {
 }
 
 class _QualityDrawerState extends State<_QualityDrawer> {
+  late final SessionVideo _unavailableVideo = SessionVideo();
   final List<Duration> _rtts = <Duration>[];
   int _total = 0;
   int _lost = 0;
@@ -1441,7 +1480,7 @@ class _QualityDrawerState extends State<_QualityDrawer> {
     final scheme = Theme.of(context).colorScheme;
     final text = Theme.of(context).textTheme;
     final median = _median;
-    final video = SessionVideo.instance;
+    final video = widget.video ?? _unavailableVideo;
     final mediaFps = video.presentFps > 0 ? video.presentFps : video.nativeFps;
     final dataLoss = video.attached ? video.lossPct : null;
 

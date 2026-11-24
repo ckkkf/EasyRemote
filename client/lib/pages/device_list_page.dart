@@ -62,7 +62,7 @@ class _DeviceListPageState extends State<DeviceListPage> {
   /// 断开结果策略（唯一判据来源）：失败不清、成功记已关闭、轮询不复活。
   final HostClosePolicy _closePolicy = HostClosePolicy();
   String? _directBusyCode;
-  bool _consentDialogOpen = false;
+  DialogRoute<void>? _consentRoute;
 
   @override
   void initState() {
@@ -91,7 +91,8 @@ class _DeviceListPageState extends State<DeviceListPage> {
       if (st.running != _hostStatus.running ||
           st.sessionId != _hostStatus.sessionId ||
           st.frames != _hostStatus.frames ||
-          st.injected != _hostStatus.injected) {
+          st.injected != _hostStatus.injected ||
+          st.error != _hostStatus.error) {
         setState(() => _hostStatus = st);
       }
     });
@@ -99,6 +100,7 @@ class _DeviceListPageState extends State<DeviceListPage> {
     // C18 本地授权弹窗没实现前，被控能力在台账里是 disabled（见 capabilities.yaml）。
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      _onConsentChanged();
       if (HostService.instance.active) {
         setState(() {
           _hostOn = true;
@@ -154,18 +156,26 @@ class _DeviceListPageState extends State<DeviceListPage> {
   void _onConsentChanged() {
     if (!mounted) return;
     final controller = ConsentController.instance;
-    if (controller.pending != null && !_consentDialogOpen) {
-      _consentDialogOpen = true;
-      showDialog<void>(
-        context: context,
-        barrierDismissible: false,
-        builder: (_) => ConsentDialog(controller: controller),
-      ).whenComplete(() => _consentDialogOpen = false);
-    } else if (controller.pending == null && _consentDialogOpen) {
-      // 决策后 controller 会清空 pending；关闭对应弹窗（只关我们打开的那一个）。
-      _consentDialogOpen = false;
-      Navigator.of(context).maybePop();
+    if (controller.pending == null) {
+      final route = _consentRoute;
+      _consentRoute = null;
+      // Remove only the authorization dialog, never another route above it.
+      if (route != null && route.isActive) route.navigator?.removeRoute(route);
+      return;
     }
+    if (_consentRoute != null) return;
+    final route = DialogRoute<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) =>
+          PopScope(canPop: false, child: ConsentDialog(controller: controller)),
+    );
+    _consentRoute = route;
+    unawaited(
+      Navigator.of(context, rootNavigator: true).push(route).whenComplete(() {
+        if (identical(_consentRoute, route)) _consentRoute = null;
+      }),
+    );
   }
 
   /// 「允许被控」开关：prepare（复用本机设备身份）→ 生成/同步密码 → 开流。
@@ -208,7 +218,7 @@ class _DeviceListPageState extends State<DeviceListPage> {
         if (relay.isEmpty) {
           throw StateError("服务端未下发 relay 端点：请检查 /v1/config 与 ER_RELAY_ADDR");
         }
-        final code = HostService.instance.prepare(
+        HostService.instance.prepare(
           gateway: widget.client.gatewayURL,
           relay: relay,
           token: widget.client.token ?? "",
@@ -226,7 +236,6 @@ class _DeviceListPageState extends State<DeviceListPage> {
           _hostPassword = pw;
           _hostStatus = HostStatus.idle;
         });
-        debugPrint("[host] 允许被控已开启 device_code=$code password=$pw");
       } else {
         HostService.instance.stop();
         setState(() {
@@ -289,8 +298,8 @@ class _DeviceListPageState extends State<DeviceListPage> {
       }
     } on ApiException catch (e) {
       if (!mounted) return;
-      final hint = e.code.contains('CAPTCHA')
-          ? '该设备不属于当前账号，请关闭免密直连或输入对方临时密码'
+      final hint = (e.name ?? e.code) == 'CONN_CAPTCHA_EXPIRED'
+          ? '服务端要求验证，请在「连接设备」页输入对方的临时密码'
           : e.message;
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text('连接失败：' + hint)));
@@ -420,7 +429,9 @@ class _DeviceListPageState extends State<DeviceListPage> {
         ? "未开启：打开开关后，这台设备才能被远程控制"
         : st.hasSession
         ? "正在被控 · $tail · 已传 ${st.frames} 帧 / 注入 ${st.injected} 次"
-        : "已就绪，等待对方连接";
+        : st.error.isNotEmpty && !st.running
+        ? "信令已停止，当前无法接收连接"
+        : "等待对方连接";
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -452,6 +463,11 @@ class _DeviceListPageState extends State<DeviceListPage> {
             statusText,
             style: text.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
           ),
+          if (st.error.isNotEmpty)
+            Text(
+              st.error,
+              style: text.bodySmall?.copyWith(color: scheme.error),
+            ),
           if (_hostCloseError.isNotEmpty) ...[
             const SizedBox(height: 6),
             Text(
