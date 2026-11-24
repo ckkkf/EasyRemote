@@ -1,11 +1,7 @@
 {
   "name": "easyremote-admin",
   "private": true,
-<<<<<<< HEAD
   "version": "0.2.16",
-=======
-  "version": "0.2.15",
->>>>>>> ef3c884 (fix(ER-905): 会话生命周期闭环 + attach 错误结构化与 UI 脱敏)
   "type": "module",
   "scripts": {
     "dev": "vite",
