@@ -768,19 +768,11 @@ checksum = "00d174d5400e5e8fd687ad1049e2f578285fa914201b1af7e8b112a4546bd826"
 
 [[package]]
 name = "er-abr"
-<<<<<<< HEAD
 version = "0.2.14"
 
 [[package]]
 name = "er-capture"
 version = "0.2.14"
-=======
-version = "0.2.13"
-
-[[package]]
-name = "er-capture"
-version = "0.2.13"
->>>>>>> ef3c884 (fix(ER-905): 会话生命周期闭环 + attach 错误结构化与 UI 脱敏)
 dependencies = [
  "windows",
  "xcap",
@@ -788,22 +780,14 @@ dependencies = [
 
 [[package]]
 name = "er-channels"
-<<<<<<< HEAD
 version = "0.2.14"
-=======
-version = "0.2.13"
->>>>>>> ef3c884 (fix(ER-905): 会话生命周期闭环 + attach 错误结构化与 UI 脱敏)
 dependencies = [
  "sha2",
 ]
 
 [[package]]
 name = "er-client"
-<<<<<<< HEAD
 version = "0.2.14"
-=======
-version = "0.2.13"
->>>>>>> ef3c884 (fix(ER-905): 会话生命周期闭环 + attach 错误结构化与 UI 脱敏)
 dependencies = [
  "ed25519-dalek",
  "er-abr",
@@ -824,11 +808,7 @@ dependencies = [
 
 [[package]]
 name = "er-codec"
-<<<<<<< HEAD
 version = "0.2.14"
-=======
-version = "0.2.13"
->>>>>>> ef3c884 (fix(ER-905): 会话生命周期闭环 + attach 错误结构化与 UI 脱敏)
 dependencies = [
  "er-capture",
  "er-common",
@@ -837,11 +817,7 @@ dependencies = [
 
 [[package]]
 name = "er-common"
-<<<<<<< HEAD
 version = "0.2.14"
-=======
-version = "0.2.13"
->>>>>>> ef3c884 (fix(ER-905): 会话生命周期闭环 + attach 错误结构化与 UI 脱敏)
 dependencies = [
  "serde",
  "serde_json",
@@ -849,19 +825,11 @@ dependencies = [
 
 [[package]]
 name = "er-features"
-<<<<<<< HEAD
 version = "0.2.14"
 
 [[package]]
 name = "er-ffi"
 version = "0.2.14"
-=======
-version = "0.2.13"
-
-[[package]]
-name = "er-ffi"
-version = "0.2.13"
->>>>>>> ef3c884 (fix(ER-905): 会话生命周期闭环 + attach 错误结构化与 UI 脱敏)
 dependencies = [
  "er-abr",
  "er-capture",
@@ -874,19 +842,11 @@ dependencies = [
 
 [[package]]
 name = "er-input"
-<<<<<<< HEAD
 version = "0.2.14"
 
 [[package]]
 name = "er-session"
 version = "0.2.14"
-=======
-version = "0.2.13"
-
-[[package]]
-name = "er-session"
-version = "0.2.13"
->>>>>>> ef3c884 (fix(ER-905): 会话生命周期闭环 + attach 错误结构化与 UI 脱敏)
 dependencies = [
  "base64",
  "chacha20poly1305",
@@ -904,11 +864,7 @@ dependencies = [
 
 [[package]]
 name = "er-transport"
-<<<<<<< HEAD
 version = "0.2.14"
-=======
-version = "0.2.13"
->>>>>>> ef3c884 (fix(ER-905): 会话生命周期闭环 + attach 错误结构化与 UI 脱敏)
 dependencies = [
  "bytes",
  "er-common",
@@ -921,11 +877,7 @@ dependencies = [
 
 [[package]]
 name = "er-winapp"
-<<<<<<< HEAD
 version = "0.2.14"
-=======
-version = "0.2.13"
->>>>>>> ef3c884 (fix(ER-905): 会话生命周期闭环 + attach 错误结构化与 UI 脱敏)
 dependencies = [
  "eframe",
  "egui",
