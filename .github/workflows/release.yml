@@ -250,7 +250,7 @@ jobs:
           VERSION: ${{ needs.verify.outputs.version }}
           GATEWAY: ${{ vars.ER_GATEWAY }}
         run: node scripts/gen-release-notes.mjs
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v3
         with:
           body_path: release/RELEASE_NOTES.md
           files: release/*
